@@ -26,28 +26,13 @@ object Parser extends RegexParsers {
    val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
 //   /** Parses basic primitives */
-//   def inferPrim(s:String): Connector = s match {
+//   def inferPrim(s:String): Progr = s match {
 //     case "fifo"     => fifo
 //     case "fifofull" => fifofull
 //     case "drain"    => drain
 //     case "id"       => id
 //     case "ids"      => lam(n,id^n)
 //     case "dupl"     => dupl
-//     case "lossy"    => lossy
-//     case "merger"   => merger
-//     case "swap"     => swap
-//     case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)))
-//     case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)))
-//     case "node"     => SubConnector(s,Repository.node, Nil)
-//     case "dupls"    => SubConnector(s,Repository.dupls, Nil)
-//     case "mergers"  => SubConnector(s,Repository.mergers, Nil)
-//     case "zip"      => SubConnector(s,Repository.zip, Nil)
-//     case "unzip"    => SubConnector(s,Repository.unzip, Nil)
-//     case "exrouter" => SubConnector(s,Repository.exrouter, Nil)
-//     case "exrouters"=> SubConnector(s,Repository.nexrouter, Nil)
-//     case "fifoloop" => SubConnector(s,Repository.fifoloop, Nil)
-//     case "sequencer"=> SubConnector(s,Repository.sequencer, Nil)
-//     case _          => str2conn(s)
 //   }
 
 
@@ -85,8 +70,6 @@ object Parser extends RegexParsers {
        }
 
 
-
-
    ////////////////
    // expression //
    ////////////////
@@ -105,12 +88,12 @@ object Parser extends RegexParsers {
 
    // boolean expressions
    def conjP: Parser[Expr] =
-     disjP ~ opt("&"~conjP) ^^ {
+     disjP ~ opt("/\\"~conjP) ^^ {
        case e1~Some(_~e2) => e1 && e2
        case e1~None       => e1
      }
    def disjP: Parser[Expr] =
-     equivP ~ opt("|"~disjP) ^^ {
+     equivP ~ opt("\\/"~disjP) ^^ {
        case e1~Some(_~e2) => e1 || e2
        case e1~None       => e1
      }
@@ -130,11 +113,11 @@ object Parser extends RegexParsers {
        case e ~ None => e
      }
    def bcontP: Parser[Expr=>Expr] =
-     "<=" ~ rlit ^^ { case _~e2 => (e1:Expr) => e1 <= e2 } |
-     ">=" ~ rlit ^^ { case _~e2 => (e1:Expr) => e1 >= e2 } |
-     "<"  ~ rlit ^^ { case _~e2 => (e1:Expr) => e1 < e2 }  |
-     ">"  ~ rlit ^^ { case _~e2 => (e1:Expr) => e1 > e2 }  |
-     "==" ~ rlit ^^ { case _~e2 => (e1:Expr) => e1 === e2 }
+     "<=" ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 <= e2 } |
+     ">=" ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 >= e2 } |
+     "<"  ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 < e2 }  |
+     ">"  ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 > e2 }  |
+     "==" ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 === e2 }
 
 //   def litP: Parser[Expr] =
 // //    booleanVal |

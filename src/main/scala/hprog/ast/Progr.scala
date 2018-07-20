@@ -2,6 +2,8 @@ package hprog.ast
 
 import hprog.frontend.Show
 
+import scala.runtime.ScalaRunTime
+
 sealed abstract class Progr {
   def ~(other:Progr) = (this,other) match {
     case (Seq(p1),Seq(p2)) => Seq(p1:::p2)
@@ -10,7 +12,8 @@ sealed abstract class Progr {
     case (p1,p2) => Seq(List(p1,p2))
   }
 
-  override def toString: String =  Show(this)
+  override def toString: String = Show(this)
+//  def show = Show(this)
 }
 
 //sealed trait Atom extends Progr

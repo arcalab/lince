@@ -18,64 +18,10 @@ object Show {
     case _ => l.mkString(", ")
   }
 
-  //   def show(con: Connector, isShort:Boolean): String = con match {
-//     case Seq(c1, c2)    => s"${showP(c1,isShort)} ; ${showP(c2,isShort)}"
-//     case Par(c1, c2)    => s"${showP(c1,isShort)} ⊗ ${showP(c2,isShort)}"
-//     case Id(Port(IVal(1))) => "id"
-//     case Id(Port(IVal(0))) => "nil"
-//     case Id(x)          => s"Id(${apply(x)})"
-//     case Symmetry(i, j) => s"sym(${apply(i)},${apply(j)})"
-//     case Trace(i, c)    => s"Tr(${apply(i)})(${show(c,isShort)})"
-//     case Prim(name,_,_,_) => name
-//     case Exp(a, c)  => s"${showP(c,isShort)}^${showP(a)}"
-//     case ExpX(x, a, c)  => s"${showP(c,isShort)}^{${apply(x:IExpr)}<--${apply(a)}}"
-//     case Choice(b, c1, c2) => s"${showP(b)} ? ${showP(c1,isShort)} ⊕ ${showP(c2,isShort)}"
-//                              //s"if ${showP(b)} then ${showP(c1)} else ${showP(c2)}"
-
-//     case Abs(x,et, c)  => s"\\${apply(x)}:${apply(et)}${showAP(c,isShort)}"
-//     case App(c, a)     => s"${showP(c,isShort)}(${apply(a)})"
-//     case Restr(c,b)     => s"${showP(c,isShort)} | ${showP(b)}"
-//     case SubConnector(name, c, _) if  isShort => if (name=="") showP(c,isShort) else name
-//     case SubConnector(name, c, _) if !isShort => (if (name=="") "" else name) + s"{${show(c,isShort)}}"
-//   }
-
-//   private def showP(con:Connector,isShort:Boolean): String = con match {
-//     case Seq(_,_) | Par(_,_) | Choice(_,_,_) | Abs(_,_,_) |
-//          Exp(_,_) | ExpX(_,_,_) | Restr(_,_) => s"(${show(con,isShort)})"
-
-//     case _ => show(con,isShort)
-//   }
-//   private def showAP(con:Connector,isShort:Boolean): String = con match {
-//     case Abs(x,et,c) => s" ${apply(x)}:${apply(et)}${showAP(c,isShort)}"
-//     case _ => s".${showP(con,isShort)}"
-//   }
-
-//   def apply(itf: Interface): String = itf match {
-//     case Tensor(i, j)  => s"${showP(i)} ⊗ ${showP(j)}"
-//     case Port(a)       => apply(a)
-//     case Repl(i, a)    => s"${showP(i)}^${showP(a)}"
-//     case Cond(b, i, j) => s"${showP(b)} ? ${showP(i)} ⊕ ${showP(j)}"
-//   }
-//   private def showP(itf:Interface):String = itf match {
-//     case Port(a) => showP(a)
-//     case _ => s"(${apply(itf)})"
-//   }
-
-// //  def apply(v:Var): String = v.x
-//   def apply(exprType: ExprType) = exprType match {
-//     case IntType => "I"
-//     case BoolType => "B"
-//   }
-
-//   def apply(exp: Expr): String = exp match {
-//     case Var(x) =>  x
-//     case e: IExpr => applyie(e)
-//     case e: BExpr => applybe(e)
-//   }
 
   def apply(exp: Expr): String = exp match {
     case Val(n) => n.toString
-    case Var(x,n) => x+(for (_<-1 to n) yield '!').mkString("")
+    case Var(x,n) => x+(for (_<-1 to n) yield '\'').mkString("")
     case Add(e1,e2) => s"${showP(e1)} + ${showP(e2)}"
     case Sub(e1,e2) => s"${showP(e1)} - ${showP(e2)}"
     case Mul(e1,e2) => s"${showP(e1)} * ${showP(e2)}"
