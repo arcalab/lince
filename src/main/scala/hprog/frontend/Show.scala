@@ -39,57 +39,33 @@ object Show {
     case Or(e1, e2)  => s"${showP(e1)} || ${showP(e2)}"
     case Not(e1)     => s"!${showP(e1)}"
 
-   }
+  }
 
-   private def showP(exp:Expr):String = exp match {
+  private def showP(exp:Expr):String = exp match {
     case BVal(_) | Val(_) | Var(_,_) | Not(_) => apply(exp)
     case _ => s"(${apply(exp)})"
 
-   }
-
-
-//   def applybe(exp: BExpr): String = exp match {
-//     case BVal(b)     => b.toString
-//     case Var(x)     => x
-//     case AndN(x,f,t,e) => s"∧{${apply(f)} ≤ ${x.x} < ${apply(t)}}${showP(e)}"
-//   }
-//   private def showP(exp:BExpr):String = exp match {
-//     case BVal(_) | Var(_) | Not(_) => apply(exp)
-//     case _ => s"(${apply(exp)})"
-//   }
-
-// //  def showVar(v:Var) = v match {
-// //    case Var(x) => x
-// //  }
-
-// //  def short(con:Connector): String = con match {
-// //    case Seq(c1, c2) =>
-// //    case Par(c1, c2) =>
-// //    case Id(i) =>
-// //    case Symmetry(i, j) =>
-// //    case Trace(i, c) =>
-// //    case Prim(name, i, j, extra) =>
-// //    case SubConnector(name, c1) =>
-// //    case Exp(a, c) =>
-// //    case ExpX(x, a, c) =>
-// //    case Choice(b, c1, c2) =>
-// //    case Abs(x, et, c) =>
-// //    case App(c, a) =>
-// //    case Restr(c, phi) =>
-// //  }
-
-//   def apply(typ:Type): String =
-//     (if (typ.isGeneral) "" else "© ") +
-//       (if (typ.args.vars.isEmpty) "" else "∀"+typ.args.toString+" . ") +
-//       apply(typ.i) + " -> "+ apply(typ.j) +
-//       (if (typ.const == BVal(b=true) || typ.const == And(List())) ""
-//       else " | " + apply(typ.const) )
-
-
+  }
 
 //   ////////////////
 //   //
-//   def source(con: Connector): String = con match {
+  def source(progr: Progr): String = progr match {
+    case Seq(ps) => "Seq("+ps.map(source).map(indent).mkString("","\n",")")
+    case Statement(st, dur) => s"Statement(\n  st:  ${st.map(source).mkString(", ")}"+
+      (dur match {
+        case Some(e) => s"\n  dur: ${apply(e)} )"
+        case None => ")"
+      })
+}
+  def source(assgn: Assgn): String = {
+    s"Var(${assgn.v.name}, ${assgn.v.der}) := Expr(${assgn.e})"
+  }
+  def indent(s:String):String = {
+    s.split("\n").map("  "+_).mkString("\n")
+  }
+
+
+//
 //     case Seq(c1, c2)    => s"${showSP(c1)} & ${showSP(c2)}"
 //     case Par(c1, c2)    => s"${showSP(c1)} * ${showSP(c2)}"
 //     case Id(Port(IVal(1))) => "id"
@@ -101,14 +77,14 @@ object Show {
 //     case Exp(a, c)  => s"${showSP(c)}^${showP(a)}"
 //     case ExpX(x, a, c)  => s"(${showSP(c)}^(${apply(x)}<--${showP(a)}))"
 //     case Choice(b, c1, c2) => s"${showP(b)} ? ${showSP(c1)} + ${showSP(c2)}"
-//     //s"if ${showP(b)} then ${showP(c1)} else ${showP(c2)}"
+     //s"if ${showP(b)} then ${showP(c1)} else ${showP(c2)}"
 
 //     case Abs(x,et,c)   => s"lam(${apply(x)},${apply(et)},${source(c)})"
 // //    case BAbs(x, c)     => s"lam(${apply(x)}${source(c)})"
 //     case App(c, a)     => s"${showSP(c)}(${apply(a)})"
 // //    case BApp(c, b)     => s"${showSP(c)}(${apply(b)})"
 //     case Restr(c,b)     => s"${showSP(c)} | ${showP(b)}"
-
+//
 //     case SubConnector(name, c, _) => if (name=="") showSP(c) else name + s"{${showSP(c)}}"
 //   }
 

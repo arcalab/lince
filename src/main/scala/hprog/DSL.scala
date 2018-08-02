@@ -3,7 +3,7 @@ package hprog
 import java.io.File
 
 import hprog.ast._
-import hprog.common.TypeCheckException
+import hprog.common.{ParserException, TypeCheckException}
 import hprog.lang.Parser
 
 import scala.language.implicitConversions
@@ -33,7 +33,7 @@ object DSL {
   val ex5 = ((x := 2) & (y:=3) & 34) ~ ((x.! :=2) & (x > 2)) // program
   val ex6 = (x.! := (x > (y*3))) & (x<5)
 
-  val pex7 = parse("""x':= x>y*3 /\ x-7<y & x<5""")
+//  val pex7 = parse("""x':= x>y*3 /\ x-7<y & x<5""")
 
   /**
     * Parses a string into a program.
@@ -42,7 +42,9 @@ object DSL {
     */
   def parse(s:String): Progr =  Parser.parse(s) match {
     case Parser.Success(result, next) => result
-    case f: Parser.NoSuccess => throw new TypeCheckException("Parser failed: "+f)
+    case f: Parser.NoSuccess => throw new ParserException(f.msg)
   }
+
+  val p: String => Parser.ParseResult[Progr] = Parser.parse
 
 }

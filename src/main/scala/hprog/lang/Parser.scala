@@ -41,33 +41,31 @@ object Parser extends RegexParsers {
 //   /// Program ///
 //   ///////////////
 
-     def progrP: Parser[Progr] =
-       statementP~opt(";"~progrP) ^^ {
-         case p1~Some(_~p2) => p1 ~ p2
+   lazy val progrP: Parser[Progr] =
+       statementP~opt(";"~>progrP) ^^ {
+         case p1~Some(p2) => p1 ~ p2
          case p1~None => p1
-       }
-     def statementP: Parser[Progr] =
-       assignsP~opt("&"~exprP)  ^^ {
-         case as~Some(_~e) => Statement(as,Some(e))
+     }
+   lazy val statementP: Parser[Progr] =
+       assignsP~opt("&"~>exprP)  ^^ {
+         case as~Some(e) => Statement(as,Some(e))
          case as~None      => Statement(as,None)
-       }
+     }
 
-     def assignsP: Parser[List[Assgn]] =
-       varP~":="~exprP~opt(","~assignsP) ^^ {
-         case v~_~e~Some(_~as) => Assgn(v,e)::as
+   lazy val assignsP: Parser[List[Assgn]] =
+       varP~":="~exprP~opt(","~>assignsP) ^^ {
+         case v~_~e~Some(as) => Assgn(v,e)::as
          case v~_~e~None       => List(Assgn(v,e))
-       }
+       } |
+       "("~>assignsP<~")"
 
-     def varP: Parser[Var] =
+  lazy val varP: Parser[Var] =
        identifier~opt(primesP) ^^ {
          case s~Some(n) => Var(s,n)
          case s~None => Var(s,0)
-       }
-     def primesP:Parser[Int] =
-       "'"~opt(primesP) ^^ {
-         case _~None => 1
-         case _~Some(n) => 1+n
-       }
+   }
+  lazy val primesP:Parser[Int] =
+       "'"~>opt(primesP) ^^ { _.getOrElse(0)+1 }
 
 
    ////////////////
@@ -76,7 +74,7 @@ object Parser extends RegexParsers {
 
 
    def exprP: Parser[Expr] = // redundancy to give priority to true/false over variable "true"/"false"
-     "(" ~ exprP ~ ")" ^^ {case _ ~ e ~ _ => e } |
+     "(" ~> exprP <~ ")" |
 //     identifierOrBool |
      conjP
 
@@ -88,24 +86,24 @@ object Parser extends RegexParsers {
 
    // boolean expressions
    def conjP: Parser[Expr] =
-     disjP ~ opt("/\\"~conjP) ^^ {
-       case e1~Some(_~e2) => e1 && e2
-       case e1~None       => e1
+     disjP ~ opt("/\\"~>conjP) ^^ {
+       case e1~Some(e2) => e1 && e2
+       case e1~None     => e1
      }
    def disjP: Parser[Expr] =
-     equivP ~ opt("\\/"~disjP) ^^ {
-       case e1~Some(_~e2) => e1 || e2
-       case e1~None       => e1
+     equivP ~ opt("\\/"~>disjP) ^^ {
+       case e1~Some(e2) => e1 || e2
+       case e1~None     => e1
      }
    def equivP: Parser[Expr] =
-     negP ~ opt("<->"~equivP) ^^ {
-       case e1~Some(_~e2) => e1 || e2
-       case e1~None       => e1
+     negP ~ opt("<->"~>equivP) ^^ {
+       case e1~Some(e2) => e1 || e2
+       case e1~None     => e1
      } //|
 //     "("~equivP~")" ^^ { case _~e~_ => e }
    def negP: Parser[Expr] =
-     "!"~"("~conjP~")"    ^^ {case _~_~e~_ => Not(e)} |
-     "!"~identifierOrBool ^^ {case _~e => Not(e)} |
+     "!"~"("~>conjP<~")"   ^^ Not |
+     "!"~>identifierOrBool ^^ Not |
      compP
    def compP: Parser[Expr] =
      rexpr ~ opt(bcontP) ^^ {
@@ -113,11 +111,11 @@ object Parser extends RegexParsers {
        case e ~ None => e
      }
    def bcontP: Parser[Expr=>Expr] =
-     "<=" ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 <= e2 } |
-     ">=" ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 >= e2 } |
-     "<"  ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 < e2 }  |
-     ">"  ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 > e2 }  |
-     "==" ~ rexpr ^^ { case _~e2 => (e1:Expr) => e1 === e2 }
+     "<=" ~> rexpr ^^ (e2 => (e1: Expr) => e1 <= e2) |
+     ">=" ~> rexpr ^^ (e2 => (e1: Expr) => e1 >= e2) |
+     "<"  ~> rexpr ^^ (e2 => (e1: Expr) => e1 < e2)  |
+     ">"  ~> rexpr ^^ (e2 => (e1: Expr) => e1 > e2)  |
+     "==" ~> rexpr ^^ (e2 => (e1: Expr) => e1 === e2)
 
 //   def litP: Parser[Expr] =
 // //    booleanVal |
@@ -143,7 +141,7 @@ object Parser extends RegexParsers {
      }) |
  //  identifier~":"~"I" ^^ {case s~_~_=>Var(s) } |
  //    identifier ^^ Var                           |
-     "(" ~ rexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
+     "(" ~> rexpr <~ ")"
 //   def intP: Parser[Int] =
 //     """[0-9]+""".r ^^ { s:String => s.toInt }
   def realP: Parser[Double] =
