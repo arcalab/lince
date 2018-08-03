@@ -11,145 +11,122 @@ import scala.util.parsing.combinator._
   */
 object Parser extends RegexParsers {
 
-   /**
-     * Main function that parses a string.
-     * @param c string representing a program
-     * @return Parse result (parsed(connector) or failure(error))
-     */
-   def parse(c:String): ParseResult[Progr] = parseAll(progrP,c)
-   def pexp(c:String): ParseResult[Expr] = parseAll(exprP,c)
+  /**
+    * Main function that parses a string.
+    *
+    * @param c string representing a program
+    * @return Parse result (parsed(connector) or failure(error))
+    */
+  def parse(c: String): ParseResult[Prog] = parseAll(progP, c)
 
-   override def skipWhitespace = true
-   override val whiteSpace: Regex = "[ \t\r\f\n]+".r
-   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
-   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
-   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
+  //  def pexp(c:String): ParseResult[Cond] = parseAll(condP,c)
 
-//   /** Parses basic primitives */
-//   def inferPrim(s:String): Progr = s match {
-//     case "fifo"     => fifo
-//     case "fifofull" => fifofull
-//     case "drain"    => drain
-//     case "id"       => id
-//     case "ids"      => lam(n,id^n)
-//     case "dupl"     => dupl
-//   }
+  override def skipWhitespace = true
+
+  override val whiteSpace: Regex = "[ \t\r\f\n]+".r
+  val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
+  val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
+  val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
+
+  //   ///////////////
+  //   /// Program ///
+  //   ///////////////
+
+  lazy val progP: Parser[Prog] =
+    basicProg ~ opt(";" ~> progP) ^^ {
+      case p1 ~ Some(p2) => p1 ~ p2
+      case p ~ None => p
+    }
+
+  lazy val basicProg: Parser[Prog] =
+    "skip" ^^ (_ => Skip) |
+      "while" ~> condP ~ "{" ~ progP ~ "}" ^^ {
+        case c ~ _ ~ p ~ _ => While(c, p)
+      } |
+      "if" ~> condP ~ "then" ~ progP ~ "else" ~ progP ^^ {
+        case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
+      } |
+      atomP
+
+  lazy val atomP: Parser[At] =
+    identifier ~ ":=" ~ linP ^^ {
+      case v ~ _ ~ l => Assign(Var(v), l)
+    } |
+      diffEqsP ~ opt("&" ~> durP) ^^ {
+        case des ~ d => des & d.getOrElse(Forever)
+      }
+
+  lazy val diffEqsP: Parser[DiffEqs] =
+    identifier ~ "=" ~ linP ~ opt("," ~> diffEqsP) ^^ {
+      case v ~ _ ~ l ~ Some(eqs) => DiffEqs(List(Var(v) ^= l), Forever) & eqs
+      case v ~ _ ~ l ~ None => DiffEqs(List(Var(v) ^= l), Forever)
+    }
+
+  lazy val durP: Parser[Dur] =
+    condP ^^ When |
+      realP ^^ Value.andThen(For)
+
+  lazy val linP: Parser[Lin] =
+    identifier ~ opt(linVarContP) ^^ {
+      case v ~ f => f.getOrElse((x: Var) => x)(Var(v))
+    } |
+      realP ~ opt(linValContP) ^^ {
+        case v ~ f => f.getOrElse((x: Value) => x)(Value(v))
+      } |
+      "(" ~> linP <~ ")"
+
+  lazy val linVarContP: Parser[Var => Lin] =
+    "+" ~> linP ^^ { l => v: Var => v + l } |
+      "*" ~> realP ^^ { r => v: Var => Value(r) * v }
+  lazy val linValContP: Parser[Value => Lin] =
+    "+" ~> linP ^^ { l => v: Value => v + l } |
+      "*" ~> linP ^^ { l => v: Value => v * l }
+
+  lazy val condP: Parser[Cond] =
+    disjP ~ opt("/\\" ~> condP) ^^ {
+      case e1 ~ Some(e2) => e1 && e2
+      case e1 ~ None => e1
+    }
+
+  lazy val disjP: Parser[Cond] =
+    equivP ~ opt("\\/" ~> disjP) ^^ {
+      case e1 ~ Some(e2) => e1 || e2
+      case e1 ~ None => e1
+    }
+
+  lazy val equivP: Parser[Cond] =
+    negP ~ opt("<->" ~> equivP) ^^ {
+      case e1 ~ Some(e2) => e1 || e2
+      case e1 ~ None => e1
+    } //|
+  //     "("~equivP~")" ^^ { case _~e~_ => e }
+  lazy val negP: Parser[Cond] =
+    "!" ~ "(" ~> condP <~ ")" ^^ Not |
+      //    "!"~>litP ^^ Not |
+      "(" ~> condP <~ ")" |
+      bopP
+
+  //  lazy val litP: Parser[Cond] =
+  //    identifierOrBool
+  //
+  lazy val bopP: Parser[Cond] =
+    identifier ~ opt(bcontP) ^? ( {
+      case "true" ~ None => BVal(true)
+      case "false" ~ None => BVal(false)
+      case e ~ Some(co) => co(Var(e))
+    }, {
+      case e ~ None => s"Not a condition: $e"
+    })
+
+  lazy val bcontP: Parser[Var => Cond] =
+    "<=" ~> linP ^^ (e2 => (e1: Var) => e1 <= e2) |
+    ">=" ~> linP ^^ (e2 => (e1: Var) => e1 >= e2) |
+    "<" ~> linP ^^ (e2 => (e1: Var) => e1 < e2) |
+    ">" ~> linP ^^ (e2 => (e1: Var) => e1 > e2) |
+    "==" ~> linP ^^ (e2 => (e1: Var) => e1 === e2)
 
 
-
-//   ///////////////
-//   /// Program ///
-//   ///////////////
-
-   lazy val progrP: Parser[Progr] =
-       statementP~opt(";"~>progrP) ^^ {
-         case p1~Some(p2) => p1 ~ p2
-         case p1~None => p1
-     }
-   lazy val statementP: Parser[Progr] =
-       assignsP~opt("&"~>exprP)  ^^ {
-         case as~Some(e) => Statement(as,Some(e))
-         case as~None      => Statement(as,None)
-     }
-
-   lazy val assignsP: Parser[List[Assgn]] =
-       varP~":="~exprP~opt(","~>assignsP) ^^ {
-         case v~_~e~Some(as) => Assgn(v,e)::as
-         case v~_~e~None       => List(Assgn(v,e))
-       } |
-       "("~>assignsP<~")"
-
-  lazy val varP: Parser[Var] =
-       identifier~opt(primesP) ^^ {
-         case s~Some(n) => Var(s,n)
-         case s~None => Var(s,0)
-   }
-  lazy val primesP:Parser[Int] =
-       "'"~>opt(primesP) ^^ { _.getOrElse(0)+1 }
-
-
-   ////////////////
-   // expression //
-   ////////////////
-
-
-   def exprP: Parser[Expr] = // redundancy to give priority to true/false over variable "true"/"false"
-     "(" ~> exprP <~ ")" |
-//     identifierOrBool |
-     conjP
-
-   def identifierOrBool: Parser[Expr] =
-     identifier ^^ {
-       case "true" => BVal(true)
-       case "false" => BVal(false)
-       case x => Var(x,0)}
-
-   // boolean expressions
-   def conjP: Parser[Expr] =
-     disjP ~ opt("/\\"~>conjP) ^^ {
-       case e1~Some(e2) => e1 && e2
-       case e1~None     => e1
-     }
-   def disjP: Parser[Expr] =
-     equivP ~ opt("\\/"~>disjP) ^^ {
-       case e1~Some(e2) => e1 || e2
-       case e1~None     => e1
-     }
-   def equivP: Parser[Expr] =
-     negP ~ opt("<->"~>equivP) ^^ {
-       case e1~Some(e2) => e1 || e2
-       case e1~None     => e1
-     } //|
-//     "("~equivP~")" ^^ { case _~e~_ => e }
-   def negP: Parser[Expr] =
-     "!"~"("~>conjP<~")"   ^^ Not |
-     "!"~>identifierOrBool ^^ Not |
-     compP
-   def compP: Parser[Expr] =
-     rexpr ~ opt(bcontP) ^^ {
-       case e ~ Some(co) => co(e)
-       case e ~ None => e
-     }
-   def bcontP: Parser[Expr=>Expr] =
-     "<=" ~> rexpr ^^ (e2 => (e1: Expr) => e1 <= e2) |
-     ">=" ~> rexpr ^^ (e2 => (e1: Expr) => e1 >= e2) |
-     "<"  ~> rexpr ^^ (e2 => (e1: Expr) => e1 < e2)  |
-     ">"  ~> rexpr ^^ (e2 => (e1: Expr) => e1 > e2)  |
-     "==" ~> rexpr ^^ (e2 => (e1: Expr) => e1 === e2)
-
-//   def litP: Parser[Expr] =
-// //    booleanVal |
-//     "!" ~ conjP        ^^ {case _ ~ e => Not(e)}         |
-//     identifier~":"~"B" ^^ {case s~_~_ => Var(s,0) } |
-//     identifierOrBool ^? ({
-//         case be: Expr => be
-//       },
-//       ie => s"Integer not expected: $ie")       |
-//     "(" ~ conjP ~ ")" ^^ {case _ ~ e ~ _ => e }
-//
-
-   // arithmetic expressions
-   def rexpr: Parser[Expr] =
-     rlit ~ rbop ~ rexpr ^^ {case l ~ op ~ r => op(l,r)} |
-     rlit
-   def rlit: Parser[Expr] =
-     realP ^^ Val                            |
-     identifierOrBool ~ opt(":"~"R") ^? ({
-       case (ie:Expr)~_ => ie
-     },{
-       case be~_ => s"Boolean not expected: $be"
-     }) |
- //  identifier~":"~"I" ^^ {case s~_~_=>Var(s) } |
- //    identifier ^^ Var                           |
-     "(" ~> rexpr <~ ")"
-//   def intP: Parser[Int] =
-//     """[0-9]+""".r ^^ { s:String => s.toInt }
-  def realP: Parser[Double] =
-    """[0-9]+(\.([0-9]+))?""".r ^^ { s:String => s.toDouble }
-   def rbop: Parser[(Expr,Expr)=>Expr] =
-       "+"  ^^ {_ => Add } |
-       "-"  ^^ {_ => Sub } |
-       "*"  ^^ {_ => Mul } |
-       "/"  ^^ {_ => Div }
-
+  lazy val realP: Parser[Double] =
+    """[0-9]+(\.([0-9]+))?""".r ^^ { s: String => s.toDouble }
 }
+

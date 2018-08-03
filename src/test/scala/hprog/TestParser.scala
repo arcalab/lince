@@ -12,16 +12,16 @@ import hprog.lang.Parser
   */
 class TestParser extends FlatSpec {
 
-  testOk("x:=2.0",ex1)
-  testOk("y:=3.0 & 34.0",ex2)
-  testOk("x:=2.0, y:=3.0",ex3)
-  testOk("x:=2.0 ; y:=3.0",ex4)
-  testOk("(x:=2.0, y:=3.0) & 34.0 ; x':=2.0 & x > 2.0",ex5)
-  testOk("x:=2.0, y:=3.0 & 34.0 ; x':=2.0 & x > 2.0",ex5)
-  testOk("x':=x > (y * 3.0) & x < 5.0",ex6)
+  testOk("x:=2",ex1)
+  testOk("y=3 & 34",ex2)
+  testOk("x=2, y=3",ex3)
+  testOk("x=2 ; y=3",ex4)
+  testOk("x:=0; x=2, y=3 & 34 ; x=2 & x > 2",ex5)
+//  testOk("x=2, y=3 & 34 ; x=2 & x > 2",ex5)
+  testOk("x=1 & x > (3 * x) /\\ x < 5",ex6)
 
 
-  private def testOk(in:String,res:Progr) =
+  private def testOk(in:String,res:Prog) =
     s"""Parsing "$in"""" should s"""produce the program "${Show(res)}"""" in {
       Parser.parse(in) match {
         case Parser.Success(result, _) =>
