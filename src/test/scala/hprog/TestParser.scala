@@ -19,7 +19,7 @@ class TestParser extends FlatSpec {
   testOk("x:=0; x=2, y=3 & 34 ; x=2 & x > 2",ex5)
 //  testOk("x=2, y=3 & 34 ; x=2 & x > 2",ex5)
   testOk("x=1 & x > (3 * x) /\\ x < 5",ex6)
-  testOk("p = v, v = g & p <= 0 /\\ v <= 0;\nv := 0.5 * v",ex7)
+  testOk("p = v, v = g & p <= 0 /\\ v <= 0;\nv := -0.5 * v",ex7)
 
 
   private def testOk(in:String,res:Prog) =
