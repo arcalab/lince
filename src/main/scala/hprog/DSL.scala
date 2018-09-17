@@ -31,10 +31,10 @@ object DSL {
   val ex4 = (x^=2) ~ (y^=3) // program
   val ex5 = (x:=0) ~ ((x^=2) & (y^=3) & 34) ~ ((x^=2) & (x > 2)) // program
   val ex6 = (x^=1) & ((x > 3*x) && (x<5))
-  val ex7 = ((p^=v) & (v^=g) & ((p<=0) && (v<=0))) ~ (v := (-0.5)*v)
+  val ex7 = ((p^=v) & (v^=g) & ((p<=0) && (v<=0))) ~ (v := (-0.5)*v) // bouncing ball
   val ex8 = (x^=1) & (((x > 3*x) && (x<5)) || (y>=3))
   val ex9 = (x^=1) & ((x > 3*x) && ((x<5) || (y>=3)))
-  
+
   /**
     * Parses a string into a program.
     * @param s string representing a program
@@ -45,6 +45,6 @@ object DSL {
     case f: Parser.NoSuccess => throw new ParserException(f.msg)
   }
 
-  val prs: String => Parser.ParseResult[Prog] = Parser.parse
+  val parseWithError: String => Parser.ParseResult[Prog] = Parser.parse
 
 }

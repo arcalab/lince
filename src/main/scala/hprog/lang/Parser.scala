@@ -127,6 +127,6 @@ object Parser extends RegexParsers {
 
 
   lazy val realP: Parser[Double] =
-    """[0-9]+(\.([0-9]+))?""".r ^^ { s: String => s.toDouble }
+    """-?[0-9]+(\.([0-9]+))?""".r ^^ { s: String => s.toDouble }
 }
 

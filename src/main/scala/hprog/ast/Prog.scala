@@ -86,6 +86,23 @@ case class GE(v:Var,l:Lin)      extends Cond
 case class LE(v:Var,l:Lin)      extends Cond
 
 
+/*
+Ideas for later - obtaining a trajectory:
+ - for each basic program (not a sequence)
+ - if a new variable is found, assume it was initially 0
+ - assignments update the variable
+ - keep map of known variables (unknown are 0)
+ - mark undefined variables (assumed to be 0)
+ - calculate duration of next action
+    + could be 0 for assignments
+    + could be +inf for "forever"
+    + could be a time value
+    + could be a condition -- need to solve system?
+ - compute function until next action...
+ - iterate
+ */
+
+
 //sealed abstract class Progr {
 //  def ~(other:Progr) = (this,other) match {
 //    case (Seq(p1),Seq(p2)) => Seq(p1:::p2)
