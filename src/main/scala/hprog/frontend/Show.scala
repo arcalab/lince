@@ -24,7 +24,7 @@ object Show {
 
   def apply(dur: Dur): String = dur match {
     case For(t)  => s" & ${apply(t)}"
-    case When(c) => s" & ${apply(c)}"
+    case Until(c) => s" & ${apply(c)}"
     case Forever => ""
   }
 

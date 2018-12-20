@@ -63,24 +63,69 @@ object Parser extends RegexParsers {
     }
 
   lazy val durP: Parser[Dur] =
-    condP ^^ When |
+    condP ^^ Until |
       realP ^^ Value.andThen(For)
+//////////
 
   lazy val linP: Parser[Lin] =
-    identifier ~ opt(linVarContP) ^^ {
-      case v ~ f => f.getOrElse((x: Var) => x)(Var(v))
-    } |
-      realP ~ opt(linValContP) ^^ {
-        case v ~ f => f.getOrElse((x: Value) => x)(Value(v))
-      } |
-      "(" ~> linP <~ ")"
+    linParcelP ~opt(("+"~>linP)|("-"~>negLinP)) ^^ {
+      case l1~Some(l2) => l1+l2
+      case l1~_        => l1
+    }
+  lazy val negLinP: Parser[Lin] =
+    linParcelP ~opt(("+"~>linP)|("-"~>negLinP)) ^^ {
+      case l1~Some(l2) => invert(l1)+l2
+      case l1~_        => invert(l1)
+  }
 
-  lazy val linVarContP: Parser[Var => Lin] =
-    "+" ~> linP ^^ { l => v: Var => v + l } |
-      "*" ~> realP ^^ { r => v: Var => Value(r) * v }
-  lazy val linValContP: Parser[Value => Lin] =
-    "+" ~> linP ^^ { l => v: Value => v + l } |
-      "*" ~> linP ^^ { l => v: Value => v * l }
+  lazy val linParcelP: Parser[Lin] =
+    "-"~>linMultP ^^ invert |
+    linMultP
+
+
+//  lazy val linP: Parser[Lin] =
+//    opt("-") ~ linLitP ~ opt(linContP) ^^ {
+//      case sign ~ l1 ~ Some(l2) => mbInvert(sign, l1) + l2
+//      case sign ~ l1 ~ _        => mbInvert(sign, l1)
+//    }
+//  // r*var | r*(..) | var*r | (..)*r | r | var | (...)
+  lazy val linMultP: Parser[Lin] = //...r | r*linAt | var*r |
+    realP ~ opt("*"~>linAtP) ^^ {
+      case r ~ Some(l) => Mult(Value(r),l)
+      case r ~ _ => Value(r)
+    } |
+    linAtP ~ opt("*"~>realP) ^^ {
+      case l ~ Some(r) => Mult(Value(r),l)
+      case l ~ _ => l
+    }
+//  // + lin  | - lin
+//  lazy  val linContP: Parser[Lin] = // + | -
+//    "+" ~> linP |
+//    "-" ~> linP ^^ invert
+  // var | (lin)
+  lazy val linAtP: Parser[Lin] =
+    identifier ^^ Var |
+    "("~>linP<~")"
+
+/////////////////
+
+  //  lazy val linP: Parser[Lin] =
+//    opt("-") ~ identifier ~ opt(linVarContP) ^^ {
+//      case sign ~ vr ~ f => mbInvert(sign,f.getOrElse((x: Var) => x)(Var(vr)))
+//    } |
+//    opt("-") ~ realP ~ opt(linValContP) ^^ {
+//      case sign ~ vl ~ f => mbInvert(sign,f.getOrElse((x: Value) => x)(Value(vl)))
+//    } |
+//    "(" ~> linP <~ ")"
+//
+//  lazy val linVarContP: Parser[Var => Lin] =
+//    "-" ~> linP ^^ { l => v: Var => v + invert(l) } |
+//    "+" ~> linP ^^ { l => v: Var => v + l } |
+//    "*" ~> realP ^^ { r => v: Var => Value(r) * v }
+//  lazy val linValContP: Parser[Value => Lin] =
+//    "-" ~> linP ^^ { l => v: Value => v + invert(l) } |
+//    "+" ~> linP ^^ { l => v: Value => v + l } |
+//    "*" ~> linP ^^ { l => v: Value => v * l }
 
   lazy val condP: Parser[Cond] =
     disjP ~ opt("/\\" ~> condP) ^^ {
@@ -128,5 +173,15 @@ object Parser extends RegexParsers {
 
   lazy val realP: Parser[Double] =
     """-?[0-9]+(\.([0-9]+))?""".r ^^ { s: String => s.toDouble }
+
+  // AUX
+  private def invert(lin: Lin): Lin = lin match {
+    case Var(v) =>  Mult(Value(-1),Var(v))
+    case Value(v) => Value(-v)
+    case Add(l1, l2) => Add(invert(l1),invert(l2))
+    case Mult(Value(v), l) => Mult(Value(-v),l)
+  }
+  private def mbInvert(sign:Option[_],lin:Lin): Lin =
+    if (sign.isDefined) invert(lin) else lin
 }
 

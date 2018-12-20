@@ -18,7 +18,7 @@ object DSL {
   implicit def int2Lin(n:Int): Value = Value(n)
   implicit def real2Dur(n:Double): Dur = For(Value(n))
   implicit def int2Dur(n:Int): Dur = For(Value(n))
-  implicit def cond2Dur(c:Cond): Dur = When(c)
+  implicit def cond2Dur(c:Cond): Dur = Until(c)
   implicit def dEq2dEqs(de:DiffEq): DiffEqs= DiffEqs(List(de),Forever)
 
 

@@ -1,5 +1,7 @@
 package hprog.ast
 
+import hprog.frontend.Show
+
 /**
   * Created by jose on 17/07/18.
  */
@@ -10,3 +12,6 @@ case object IntType  extends ExprType { override def toString = "I"}
 case object BoolType extends ExprType { override def toString = "B"}
 
 
+object Type {
+
+}

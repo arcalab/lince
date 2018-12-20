@@ -36,6 +36,7 @@ case class            Seq(ps:List[Prog])                  extends Prog
 case object           Skip                                extends Prog
 case class            ITE(ifP:Cond,thenP:Prog,elseP:Prog) extends Prog
 case class            While(c:Cond,doP:Prog)              extends Prog
+
 // atoms
 case class Assign(v:Var,e:Lin) extends At
 case class DiffEqs(eqs:List[DiffEq],dur:Dur) extends At {
@@ -43,13 +44,16 @@ case class DiffEqs(eqs:List[DiffEq],dur:Dur) extends At {
   def &(diffEq: DiffEq)   = DiffEqs(eqs++List(diffEq),dur) // add eq
   def &(diffEqs: DiffEqs) = DiffEqs(eqs++diffEqs.eqs,diffEqs.dur) // add eqs and override dur
 }
+
 // DiffEq
 case class DiffEq(v:Var,e:Lin)
+
 // duration
 sealed abstract class Dur
-case class  For(t:Value) extends Dur
-case class  When(c:Cond) extends Dur
-case object Forever      extends Dur
+case class  For(t:Value)  extends Dur
+case class  Until(c:Cond) extends Dur
+case object Forever       extends Dur
+
 // linear expression
 sealed abstract class Lin {
   def +(other:Lin) = Add(this,other)
@@ -68,6 +72,7 @@ case class Value(v:Double)     extends Lin {
 }
 case class Add(l1:Lin,l2:Lin)  extends Lin
 case class Mult(v:Value,l:Lin) extends Lin
+
 // Conditions
 sealed abstract class Cond {
   def &&(that:Cond): Cond  = And(this,that)
@@ -84,6 +89,10 @@ case class GT(v:Var,l:Lin)      extends Cond
 case class LT(v:Var,l:Lin)      extends Cond
 case class GE(v:Var,l:Lin)      extends Cond
 case class LE(v:Var,l:Lin)      extends Cond
+
+// boolean expression
+//sealed abstract class BExpr extends Cond
+//case class Not(c:Cond)      extends Cond
 
 
 /*
