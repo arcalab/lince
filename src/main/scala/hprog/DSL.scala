@@ -40,9 +40,12 @@ object DSL {
     * @param s string representing a program
     * @return parsed program
     */
-  def parse(s:String): Prog =  Parser.parse(s) match {
-    case Parser.Success(result, next) => result
-    case f: Parser.NoSuccess => throw new ParserException(f.msg)
+  def parse(s:String): Prog =  {
+    println("parsing...")
+    Parser.parse(s) match {
+      case Parser.Success(result, next) => { println("parsed"); result}
+      case f: Parser.NoSuccess => {println("failed"); throw new ParserException(f.toString)}
+    }
   }
 
   val parseWithError: String => Parser.ParseResult[Prog] = Parser.parse
