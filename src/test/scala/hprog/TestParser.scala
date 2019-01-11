@@ -22,7 +22,7 @@ class TestParser extends FlatSpec {
   testOk("p = v, v = g & p <= 0 /\\ v <= 0;\nv := -0.5 * v",ex7)
 
 
-  private def testOk(in:String,res:Prog) =
+  private def testOk(in:String,res:Syntax) =
     s"""Parsing "$in"""" should s"""produce the program "${Show(res)}"""" in {
       Parser.parse(in) match {
         case Parser.Success(result, _) =>

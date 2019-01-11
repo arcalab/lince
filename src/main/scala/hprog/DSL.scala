@@ -1,9 +1,9 @@
 package hprog
 
-import java.io.File
-
 import hprog.ast._
-import hprog.common.{ParserException, TypeCheckException}
+import hprog.common.ParserException
+import hprog.frontend.Semantics.Valuation
+import hprog.frontend.{Semantics, Traj}
 import hprog.lang.Parser
 
 import scala.language.implicitConversions
@@ -40,14 +40,21 @@ object DSL {
     * @param s string representing a program
     * @return parsed program
     */
-  def parse(s:String): Prog =  {
-    println("parsing...")
+  def parse(s:String): Syntax =  {
+    //println("parsing...")
     Parser.parse(s) match {
-      case Parser.Success(result, next) => { println("parsed"); result}
-      case f: Parser.NoSuccess => {println("failed"); throw new ParserException(f.toString)}
+      case Parser.Success(result, _) =>
+        //println("parsed")
+        result
+      case f: Parser.NoSuccess =>
+        //println("failed")
+        throw new ParserException(f.toString)
     }
   }
 
-  val parseWithError: String => Parser.ParseResult[Prog] = Parser.parse
+  val parseWithError: String => Parser.ParseResult[Syntax] = Parser.parse
+
+  def parseTraj(s:String): Traj[Valuation] =
+    Semantics.syntaxToValuation(parse(s)).traj(Map())
 
 }

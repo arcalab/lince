@@ -22,8 +22,8 @@ New version - correct one:
 
  */
 
-sealed abstract class Prog {
-  def ~(other:Prog) = (this,other) match {
+sealed abstract class Syntax {
+  def ~(other:Syntax) = (this,other) match {
     case (Seq(p1), Seq(p2)) => Seq(p1 ::: p2)
     case (Seq(p1), p2) => Seq(p1 ::: List(p2))
     case (p1, Seq(p2)) => Seq(p1 :: p2)
@@ -31,14 +31,14 @@ sealed abstract class Prog {
   }
 }
 // programs
-sealed abstract class At                                  extends Prog
-case class            Seq(ps:List[Prog])                  extends Prog
-case object           Skip                                extends Prog
-case class            ITE(ifP:Cond,thenP:Prog,elseP:Prog) extends Prog
-case class            While(c:Cond,doP:Prog)              extends Prog
+sealed abstract class At                                        extends Syntax
+case class            Seq(ps:List[Syntax])                      extends Syntax
+case object           Skip                                      extends Syntax
+case class            ITE(ifP:Cond, thenP:Syntax, elseP:Syntax) extends Syntax
+case class            While(c:Cond,doP:Syntax)                  extends Syntax
 
 // atoms
-case class Assign(v:Var,e:Lin) extends At
+case class Assign(v:Var,e:Lin)               extends At
 case class DiffEqs(eqs:List[DiffEq],dur:Dur) extends At {
   def &(dur:Dur) = DiffEqs(eqs,dur) // override dur
   def &(diffEq: DiffEq)   = DiffEqs(eqs++List(diffEq),dur) // add eq
@@ -89,6 +89,8 @@ case class GT(v:Var,l:Lin)      extends Cond
 case class LT(v:Var,l:Lin)      extends Cond
 case class GE(v:Var,l:Lin)      extends Cond
 case class LE(v:Var,l:Lin)      extends Cond
+
+
 
 // boolean expression
 //sealed abstract class BExpr extends Cond

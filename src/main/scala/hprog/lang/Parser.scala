@@ -17,7 +17,7 @@ object Parser extends RegexParsers {
     * @param c string representing a program
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parse(c: String): ParseResult[Prog] = parseAll(progP, c)
+  def parse(c: String): ParseResult[Syntax] = parseAll(progP, c)
 
   //  def pexp(c:String): ParseResult[Cond] = parseAll(condP,c)
 
@@ -32,13 +32,13 @@ object Parser extends RegexParsers {
   //   /// Program ///
   //   ///////////////
 
-  lazy val progP: Parser[Prog] =
+  lazy val progP: Parser[Syntax] =
     basicProg ~ opt(";" ~> progP) ^^ {
       case p1 ~ Some(p2) => p1 ~ p2
       case p ~ None => p
     }
 
-  lazy val basicProg: Parser[Prog] =
+  lazy val basicProg: Parser[Syntax] =
     "skip" ^^ (_ => Skip) |
       "while" ~> condP ~ "{" ~ progP ~ "}" ^^ {
         case c ~ _ ~ p ~ _ => While(c, p)
@@ -64,7 +64,7 @@ object Parser extends RegexParsers {
 
   lazy val durP: Parser[Dur] =
     condP ^^ Until |
-      realP ^^ Value.andThen(For)
+    realP ^^ Value.andThen(For)
 //////////
 
   lazy val linP: Parser[Lin] =

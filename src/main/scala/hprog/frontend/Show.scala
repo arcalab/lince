@@ -4,7 +4,7 @@ import hprog.ast._
 
 object Show {
 
-  def apply(p:Prog): String = p match {
+  def apply(p:Syntax): String = p match {
     case a: At    => apply(a)
 //    case Seq(p::Nil) => apply(p)
     case Seq(ps) => ps.map(apply).mkString("\n")

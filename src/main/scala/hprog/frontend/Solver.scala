@@ -7,41 +7,50 @@ import hprog.ast._
 
 object Solver {
   /**
-    * collect list of unique variables used by a system of equations
+    * collect list of unique variables used by a system of equations, including dummies
     * @param eqs
     * @return unique variables
     */
-  def getVars(eqs:DiffEqs): List[String] =
-    eqs.eqs.flatMap(getVars).distinct
+  def getVars(eqs:List[DiffEq]): List[String] =
+    eqs.flatMap(getVars).distinct
 
   private def getVars(eq:DiffEq): List[String] =
-    eq.v.v :: getVars(eq.e)
+    eq.v.v :: getVars(eq.e,eq.v.v)
 
-  private def getVars(e:Lin): List[String] = e match {
+  private def getVars(e:Lin,base:String): List[String] = e match {
     case Var(v) => List(v)
-    case Value(v) => List("")
-    case Add(l1, l2) => getVars(l1) ::: getVars(l2)
-    case Mult(v, l) => getVars(l)
+    case Value(v) => List("_"+base)
+    case Add(l1, l2) => getVars(l1,base) ::: getVars(l2,base)
+    case Mult(v, l) => getVars(l,base)
   }
 
-  private def getMatrix(eqs:DiffEqs): (List[String],List[List[Double]]) = {
+  def getMatrix(eqs:List[DiffEq]): (List[String],List[List[Double]]) = {
     val vars = getVars(eqs)
-    println(s"## collected vars: ${vars.map("'"+_+"'").mkString(", ")}")
-    val rows = eqs.eqs.map((x:DiffEq) => x.v.v -> getRow(vars,x.e)).toMap
+    //println(s"## collected vars: ${vars.map("'"+_+"'").mkString(", ")}")
+    val rows = eqs.map((x:DiffEq) => x.v.v -> getRow(vars,x.v.v,x.e)).toMap
     (  vars
       ,for (v<-vars) yield rows.getOrElse(v,vars.map(_ => 0.0))) // Note: set to 0 when unknown variable
   }
 
-  private def getRow(vars:List[String],e:Lin): List[Double] = {
-    val m = getRowValues(e)
+//  def getMatrixAndConstants(eqs: DiffEqs):  (List[String],List[List[Double]],List[Double]) = {
+//    val (vars,mtx) = Solver.getMatrix(eqs)
+//    val i = vars.indexOf("")
+//    if (i == -1)
+//      (vars,mtx,vars.map(_=>0.0))
+//    else
+//      (vars - "" , mtx.map(_.drop(i)) , mtx.map(_(i)))
+//  }
+
+  private def getRow(vars:List[String],base:String,e:Lin): List[Double] = {
+    val m = getRowValues(e,base)
     vars.map(x => m.getOrElse[Double](x,0))
   }
 
-  private def getRowValues(e:Lin): Map[String,Double] = e match {
+  private def getRowValues(e:Lin,base:String): Map[String,Double] = e match {
     case Var(v) => Map(v->1)
-    case Value(v) => Map(""->v)
-    case Add(l1, l2) => join(getRowValues(l1),getRowValues(l2))
-    case Mult(v, l) => getRowValues(l).mapValues(_*v.v)
+    case Value(v) => Map(("_"+base)->v)
+    case Add(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
+    case Mult(v, l) => getRowValues(l,base).mapValues(_*v.v)
   }
   //  private def multt(d:Double,d2:Double): Double = d*d2
   private def join(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
@@ -60,88 +69,149 @@ object Solver {
     DenseMatrix.create(cols,rows,m.flatten.toArray).t
   }
 
-  /**
-    * Core function that solves an equation using breeze libraries
-    * @param eqs differential equations to be solved (ignoring conditions for now)
-    * @return trajectory (ignoring conditions)
-    */
-  def solve(state:Map[String,Double],eqs:DiffEqs): Trajectory = { //scala.Seq[Double] => Double => DenseMatrix[Double] = {
-    val (vars, mtx) = getMatrix(eqs)
-    val res = solve(vars,mtx)
-    //    if ((vars contains "") && mtx.forall(_ == 0.0))
-    //
 
-//    def buildGuard(trajectory: Trajectory, init: List[Double], cond: Cond): Double => Boolean = {
-//      val c: Double => Boolean = (t:Double) =>  {
-//        val res = Eval(trajectory, init, cond)(t)
-//        println(s"--- guard[$cond]($t) = $res")
-//        res
-//      }
-//      c
-//    }
-
-    eqs.dur match {
-      case For(t) => res until Some(t.v)
-      case Until(c) =>
-        val init = res.vars.map(state.getOrElse(_,0.0))
-        val guard: Double => Boolean = Eval(res,init,c) //buildGuard(res,init,c)
-        println(s"--- guard[$cond](${init.mkString(",")}) = $guard")
-        // TODO: experiment with different parameters
-        val dur = if (guard(0)) Some(0.0)
-                  else logSearch(1,0,true,guard)
-        res until dur
-      case Forever => res until None
-    }
+  def solveDur[X](dur:Dur, input:X, guard:Cond=>Double=>Boolean) = dur match {
+    case For(t) => Some(t.v)
+    case Until(c) => if (guard(c)(0)) Some(0.0)
+                     else logSearch(1, 0, None, guard(c))
+    case Forever => None
   }
 
+
   /**
-    * Solve a linear/coupled system of diferential equations
-    * @param vars names of variables
+    * Core function that solves a linear/coupled system of diferential equations using breeze libraries
     * @param mtx matrix
     * @return
     */
-  def solve(vars:List[String],mtx:List[List[Double]]): Trajectory = {
+  def solveInvertable(mtx:List[List[Double]]): (List[Double],Double) => List[Double] = {
     val a = list2Matrix(mtx)
+    inv(a) // throw an error if "a" is not invertable
+    val b = breeze.linalg.inv
     val p = eig(a).eigenvectors
     val pi = inv(p)
     val ev = eig(a).eigenvalues
 
-//    println("## A:\n"+a)
-//    println("## p:\n"+p)
-//    println("## p^-1:\n"+pi)
-//    println("## eigV: "+ev.toArray.mkString(", "))
+    println("## A:\n"+a)
+    println("## p:\n"+p)
+    println("## p^-1:\n"+pi)
+    println("## eigV: "+ev.toArray.mkString(", "))
 
-    def sol(x0:List[Double],t:Double): DenseMatrix[Double] = {
-//      println("#### E:\n"+diag(exp(ev *:* t)))
-//      println("#### pEp-1:\n"+p * diag(exp(ev *:* t)) * pi)
-//      println(s"#### x0=${x0.mkString(",")} ")
+    def sol(x0:List[Double],t:Double): List[Double] = {
+            println("##### E:\n"+diag(exp(ev *:* t)))
+            println("##### pEp-1:\n"+p * diag(exp(ev *:* t)) * pi)
+            println(s"##### x0=${x0.mkString(",")} ")
       val res = p * diag(exp(ev *:* t)) * pi * list2Matrix(x0.map(List(_)))
-//      println(s"--- sol($t) = ${res.t}")
-      res
+            println(s"--- sol($t) = ${res.t}")
+      res.data.toList
     }
-
-    val traj = buildTrajectory(vars,sol)
-    traj
+    sol
   }
 
   /**
-    * Converts a function over matrices into a trajectory (over assignments)
-    * @param vars List of variables in the order used by the matrices
-    * @param matrixFun function over matrices
-    * @return Trajectory for that function
+    * Returns x(x0,t) = x0*e^At, where e^At is expended to the taylor series:
+    *   e^At = I + At + At^2/2! + At^3/3! + At^4/4! + ...
+    * @param mtx
+    * @param precision
+    * @return
     */
-  private def buildTrajectory(vars: List[String],
-                              matrixFun: (List[Double],Double) => DenseMatrix[Double]) : Trajectory = {
-//    def list2map[A](l:Iterable[A]): Map[String,A] =
-//      (for ((v,i) <- vars.zipWithIndex) yield (v,l.toList(i))).toMap
-//    def map2list(m:Map[String,Double]): List[Double] =
-//      for ( v  <-  vars) yield m.getOrElse(v,0.0)
+  def solveTaylor(mtx:List[List[Double]],precision:Double = 0.0000001):  (List[Double],Double) => List[Double] = {
+    val a = list2Matrix(mtx)
+    val size = a.rows // square matrix
+    val id = DenseMatrix.eye[Double](size)
 
-    val res: List[Double] => Double => List[Double] =
-      mapVars => t =>  matrixFun(mapVars,t).data.toList
+    def fact(n:Int):Int = if (n<=0) 1 else n * fact(n-1)
+    def avg(m:DenseMatrix[Double]): Double = m.data.map(abs(_)).sum / m.size
 
-    Trajectory.buildFromList(None,vars,res)
+    def sol(x0:List[Double],t:Double): List[Double] = {
+      val at = a * t
+
+      def iter(step:Int,bigA:DenseMatrix[Double],cur:DenseMatrix[Double]): DenseMatrix[Double] ={
+        val nextBigA = bigA * at
+        val next = nextBigA / fact(step).toDouble
+        val res = cur + next
+        // TODO: control precision and use error
+        val av = avg(next)
+//        println(s"avg: $av")
+        if (av.isNaN || avg(next) < precision)
+          res
+        else
+          iter(step+1,nextBigA,res)
+      }
+
+      val res = iter(1,id,id) * list2Matrix(x0.map(List(_)))
+      res.data.toList
+    }
+
+    sol
   }
+
+
+
+  /**
+    * Returns x(x0,t) = x0*e^At, where e^At is expended to the taylor series:
+    *   e^At = I + At + At^2/2! + At^3/3! + At^4/4! + ...
+    * @param mtx
+    * @param precision
+    * @return
+    */
+  def solveTaylorManual(a:List[List[Double]],precision:Double = 0.0000001):  (List[Double],Double) => List[Double] = {
+//    val a = list2Matrix(mtx)
+    println("building ODE "+a.mkString("/"))
+    val size = a.size // square matrix
+
+    type Row=List[Double]
+    type Matrix=List[Row]
+
+    def fact(n:Int):Int = if (n<=0) 1 else n * fact(n-1)
+    def avg(m:Matrix): Double = m.flatten.map(myAbs(_)).sum / (size*size)
+    def myAbs(d: Double): Double = if(d<0) -d else d
+    def myEye(size: Int, step: Int): Matrix = {
+      if (step >= size)
+        Nil
+      else (for (p <- 0 until size) yield if (p == step) 1.0 else 0.0).toList :: myEye(size, step + 1)
+    }
+
+    val id = myEye(size,0)
+
+    def mPlusm(m1: Matrix, m2: Matrix): Matrix = {
+      (m1 zip m2).map(x => x._1.zip(x._2).map(y=>y._1+y._2))
+    }
+    def dotProd(v1:Row,v2:Row) =
+      v1.zip(v2).
+        map { t: (Double, Double) => t._1 * t._2 }.sum
+    def transpose(m:Matrix):Matrix =
+      if(m.head.isEmpty) Nil
+      else m.map(_.head) :: transpose(m.map(_.tail))
+
+    def mXm( m1:Matrix, m2:Matrix ) =
+      for( m1row <- m1 ) yield
+        for( m2col <- transpose(m2) ) yield
+          dotProd( m1row, m2col )
+
+    def sol(x0:List[Double],t:Double): List[Double] = {
+      val at = a.map(_.map(_*t))
+
+      def iter(step:Int,bigA:List[List[Double]],cur:List[List[Double]]): List[List[Double]] ={
+        val nextBigA: List[List[Double]] = mXm(bigA,at)
+        val den = fact(step).toDouble
+        val next = nextBigA.map(_.map(_/den))
+        val res = mPlusm(cur,next)
+        // TODO: control precision and use error
+        val av = avg(next)
+        //        println(s"avg: $av")
+        if (av.isNaN || avg(next) < precision)
+          res
+        else
+          iter(step+1,nextBigA,res)
+      }
+
+      val res = mXm(iter(1,id,id) , x0.map(List(_)) )
+      res.flatten
+    }
+
+    sol
+  }
+
 
 
   ////////////////////////
@@ -155,7 +225,7 @@ object Solver {
 //    case t1::tl =>
 //  }
 
-  def getFstDiffEq(prog:Prog): DiffEqs  = prog match {
+  def getFstDiffEq(prog:Syntax): DiffEqs  = prog match {
 //    case Assign(v, e) => Nil
     case d@DiffEqs(eqs, dur) => d
 //    case Seq(Nil) => Nil
@@ -174,49 +244,12 @@ object Solver {
     case _ => throw new RuntimeException("no diff. eq. found")
   }
 
-  def getFstMatrix(prog:Prog): List[List[Double]] =
-    getMatrix(getFstDiffEq(prog))._2
+  def getFstMatrix(prog:Syntax): List[List[Double]] =
+    getMatrix(getFstDiffEq(prog).eqs)._2
 
   def tryM(prog:String): List[List[Double]] = getFstMatrix(DSL.parse(prog))
 
-  //  def tryS(prog:String): scala.Seq[Double] => Double => DenseMatrix[Double] = solve(getFstDiffEq(DSL.parse(prog)))
-//    def tryS(prog:String): Trajectory = {
-//      val ed = getFstDiffEq(DSL.parse(prog))
-//      val res = solve(ed)
-//
-//      val until: Option[Double] = ed.dur match {
-//        case For(t) => Some(t.v)
-//        case Until(c) =>
-//          val init = res.vars.map(_=>1.0) // TODO: now testing with hard coded value (1,1,1,...)
-//          val guard =  buildGuard(res,init,c)
-//          // TODO: experiment with different parameters
-//          logSearch(1,0,true,guard)
-//        case Forever => None
-//      }
-//      println(s"until: $until")
-//      res
-//    }
 
-  // import hprog.frontend.Solver._
-  // ex1:
-  // tryS("x1=-(x1+3*x2)-x3, x2=2*x2 & 2")
-  // ex2 (from the bool):
-  // tryS("x1=-x1, x2=2*x2 & 2")
-  // ex3 (from th book):
-  // tryS("x1=-x1-3*x2, x2=2*x2 & 2")
-
-  // usage:
-  // val sol = tryS("x1=-x1-3*x2, x2=2*x2 & 2")
-  // sol(List(1,1))(4) // x(0)=[1 1] , t=4
-
-
-
-//  val curX = 6
-//  val gamma = 0.01
-//  val precision = 0.00001
-//  val previousStepSize = 1 / precision
-//
-//  def df(x: Double): Double = 4 * pow(x, 3) - 9 * pow(x, 2)
 
   /**
     * Performs a gradient descent, i.e., searches for an argument "t" of "function" s.t. function(t) = 0.
@@ -254,22 +287,30 @@ object Solver {
     * @param precision
     * @return
     */
-  def logSearch(prevStepSize:Double, curX: Double, expanding:Boolean,
+  def logSearch(prevStepSize:Double, curX: Double, last:Option[Double],
                 guard: Double => Boolean,
                 precision: Double = 0.0000001, max: Int = 1000000) : Option[Double] = {
 //    println(s"${if (expanding) "EXPANDING" else "DIVING "} at $curX with step $prevStepSize")
     if (max<curX)  return None
 
-    if (expanding) { // growing steps until guard succeeds
-      if (!guard(curX))
-           logSearch(prevStepSize*2,curX + prevStepSize  ,expanding,guard,precision,max)
-      else logSearch(prevStepSize/8,curX - prevStepSize/4,false,guard,precision,max)
+    last match {
+      // no value found yet
+      case None =>
+        if (guard(curX))
+          logSearch(prevStepSize/8,curX - prevStepSize/4,Some(curX),guard,precision,max)
+        else
+          logSearch(prevStepSize*2,curX + prevStepSize  ,None      ,guard,precision,max)
+
+      // growing steps until guard succeeds
+      case Some(value) =>
+        if (prevStepSize > precision) { // shrinking steps until having the right precision
+          if (guard(curX))
+            logSearch(prevStepSize/2,curX - prevStepSize,Some(curX),guard,precision,max)
+          else
+            logSearch(prevStepSize/2,curX + prevStepSize,last      ,guard,precision,max)
+        }
+        else last
+        // TODO: control precision and errors
     }
-    else if (prevStepSize > precision) { // shrinking steps until having the right precision
-      if (!guard(curX))
-           logSearch(prevStepSize/2,curX + prevStepSize,expanding,guard,precision,max)
-      else logSearch(prevStepSize/2,curX - prevStepSize,expanding,guard,precision,max)
-    }
-    else Some(curX)
   }
 }

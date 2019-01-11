@@ -20,7 +20,7 @@ object TypeCheck {
   //  }
   //  def seqUnit(x:Result[Unit],y:Result[Unit]): Result[Unit] = seq((_,_)=>())(x,y)
 
-  def findProblems(f:Prog=>Result,prog:Prog): Result =
+  def findProblems(f:Syntax=>Result, prog:Syntax): Result =
     f(prog) ++
       (prog match {
         //        case Assign(v, e) => Result(None)
@@ -45,7 +45,7 @@ object TypeCheck {
     case _ => false
   }
 
-  def validDur(prog: Prog): Result = findProblems({
+  def validDur(prog: Syntax): Result = findProblems({
     case DiffEqs(_,Until(cond)) if !isDur(cond) => Result(Some(List(s"invalid duration condition: ${Show(cond)}")))
     case _ => Result(None)
   },prog

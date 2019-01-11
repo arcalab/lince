@@ -7,7 +7,7 @@ import hprog.frontend.Show
 
 class TestShow extends FlatSpec {
 
-  def testPrint(c:Prog,res:String) {
+  def testPrint(c:Syntax, res:String) {
 //    println(show(c))
     s"Program ${Show(c)}" should s"be printed as expected" in
       assertResult(res)(Show(c))
