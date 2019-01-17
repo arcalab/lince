@@ -35,7 +35,7 @@ sealed abstract class At                                        extends Syntax
 case class            Seq(ps:List[Syntax])                      extends Syntax
 case object           Skip                                      extends Syntax
 case class            ITE(ifP:Cond, thenP:Syntax, elseP:Syntax) extends Syntax
-case class            While(c:Cond,doP:Syntax)                  extends Syntax
+case class            While(d:LoopGuard,doP:Syntax)             extends Syntax
 
 // atoms
 case class Assign(v:Var,e:Lin)               extends At
@@ -53,6 +53,11 @@ sealed abstract class Dur
 case class  For(t:Value)  extends Dur
 case class  Until(c:Cond) extends Dur
 case object Forever       extends Dur
+
+// loopguard
+sealed abstract  class LoopGuard
+case class Counter(i:Int) extends LoopGuard
+case class Guard(c:Cond)  extends LoopGuard
 
 // linear expression
 sealed abstract class Lin {

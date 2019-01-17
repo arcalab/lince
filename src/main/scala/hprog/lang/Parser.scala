@@ -23,7 +23,8 @@ object Parser extends RegexParsers {
 
   override def skipWhitespace = true
 
-  override val whiteSpace: Regex = "[ \t\r\f\n]+".r
+  override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
+//  override val whiteSpace: Regex = "[ \t\r\f\n]+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
@@ -39,14 +40,25 @@ object Parser extends RegexParsers {
     }
 
   lazy val basicProg: Parser[Syntax] =
-    "skip" ^^ (_ => Skip) |
-      "while" ~> condP ~ "{" ~ progP ~ "}" ^^ {
+    "skip" ~> opt("&"~>realP) ^^ {
+      case None => Skip
+      case Some(real) => DiffEqs(Nil,For(Value(real)))
+    } |
+      "while" ~> whileGuard ~ "{" ~ progP ~ "}" ^^ {
         case c ~ _ ~ p ~ _ => While(c, p)
+      } |
+      "repeat" ~> intPP ~ "{" ~ progP ~ "}" ^^ {
+        case c ~ _ ~ p ~ _ => While(Counter(c), p)
       } |
       "if" ~> condP ~ "then" ~ progP ~ "else" ~ progP ^^ {
         case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
       } |
       atomP
+
+  lazy val whileGuard: Parser[LoopGuard] = {
+    condP ^^ Guard |
+    intPP ^^ Counter
+  }
 
   lazy val atomP: Parser[At] =
     identifier ~ ":=" ~ linP ^^ {
@@ -173,6 +185,12 @@ object Parser extends RegexParsers {
 
   lazy val realP: Parser[Double] =
     """-?[0-9]+(\.([0-9]+))?""".r ^^ { s: String => s.toDouble }
+
+  lazy val intPP: Parser[Int] =
+    "("~>intP<~")" |
+    intP
+  lazy val intP: Parser[Int] =
+    """[0-9]+""".r ^^ { s: String => s.toInt }
 
   // AUX
   private def invert(lin: Lin): Lin = lin match {

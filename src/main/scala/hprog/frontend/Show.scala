@@ -10,7 +10,8 @@ object Show {
     case Seq(ps) => ps.map(apply).mkString("\n")
     case Skip    => "skip"
     case ITE(ifP, thenP, elseP) => s"if ${apply(ifP)} then ${apply(thenP)} else ${apply(elseP)} "
-    case While(c, doP)          => s"while (${apply(c)}) { ${apply(doP)} }"
+    case While(Guard(c), doP)   => s"while (${apply(c)}) { ${apply(doP)} }"
+    case While(Counter(i), doP) => s"while ($i) { ${apply(doP)} }"
   }
 
   def apply(a:At): String = a match {

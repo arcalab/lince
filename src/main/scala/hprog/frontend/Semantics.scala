@@ -92,8 +92,13 @@ object Semantics {
   }
 
   def whileToValuation(whileStx: While): Prog[Valuation] = {
-    val While(c,doP) = whileStx
-    syntaxToValuation(ITE(c,doP ~ whileStx, Skip))
+//    val While(c,doP) = whileStx
+    whileStx match {
+      case While(Guard(c),doP) => syntaxToValuation(ITE(c,doP ~ whileStx, Skip))
+      case While(Counter(0),doP) => syntaxToValuation(Skip)
+      case While(Counter(i),doP) => syntaxToValuation(doP ~ While(Counter(i-1),doP))
+    }
+
   }
 
 

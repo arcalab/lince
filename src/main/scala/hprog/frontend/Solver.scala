@@ -155,8 +155,7 @@ object Solver {
     * @return
     */
   def solveTaylorManual(a:List[List[Double]],precision:Double = 0.0000001):  (List[Double],Double) => List[Double] = {
-//    val a = list2Matrix(mtx)
-    println("building ODE "+a.mkString("/"))
+    //println("building ODE "+a.mkString("/"))
     val size = a.size // square matrix
 
     type Row=List[Double]
@@ -189,6 +188,7 @@ object Solver {
           dotProd( m1row, m2col )
 
     def sol(x0:List[Double],t:Double): List[Double] = {
+      //print(s"t=$t -")
       val at = a.map(_.map(_*t))
 
       def iter(step:Int,bigA:List[List[Double]],cur:List[List[Double]]): List[List[Double]] ={
@@ -199,6 +199,9 @@ object Solver {
         // TODO: control precision and use error
         val av = avg(next)
         //        println(s"avg: $av")
+//        if (res.nonEmpty && res.head.nonEmpty && res.head.head.isNaN)
+//          cur
+        //else
         if (av.isNaN || avg(next) < precision)
           res
         else
@@ -206,6 +209,7 @@ object Solver {
       }
 
       val res = mXm(iter(1,id,id) , x0.map(List(_)) )
+      //println("res="+res.flatten.mkString(","))
       res.flatten
     }
 
