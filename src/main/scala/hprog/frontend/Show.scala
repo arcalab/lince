@@ -33,8 +33,8 @@ object Show {
     case Var(v) => v
     case Value(v) => if (v-v.toInt == 0) v.toInt.toString else v.toString
     case Add(l1, l2) => s"${apply(l1)} + ${apply(l2)}"
-    case Mult(v, l:Add) =>  s"${apply(v)} (${apply(l)})"
-    case Mult(v, l) =>  s"${apply(v)} ${apply(l)}"
+    case Mult(v, l:Add) =>  s"${apply(v)}*(${apply(l)})"
+    case Mult(v, l) =>  s"${apply(v)}*${apply(l)}"
   }
 
   def apply(cond: Cond): String = cond match {

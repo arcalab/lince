@@ -51,11 +51,32 @@ object Semantics {
     }
   }
 
+  /**
+    * Experimental: generating code to be sent to Sage
+    * @param eqs
+    * @return
+    */
+  def genSage(eqs:List[DiffEq]): String = {
+    var res = "t = var('t')\n"
+    for (e <- eqs)
+      res += s"${e.v.v} = function('${e.v.v}')(t)\n"
+    for ((e,i) <- eqs.zipWithIndex)
+      res += s"de$i = diff(${e.v.v},t) == ${Show(e.e)}\n"
+    res += s"print(expand(desolve_system([${(for(i<-0 until eqs.size)yield "de"+i).mkString(",")}]," +
+           s"[${eqs.map(_.v.v).mkString(",")}])))"
+    res
+  }
 
   private def callSolver(input:Valuation, eqs:List[DiffEq]): Double => Valuation = {
     val (vars,mtx): (List[String],List[List[Double]]) = Solver.getMatrix(eqs)
     val sol1: (List[Double],Double) => List[Double] = Solver.solveTaylorManual(mtx)
 
+//    println(s"## calling solver" +
+//      s"\neqs:\n  ${eqs.mkString("\n  ")}" +
+//      s"\ninput: ${input.map(p=>s"${p._1}->${p._2}").mkString(", ")}" +
+//      s"\nvars: ${vars.mkString(",")}" +
+//      s"\nmtx:\n  ${mtx.map(_.mkString("\t")).mkString("\n  ")}")
+    println("## Sage\n"+genSage(eqs))
     //println(s"calling solver for ${input} and ${eqs.map(Show(_)).mkString(",")}")
     def sol(t:Double): Valuation = {
       // "input" should have all variables but no "" - this should be assigned to 0

@@ -229,6 +229,19 @@ object Solver {
 //    case t1::tl =>
 //  }
 
+  def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
+    case d@DiffEqs(eqs, dur) => List(eqs)
+    //    case Seq(Nil) => Nil
+    case Seq(p::ps) =>
+      getDiffEqs(p) ::: getDiffEqs(Seq(ps))
+    //    case Skip => Nil
+    case ITE(ifP, thenP, elseP) =>
+      getDiffEqs(thenP) ++ getDiffEqs(elseP)
+    case While(c, doP) => getDiffEqs(doP)
+    case _ => Nil
+  }
+
+
   def getFstDiffEq(prog:Syntax): DiffEqs  = prog match {
 //    case Assign(v, e) => Nil
     case d@DiffEqs(eqs, dur) => d
