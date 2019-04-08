@@ -1,12 +1,11 @@
 package hprog.frontend
 
-import hprog.ast.{DiffEq, DiffEqs, ITE, Syntax, While}
+import hprog.ast._
+import hprog.common.ParserException
 import hprog.frontend.Semantics.Solution
-import hprog.frontend.Semantics.Valuation
 import hprog.lang.SageParser
-import hub.common.ParseException
 
-import sys.process._
+import scala.sys.process._
 
 
 class SageSolver(path:String) extends Solver {
@@ -25,7 +24,7 @@ class SageSolver(path:String) extends Solver {
       //println(s"- adding  ${eqs} -> $res")
       val resParsed = SageParser.parse(res) match {
         case SageParser.Success(result, _) => result.sol
-        case _: SageParser.NoSuccess => throw new ParseException(s"Failed to parse $res")
+        case _: SageParser.NoSuccess => throw new ParserException(s"Failed to parse $res")
       }
       cache += eqs -> resParsed
     }
