@@ -17,16 +17,18 @@ class SageSolver(path:String) extends Solver {
     */
   def ++=(systems: List[List[DiffEq]]): Unit = {
     val filtered = systems.filterNot(cache.contains)
-    val instructions = filtered.map(SageSolver.genSage).mkString("; print(\"§\"); ")
-    val results = s"$path/sage -c $instructions".!!
-    val parsed = results.split('§')
-    for ((eqs,res) <- filtered.zip(parsed)) {
-      //println(s"- adding  ${eqs} -> $res")
-      val resParsed = SageParser.parse(res) match {
-        case SageParser.Success(result, _) => result.sol
-        case _: SageParser.NoSuccess => throw new ParserException(s"Failed to parse $res")
+    if (filtered.nonEmpty) {
+      val instructions = filtered.map(SageSolver.genSage).mkString("; print(\"§\"); ")
+      val results = s"$path/sage -c $instructions".!!
+      val parsed = results.split('§')
+      for ((eqs, res) <- filtered.zip(parsed)) {
+        //println(s"- adding  ${eqs} -> $res")
+        val resParsed = SageParser.parse(res) match {
+          case SageParser.Success(result, _) => result.sol
+          case _: SageParser.NoSuccess => throw new ParserException(s"Failed to parse $res")
+        }
+        cache += eqs -> resParsed
       }
-      cache += eqs -> resParsed
     }
   }
 
