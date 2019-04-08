@@ -1,26 +1,49 @@
 package hprog.frontend
 
-import hprog.ast.DiffEq
+import hprog.ast.{DiffEq, DiffEqs, ITE, Syntax, While}
+import hprog.frontend.Semantics.Solution
+import hprog.frontend.Semantics.Valuation
+import hprog.lang.SageParser
+import hub.common.ParseException
+
 import sys.process._
 
 
-class SageSolver(path:String) {
-  type Solution = String // to change to something with more structure
-  private var cache = Map[List[DiffEq],Solution](Nil->"")
+class SageSolver(path:String) extends Solver {
+  private var cache = Map[List[DiffEq],Solution](Nil->Map())
 
   /**
     * Precompute and cache several system of equations with a single system call to Sage
     * @param systems systems of equations to be precomupted
     */
-  def batch(systems: List[List[DiffEq]]): Unit = {
+  def ++=(systems: List[List[DiffEq]]): Unit = {
     val filtered = systems.filterNot(cache.contains)
     val instructions = filtered.map(SageSolver.genSage).mkString("; print(\"§\"); ")
     val results = s"$path/sage -c $instructions".!!
     val parsed = results.split('§')
     for ((eqs,res) <- filtered.zip(parsed)) {
-      println(s"- adding (batch) ${eqs} -> $res")
-      cache += eqs -> res
+      //println(s"- adding  ${eqs} -> $res")
+      val resParsed = SageParser.parse(res) match {
+        case SageParser.Success(result, _) => result.sol
+        case _: SageParser.NoSuccess => throw new ParseException(s"Failed to parse $res")
+      }
+      cache += eqs -> resParsed
     }
+  }
+
+  def ++=(syntax:Syntax): Unit = {
+    def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
+      case d@DiffEqs(eqs, dur) => List(eqs)
+      //    case Seq(Nil) => Nil
+      case hprog.ast.Seq(p :: ps) =>
+        getDiffEqs(p) ::: getDiffEqs(hprog.ast.Seq(ps))
+      //    case Skip => Nil
+      case ITE(ifP, thenP, elseP) =>
+        getDiffEqs(thenP) ++ getDiffEqs(elseP)
+      case While(c, doP) => getDiffEqs(doP)
+      case _ => Nil
+    }
+    ++=(getDiffEqs(syntax))
   }
 
   /**
@@ -29,9 +52,10 @@ class SageSolver(path:String) {
     */
   def +=(eqs:List[DiffEq]): Unit = {
     if (!cache.contains(eqs)) {
-      val instr = SageSolver.genSage(eqs)
-      cache += eqs -> s"$path/sage -c $instr".!!
-      println(s"- adding ${eqs.map(Show(_)).mkString(",")} -> ${cache(eqs)}")
+//      val instr = SageSolver.genSage(eqs)
+//      cache += (eqs -> (s"$path/sage -c $instr".!!))
+//      println(s"- adding ${eqs.map(Show(_)).mkString(",")} -> ${cache(eqs)}")
+      ++=(List(eqs))
     }
   }
 
@@ -45,10 +69,11 @@ class SageSolver(path:String) {
     cache(eqs)
   }
 
-  def cached: Map[List[DiffEq],Solution] = cache - Nil
+  private def cached: Map[List[DiffEq],Solution] = cache - Nil
 }
 
 object SageSolver {
+
 
   /**
     * Experimental: generating code to be sent to Sage

@@ -44,16 +44,19 @@ object Parser extends RegexParsers {
       case None => Skip
       case Some(real) => DiffEqs(Nil,For(Value(real)))
     } |
-      "while" ~> whileGuard ~ "{" ~ progP ~ "}" ^^ {
-        case c ~ _ ~ p ~ _ => While(c, p)
-      } |
-      "repeat" ~> intPP ~ "{" ~ progP ~ "}" ^^ {
-        case c ~ _ ~ p ~ _ => While(Counter(c), p)
-      } |
-      "if" ~> condP ~ "then" ~ progP ~ "else" ~ progP ^^ {
-        case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
-      } |
-      atomP
+    "while" ~> whileGuard ~ "{" ~ progP ~ "}" ^^ {
+      case c ~ _ ~ p ~ _ => While(c, p)
+    } |
+    "repeat" ~> intPP ~ "{" ~ progP ~ "}" ^^ {
+      case c ~ _ ~ p ~ _ => While(Counter(c), p)
+    } |
+    "if" ~> condP ~ "then" ~ progP ~ "else" ~ progP ^^ {
+      case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
+    } |
+    "wait"~>realP ^^ {
+      time:Double => DiffEqs(Nil,For(Value(time)))
+    }|
+    atomP
 
   lazy val whileGuard: Parser[LoopGuard] = {
     condP ^^ Guard |

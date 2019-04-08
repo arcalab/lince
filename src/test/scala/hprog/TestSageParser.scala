@@ -20,9 +20,9 @@ class TestSageParser extends FlatSpec {
     Map("f1"->100, "f2"->500),
     List(0.0->Map("f1"->100.0,"f2"->500.0), 3.0 -> Map("f1"-> (3.0+100.0),"f2"-> (3.0+500.0))))
 
-//  testOk("[p(_t_) == cos(_t_)*p(0) + sin(_t_)*v(0), v(_t_) == -p(0)*sin(_t_) + cos(_t_)*v(0)]",
-//    Map("v"->100, "p"->500),
-//    List(3.0 -> Map("v"-> (Math.cos(3.0)*500.0+Math.sin(3.0)*100.0),"p"-> (Math.cos(3.0)*100.0-Math.sin(3.0)*500.0))))
+  testOk("[p(_t_) == cos(_t_)*p(0) + sin(_t_)*v(0), v(_t_) == -p(0)*sin(_t_) + cos(_t_)*v(0)]",
+    Map("v"->100, "p"->500),
+    List(3.0 -> Map("p"-> (Math.cos(3.0)*500.0+Math.sin(3.0)*100.0),"v"-> (Math.cos(3.0)*100.0-Math.sin(3.0)*500.0))))
 
   //  testOk("[f1(_t_) == _t_ + f1(0), f2(_t_) == _t_ + f2(0)]",
 //    Map("f1"->100, "f2"->500),List(0.0->0.0,1.0->0.0,2.0->0.0))
@@ -30,10 +30,6 @@ class TestSageParser extends FlatSpec {
 //    Map("p"->100, "v"->500),List(0.0->0.0,1.0->0.0,2.0->0.0))
 //  testOk("[p(_t_) == -_t_^2 + _t_*v(0) + p(0), v(_t_) == -2*_t_ + v(0)]",
 //    Map("p"->100, "v"->500),List(0.0->0.0,1.0->0.0,2.0->0.0))
-
-
-
-
 
 
   private def testOk(in:String,ctx:lang.SageParser.InitVals,res:List[(Double,Map[String,Double])]) =

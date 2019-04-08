@@ -1,6 +1,7 @@
 package hprog.frontend
 
 import hprog.ast._
+import hprog.lang.SageParser
 
 object Semantics {
 
@@ -8,20 +9,52 @@ object Semantics {
     *
     */
   type Vars      = String
-  /**
-    * Maps names of variables or trajectories to their value at a given time
-    */
+  /** Maps names of variables or trajectories to their value at a given time */
   type Valuation = Map[Vars,Double]
+  /** Maps variables to their semantic functions */
+  type Solution  = Map[String,SFunction]
+  /** Function, given a time value and an initial valuation */
+  type SFunction = Double => Valuation => Double
+  /** Solution and variables for a system of equations */
+  case class SolVars(vars:Set[String],sol: Solution) {
+    def ++(that:SolVars): SolVars = {
+      SolVars( vars ++ that.vars , sol ++ that.sol )
+    }
+  }
 
-  def syntaxToValuation(syntax:Syntax): Prog[Valuation] = syntax match {
+
+
+  def syntaxToValuation(syntax:Syntax): Prog[Valuation] = {
+    val solver = new SageSolver("/home/jose/Applications/SageMath")
+    solver.++=(syntax)
+    syntaxToValuationAux(syntax,solver)
+  }
+
+  def syntaxToValuationTaylor(syntax:Syntax): Prog[Valuation] = {
+    val solver = new Solver{
+      override def ++=(systems: List[List[DiffEq]]): Unit = {}
+      override def ++=(syntax: Syntax): Unit = {}
+      override def +=(eqs: List[DiffEq]): Unit = {}
+      override def get(eqs: List[DiffEq]): Solution = {
+        val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
+        vars.map(v=> v -> ( (t:Double) => (init:Valuation) =>
+          callTaylorSolver(init,eqs)(t)(v)
+        )).toMap
+      }
+    }
+    solver.++=(syntax)
+    syntaxToValuationAux(syntax,solver)
+  }
+
+  private def syntaxToValuationAux(syntax:Syntax,sol:Solver): Prog[Valuation] = syntax match {
     case a:Assign    => assignmentToValuation(a)
-    case d:DiffEqs   => diffEqsToValuation(d)
-    case Seq(Nil)    => syntaxToValuation(Skip)
-    case Seq(p::Nil) => syntaxToValuation(p)
-    case Seq(p::ps)  => syntaxToValuation(p) ++ syntaxToValuation(Seq(ps))
+    case d:DiffEqs   => diffEqsToValuation(d,sol)
+    case Seq(Nil)    => syntaxToValuationAux(Skip,sol)
+    case Seq(p::Nil) => syntaxToValuationAux(p,sol)
+    case Seq(p::ps)  => syntaxToValuationAux(p,sol) ++ syntaxToValuationAux(Seq(ps),sol)
     case Skip        => skipToValuation()
-    case ite:ITE     => iteToValuation(ite)
-    case whil:While  => whileToValuation(whil)
+    case ite:ITE     => iteToValuation(ite,sol)
+    case whil:While  => whileToValuation(whil,sol)
   }
 
   def assignmentToValuation(assign: Assign): Prog[Valuation] = input => {
@@ -36,23 +69,24 @@ object Semantics {
 
   }
 
-  def diffEqsToValuation(diffEqs: DiffEqs): Prog[Valuation] = input => {
+  def diffEqsToValuation(diffEqs: DiffEqs, solver: Solver): Prog[Valuation] = input => {
     val DiffEqs(eqs,dur) = diffEqs
 
-    val sol = callSolver(input,eqs)
+//    val sol = callSageSolver(input,eqs,sol)
+    val sol = solver.get(eqs) // maps variables to their solutions (function from t/ctx to value)
     def guard(c: Cond): Double => Boolean =
-      t => Eval(sol(t),c)
+      t => Eval(sol.mapValues(fun=>fun(t)(input)),c)
     val durValue = Solver.solveDur(dur,input,guard)
 
     new Traj[Valuation] {
       override val dur: Option[Double] = durValue
 
-      override def apply(t: Double): Valuation = input ++ sol(t)
+      override def apply(t: Double): Valuation = input ++ sol.mapValues(fun=>fun(t)(input))
     }
   }
 
 
-  private def callSolver(input:Valuation, eqs:List[DiffEq]): Double => Valuation = {
+  private def callTaylorSolver(input:Valuation, eqs:List[DiffEq]): Double => Valuation = {
     val (vars,mtx): (List[String],List[List[Double]]) = Solver.getMatrix(eqs)
     val sol1: (List[Double],Double) => List[Double] = Solver.solveTaylorManual(mtx)
 
@@ -88,21 +122,21 @@ object Semantics {
     }
   }
 
-  def iteToValuation(ite: ITE): Prog[Valuation] = input => {
+  def iteToValuation(ite: ITE,sol: Solver): Prog[Valuation] = input => {
     val ITE(ifS, thenS, elseS) = ite
 
     if (Eval(input, ifS))
-      syntaxToValuation(thenS).traj(input)
+      syntaxToValuationAux(thenS,sol).traj(input)
     else
-      syntaxToValuation(elseS).traj(input)
+      syntaxToValuationAux(elseS,sol).traj(input)
   }
 
-  def whileToValuation(whileStx: While): Prog[Valuation] = {
+  def whileToValuation(whileStx: While, sol: Solver): Prog[Valuation] = {
 //    val While(c,doP) = whileStx
     whileStx match {
-      case While(Guard(c),doP) => syntaxToValuation(ITE(c,doP ~ whileStx, Skip))
-      case While(Counter(0),doP) => syntaxToValuation(Skip)
-      case While(Counter(i),doP) => syntaxToValuation(doP ~ While(Counter(i-1),doP))
+      case While(Guard(c),doP) => syntaxToValuationAux(ITE(c,doP ~ whileStx, Skip),sol)
+      case While(Counter(0),doP) => syntaxToValuationAux(Skip,sol)
+      case While(Counter(i),doP) => syntaxToValuationAux(doP ~ While(Counter(i-1),doP),sol)
     }
 
   }

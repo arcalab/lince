@@ -4,6 +4,30 @@ import breeze.linalg._
 import breeze.numerics._
 import hprog.DSL
 import hprog.ast._
+import hprog.frontend.Semantics.Solution
+
+trait Solver {
+  /**
+    * Precompute and cache several system of equations with a single system call to Sage
+    * @param systems systems of equations to be precomupted
+    */
+  def ++=(systems: List[List[DiffEq]]): Unit
+  def ++=(syntax:Syntax): Unit
+
+  /**
+    * precompute a system of equations using a system call to Sage
+    * @param eqs
+    */
+  def +=(eqs:List[DiffEq]): Unit
+
+  /** Gets a solution of a system of equations, using system calls to Sage,
+    * checking first in its cache.
+    * @param eqs System of equations to be retrived
+    * @return Result from Sage
+    */
+  def get(eqs:List[DiffEq]): Solution
+
+}
 
 object Solver {
   /**
