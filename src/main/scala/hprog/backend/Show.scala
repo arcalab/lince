@@ -1,4 +1,4 @@
-package hprog.frontend
+package hprog.backend
 
 import hprog.ast._
 

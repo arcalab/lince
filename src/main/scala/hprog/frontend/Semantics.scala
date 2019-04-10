@@ -1,6 +1,7 @@
 package hprog.frontend
 
 import hprog.ast._
+import hprog.backend.Show
 import hprog.lang.SageParser
 
 object Semantics {
@@ -65,6 +66,7 @@ object Semantics {
       new Traj[Valuation] {
         override val dur: Option[Double] = Some(0)
         override def apply(t: Double): Valuation = newValuation
+        override val inits: Map[Double, Valuation] = Map(0.0 -> newValuation)
       }
 
   }
@@ -80,6 +82,11 @@ object Semantics {
 
     new Traj[Valuation] {
       override val dur: Option[Double] = durValue
+      override val inits: Map[Double, Valuation] = Map(0.0 -> input)
+      override val ends: Map[Double, Valuation] = durValue match {
+        case Some(value) => Map(value -> apply(value))
+        case None => Map()
+      }
 
       override def apply(t: Double): Valuation = input ++ sol.mapValues(fun=>fun(t)(input))
     }
@@ -124,11 +131,17 @@ object Semantics {
 
   def iteToValuation(ite: ITE,sol: Solver): Prog[Valuation] = input => {
     val ITE(ifS, thenS, elseS) = ite
-
+    def note(txt:String): Prog[Valuation] = input => {
+      new Traj[Valuation] {
+        override val dur: Option[Double] = Some(0)
+        override def apply(t: Double): Valuation = input
+        override val notes: Map[Double, String] = Map(0.0->txt)
+      }
+    }
     if (Eval(input, ifS))
-      syntaxToValuationAux(thenS,sol).traj(input)
+      note(s"${Show(ifS)}? True").++(syntaxToValuationAux(thenS,sol)).traj(input)
     else
-      syntaxToValuationAux(elseS,sol).traj(input)
+      note(s"${Show(ifS)}? False").++(syntaxToValuationAux(elseS,sol)).traj(input)
   }
 
   def whileToValuation(whileStx: While, sol: Solver): Prog[Valuation] = {

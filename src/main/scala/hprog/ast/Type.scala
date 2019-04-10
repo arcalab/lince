@@ -1,6 +1,6 @@
 package hprog.ast
 
-import hprog.frontend.Show
+import hprog.backend.Show
 
 /**
   * Created by jose on 17/07/18.

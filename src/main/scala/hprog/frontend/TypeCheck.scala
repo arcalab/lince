@@ -1,6 +1,7 @@
 package hprog.frontend
 
 import hprog.ast._
+import hprog.backend.Show
 import hprog.common.TypeCheckException
 
 /**

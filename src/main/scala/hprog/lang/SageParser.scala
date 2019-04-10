@@ -63,6 +63,9 @@ object SageParser extends RegexParsers {
     }
 
   lazy val expn: Parser[SFunction] =
+    "e" ~ "^" ~ lit ^^ {
+      case _~_~e => (t:Double) => (ctx:Valuation) => Math.exp(e(t)(ctx))
+    } |
     lit ~ opt("^"~>lit) ^^ {
       case e ~ None => e
       case e1 ~ Some(e2) => (t:Double) => (ctx:Valuation) => Math.pow(e1(t)(ctx),e2(t)(ctx))
@@ -88,6 +91,9 @@ object SageParser extends RegexParsers {
         case (_,0) if ctx.contains(name) => ctx(name)
         case ("sin",v) => Math.sin(v)
         case ("cos",v) => Math.cos(v)
+        case ("sqrt",v) => Math.sqrt(v)
+        case ("log",v) => Math.log(v)
+        case ("log10",v) => Math.log10(v)
         case (_,v) => throw new ParserException(s"Unknown function '$name($v)'")
       }
     }

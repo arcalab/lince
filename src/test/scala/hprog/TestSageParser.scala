@@ -3,7 +3,7 @@ package hprog
 import org.scalatest.FlatSpec
 import hprog.DSL._
 import hprog.ast._
-import hprog.frontend.Show
+import hprog.backend.Show
 import hprog.lang.SageParser
 
 

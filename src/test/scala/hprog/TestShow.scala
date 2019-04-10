@@ -3,7 +3,7 @@ package hprog
 import org.scalatest.FlatSpec
 import DSL._
 import hprog.ast._
-import hprog.frontend.Show
+import hprog.backend.Show
 
 class TestShow extends FlatSpec {
 
