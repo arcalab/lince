@@ -64,27 +64,49 @@ object TrajToJS {
     }
     for ((variable, values) <- boundaries) {
 //      val sortedVals = values.sorted
-      val sortedVals = values.toList
-      js +=
-        s"""var b_${variable} = {
-           |   x: ${sortedVals.map(_._1.fold(x=>x,x=>x)).mkString("[", ",", "]")},
-           |   y: ${sortedVals.map(_._2._1).mkString("[", ",", "]")},
-           |   text: ${sortedVals.map("'"+_._2._2.replaceAll("\\\\","\\\\\\\\")+"'").mkString("[",",","]")},
-           |   mode: 'markers',
-           |   marker: {color: colors(${colorID.getOrElse(variable, 0)})},
-           |   type: 'scatter',
-           |   legendgroup: 'g_${variable}',
-           |   name: 'boundary of $variable',
-           |   showlegend: false
-           |};
-             """.stripMargin
+      val (ins,outs) = values.toList.partition(pair=>pair._1.isLeft)
+      js += mkMarkers(variable,"out",outs,
+              s"""{color: 'rgb(255, 255, 255)',
+                 | size: 10,
+                 | line: {
+                 |   color: colors(${colorID.getOrElse(variable, 0)}),
+                 |   width: 2}}""".stripMargin)
+      js += mkMarkers(variable,"in",ins,
+              s"""{color: colors(${colorID.getOrElse(variable, 0)}),
+                 | size: 10,
+                 | line: {
+                 |   color: colors(${colorID.getOrElse(variable, 0)}),
+                 |   width: 2}}""".stripMargin)
     }
-    val traceNames = traces.keys.map("t_"+_) ++ boundaries.keys.map("b_"+_)
+    val traceNames = traces.keys.map("t_"+_).toList ++
+                     boundaries.keys.map("b_out_"+_).toList ++
+                     boundaries.keys.map("b_in_"+_).toList
+
+
     js += s"var data = ${traceNames.mkString("[",",","]")};" +
       s"\nvar layout = {hovermode:'closest'};" +
       s"\nPlotly.newPlot('graphic', data, layout, {showSendToCloud: true});"
 
     js
   }
+
+
+  private def mkMarkers(variable:String,
+                        inout:String,
+                        data:List[(Either[Double,Double],(Double,String))],
+                        style: String): String =
+    s"""var b_${inout}_$variable = {
+       |   x: ${data.map(_._1.fold(x=>x,x=>x)).mkString("[", ",", "]")},
+       |   y: ${data.map(_._2._1).mkString("[", ",", "]")},
+       |   text: ${data.map("'"+_._2._2.replaceAll("\\\\","\\\\\\\\")+"'").mkString("[",",","]")},
+       |   mode: 'markers',
+       |   marker: $style,
+       |   type: 'scatter',
+       |   legendgroup: 'g_$variable',
+       |   name: 'boundary of $variable',
+       |   showlegend: false
+       |};""".stripMargin
+
+//  marker: {color: colors(${colorID.getOrElse(variable, 0)})},
 
 }

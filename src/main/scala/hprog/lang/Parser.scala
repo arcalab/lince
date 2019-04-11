@@ -50,13 +50,17 @@ object Parser extends RegexParsers {
     "repeat" ~> intPP ~ "{" ~ progP ~ "}" ^^ {
       case c ~ _ ~ p ~ _ => While(Counter(c), p)
     } |
-    "if" ~> condP ~ "then" ~ progP ~ "else" ~ progP ^^ {
+    "if" ~> condP ~ "then" ~ blockP ~ "else" ~ blockP ^^ {
       case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
     } |
     "wait"~>realP ^^ {
       time:Double => DiffEqs(Nil,For(Value(time)))
     }|
     atomP
+
+  lazy val blockP: Parser[Syntax] =
+    "{"~>progP<~"}" |
+    basicProg
 
   lazy val whileGuard: Parser[LoopGuard] = {
     condP ^^ Guard |
