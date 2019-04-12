@@ -3,7 +3,7 @@ package hprog.frontend
 import hprog.ast._
 import hprog.backend.Show
 import hprog.common.ParserException
-import hprog.frontend.Semantics.Solution
+import hprog.frontend.Semantics.{SolVars, Solution}
 import hprog.lang.SageParser
 
 import scala.sys.process._
@@ -25,6 +25,13 @@ class SageSolver(path:String) extends Solver {
       for ((eqs, res) <- filtered.zip(parsed)) {
         //println(s"- adding  ${eqs} -> $res")
         val resParsed = SageParser.parse(res) match {
+          case SageParser.Success(SolVars(s,sol), _) if s.isEmpty && sol.keySet == Set("") =>
+            val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
+            vars match {
+              case List(variable) => Map(variable -> sol(""))
+              case _ => throw new ParserException(s"Failed to parse $res - " +
+                s"only one variable expected, but found ${vars.mkString(",")}.")
+            }
           case SageParser.Success(result, _) => result.sol
           case _: SageParser.NoSuccess => throw new ParserException(s"Failed to parse $res")
         }

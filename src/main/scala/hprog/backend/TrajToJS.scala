@@ -22,7 +22,7 @@ object TrajToJS {
     /////
     // Generate sampling values for time - 100 values from 0 to max
     val (start,end) = range match {
-      case Some(x) => x
+      case Some((s,e)) => (s max 0,e max 0)
       case None => if (max<=0) (0.0,0.0) else (0.0,max)
     }
     val samples = if ((end-start)<=0) List(start) else start to end by ((end-start) / 100)

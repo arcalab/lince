@@ -24,9 +24,9 @@ class TestSageParser extends FlatSpec {
     Map("v"->100, "p"->500),
     List(3.0 -> Map("p"-> (Math.cos(3.0)*500.0+Math.sin(3.0)*100.0),"v"-> (Math.cos(3.0)*100.0-Math.sin(3.0)*500.0))))
 
-  testOk("x(_t_) == _t_ + x(0)",
+  testOk("_t_ + x(0)",
     Map("x"->0),
-    List(0.0->Map("x"->0.0), 3.0 -> Map("x"-> 3.0)))
+    List(0.0->Map(""->0.0), 3.0 -> Map(""-> 3.0)))
 
 
   //  testOk("[f1(_t_) == _t_ + f1(0), f2(_t_) == _t_ + f2(0)]",
