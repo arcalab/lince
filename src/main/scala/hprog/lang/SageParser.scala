@@ -36,7 +36,7 @@ object SageParser extends RegexParsers {
   //   ///////////////
 
   lazy val sols: Parser[SolVars] =
-    "["~>solsIn<~"]"
+    "["~>solsIn<~"]" | eqDef
 
   lazy val solsIn: Parser[SolVars] = 
     eqDef ~ opt("," ~> solsIn) ^^ {

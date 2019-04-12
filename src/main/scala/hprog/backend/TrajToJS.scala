@@ -5,7 +5,8 @@ import hprog.frontend.Traj
 
 object TrajToJS {
 
-  def apply(traj:Traj[Valuation]): String = {
+  def apply(traj:Traj[Valuation],range:Option[(Double,Double)]=None): String = {
+
     val max: Double = traj.dur.getOrElse(10)
     //      val x0 = traj(0)
     var colorID: Map[String,Int] =
@@ -20,19 +21,25 @@ object TrajToJS {
     //      println(s"c - max=$max")
     /////
     // Generate sampling values for time - 100 values from 0 to max
-    val samples = if (max<=0) List(0.0) else 0.0 to max by (max / 100)
+    val (start,end) = range match {
+      case Some(x) => x
+      case None => if (max<=0) (0.0,0.0) else (0.0,max)
+    }
+    val samples = if ((end-start)<=0) List(start) else start to end by ((end-start) / 100)
+
+
     for (t: Double <- samples)
       for ((variable, value) <- traj(t))
         traces += variable -> (traces(variable) + (t->Some(value)))
     //      println("d")
     ////
     // Add starting/ending points with notes when available
-    for ((t,valt) <- traj.ends; (variable,value) <- valt) {
+    for ((t,valt) <- traj.ends if t>=start && t<=end; (variable,value) <- valt) {
       val oldNote = boundaries(variable).getOrElse[(Double,String)](Right(t),(0,""))._2
       boundaries += variable -> (boundaries(variable) + (Right(t) ->(value, oldNote)))
       traces += variable -> (traces(variable) + (t->None))
     }
-    for ((t,valt) <- traj.inits; (variable,value) <- valt) {
+    for ((t,valt) <- traj.inits if t>=start && t<=end; (variable,value) <- valt) {
       val oldNote = boundaries(variable).getOrElse[(Double,String)](Left(t),(0,""))._2
       val newNote = traj.notes.get(t) match {
         case Some(str) if str.nonEmpty => str
