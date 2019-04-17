@@ -7,22 +7,24 @@ object TrajToJS {
 
   def apply(traj:Traj[Valuation],range:Option[(Double,Double)]=None): String = {
 
+    type Traces = Map[String,Trace]
+    type Trace = Map[Double,Either[Double,(Double,Double)]] // time -> 1 or 2 points (if boundary)
+
     val max: Double = traj.dur.getOrElse(10)
     //      val x0 = traj(0)
     var colorID: Map[String,Int] =
       traj(0).keys.zipWithIndex.toMap
     // traces are mappings from variables t0 lists of "y" values
-    //      var traces =  (x0.keys zip List[List[Double]]())
-    //        .toMap.withDefaultValue(List())
-    var traces = Map[String,Map[Double,Option[Double]]]().withDefaultValue(Map())
+    var traces = Map[String,Map[Double,Either[Double,(Double,Double)]]]().withDefaultValue(Map())
     var boundaries =  Map[String,Map[Either[Double,Double],(Double,String)]]().withDefaultValue(Map())
-    //      var ends   = Map[String,List[(Double,Double)]]()
-    //(traj.vars zip List[List[Double]]()).toMap.withDefaultValue(List())
-    //      println(s"c - max=$max")
-    /////
+
     // Generate sampling values for time - 100 values from 0 to max
     val (start,end) = range match {
-      case Some((s,e)) => (s max 0,e max 0)
+      case Some((s,e)) =>
+        if (traj.dur.isDefined)
+          (s.max(0).min(max),e.max(0).min(max))
+        else
+          (s max 0, e max 0)
       case None => if (max<=0) (0.0,0.0) else (0.0,max)
     }
     val samples = if ((end-start)<=0) List(start) else start to end by ((end-start) / 100)
@@ -30,14 +32,20 @@ object TrajToJS {
 
     for (t: Double <- samples)
       for ((variable, value) <- traj(t))
-        traces += variable -> (traces(variable) + (t->Some(value)))
+        traces += variable -> (traces(variable) + (t->Left(value)))
     //      println("d")
     ////
     // Add starting/ending points with notes when available
-    for ((t,valt) <- traj.ends if t>=start && t<=end; (variable,value) <- valt) {
+    for ((t,beforeVals) <- traj.ends if t>=start && t<=end; (variable,beforeVal) <- beforeVals) {
       val oldNote = boundaries(variable).getOrElse[(Double,String)](Right(t),(0,""))._2
-      boundaries += variable -> (boundaries(variable) + (Right(t) ->(value, oldNote)))
-      traces += variable -> (traces(variable) + (t->None))
+      boundaries += variable -> (boundaries(variable) + (Right(t) ->(beforeVal, oldNote)))
+      val traceBoundary: Either[Double,(Double,Double)] =
+        traj.inits.get(t).flatMap(valuation=>valuation.get(variable)) match {
+          case Some(afterVal) =>
+            Right((beforeVal,afterVal))
+          case None => Left(beforeVal)
+        }
+      traces += variable -> (traces(variable) + (t->traceBoundary))
     }
     for ((t,valt) <- traj.inits if t>=start && t<=end; (variable,value) <- valt) {
       val oldNote = boundaries(variable).getOrElse[(Double,String)](Left(t),(0,""))._2
@@ -47,7 +55,9 @@ object TrajToJS {
       }
       boundaries += variable -> (boundaries(variable) + (Left(t) ->(value, newNote)))
 //      boundaries += variable -> ((t, value,txt) :: boundaries(variable))
-      traces += variable -> (traces(variable) + (t->None))
+      // if very first, need to update the trace
+      if (!traj.ends.contains(t))
+        traces += variable -> (traces(variable) + (t -> Left(value)))
     }
     /////
     /// Build the JavaScript code to generate graph
@@ -56,12 +66,13 @@ object TrajToJS {
     //      val rangeTxt = "x: "+samples.mkString("[",",","]")
     //      println("e")
     for ((variable, values) <- traces) {
-      val (xs,ys) = values.toList.sorted.unzip
+      val tr = values.toList.sortWith(_._1 <= _._1).flatMap(expandPoint)
+      val (xs,ys) = tr.unzip
+      ////   ${ys.map(_.map(_.toString()).getOrElse("null")).mkString("[", ",", "]")},
       js +=
         s"""var t_${variable} = {
            |   x: ${xs.mkString("[",",","]")},
-           |   y: ${ys.map(_.map(_.toString()).getOrElse("null"))
-          .mkString("[", ",", "]")},
+           |   y: ${ys.mkString("[",",","]")},
            |   mode: 'lines',
            |   line: {color: colors(${colorID.getOrElse(variable,0)})},
            |   legendgroup: 'g_${variable}',
@@ -97,6 +108,12 @@ object TrajToJS {
     js
   }
 
+
+  private def expandPoint(point:(Double,Either[Double,(Double,Double)])): List[(Double,String)] =
+    point match {
+      case (t,Left(v)) => List((t,v.toString))
+      case (t,Right((v1,v2))) => List((t,v1.toString),(t,"null"),(t,v2.toString))
+    }
 
   private def mkMarkers(variable:String,
                         inout:String,
