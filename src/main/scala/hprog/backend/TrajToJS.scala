@@ -5,18 +5,23 @@ import hprog.frontend.Traj
 
 object TrajToJS {
 
-  def apply(traj:Traj[Valuation],range:Option[(Double,Double)]=None): String = {
+  // Type of intermediate structures
+  private type Traces      = Map[String,TraceVar]
+  private type TraceVar    = Map[Double,Either[Double,(Double,Double)]] // time -> 1 or 2 points (if boundary)
+  private type Boundaries  = Map[String,BoundaryVar]
+  private type BoundaryVar = Map[Either[Double,Double],(Double,String)] // left/right of a time t -> value and comment
 
-    type Traces = Map[String,Trace]
-    type Trace = Map[Double,Either[Double,(Double,Double)]] // time -> 1 or 2 points (if boundary)
+
+  def apply(traj:Traj[Valuation],range:Option[(Double,Double)]=None,hideCont:Boolean=true): String = {
 
     val max: Double = traj.dur.getOrElse(10)
     //      val x0 = traj(0)
     var colorID: Map[String,Int] =
       traj(0).keys.zipWithIndex.toMap
+
     // traces are mappings from variables t0 lists of "y" values
-    var traces = Map[String,Map[Double,Either[Double,(Double,Double)]]]().withDefaultValue(Map())
-    var boundaries =  Map[String,Map[Either[Double,Double],(Double,String)]]().withDefaultValue(Map())
+    var traces:Traces          = Map().withDefaultValue(Map())
+    var boundaries: Boundaries = Map().withDefaultValue(Map())
 
     // Generate sampling values for time - 100 values from 0 to max
     val (start,end) = range match {
@@ -41,9 +46,9 @@ object TrajToJS {
       boundaries += variable -> (boundaries(variable) + (Right(t) ->(beforeVal, oldNote)))
       val traceBoundary: Either[Double,(Double,Double)] =
         traj.inits.get(t).flatMap(valuation=>valuation.get(variable)) match {
-          case Some(afterVal) =>
+          case Some(afterVal) if !hideCont || afterVal!=beforeVal => // could be simplified...
             Right((beforeVal,afterVal))
-          case None => Left(beforeVal)
+          case _ => Left(beforeVal)
         }
       traces += variable -> (traces(variable) + (t->traceBoundary))
     }
@@ -59,6 +64,12 @@ object TrajToJS {
       if (!traj.ends.contains(t))
         traces += variable -> (traces(variable) + (t -> Left(value)))
     }
+
+    // clean boundaries in continuous points
+    if (hideCont) {
+      boundaries = boundaries.map(filterCont)
+    }
+
     /////
     /// Build the JavaScript code to generate graph
     var js = "var colors = Plotly.d3.scale.category10();\n"
@@ -114,6 +125,19 @@ object TrajToJS {
       case (t,Left(v)) => List((t,v.toString))
       case (t,Right((v1,v2))) => List((t,v1.toString),(t,"null"),(t,v2.toString))
     }
+
+  private def filterCont(boundary: (String,BoundaryVar)): (String,BoundaryVar) = {
+    (boundary._1, boundary._2.filter({
+      case (Left(t),v1)  => boundary._2.get(Right(t)) match {
+          case Some(v2) => v1._1 != v2._1
+          case None     => true
+        }
+      case (Right(t),v1) => boundary._2.get(Left(t)) match {
+          case Some(v2) => v1._1 != v2._1
+          case None     => true
+        }
+    }))
+  }
 
   private def mkMarkers(variable:String,
                         inout:String,
