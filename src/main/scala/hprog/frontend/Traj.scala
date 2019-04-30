@@ -11,6 +11,7 @@ trait Traj[X] {
   val inits:Map[Double,X] = Map() // starting points of sub-trajectories
   val ends: Map[Double,X] = Map() // ending   points of sub-trajectories
   val notes: Map[Double,String] = Map() // text notes to add at trajectory points.
+  val warnings: Map[Double,Set[String]] = Map() // Warnings at trajectory points.
 }
 
 //object Traj {
@@ -49,6 +50,8 @@ object Prog {
             t1.ends  ++ t2.ends.map(p => (p._1+dur1)->p._2)
           override val notes: Map[Double, String] =
             append(t1.notes,t2.notes.map(p => (p._1+dur1)->p._2))
+          override val warnings: Map[Double, Set[String]] =
+            appendW(t1.warnings,t2.warnings.map(p => (p._1+dur1)->p._2))
 
           override val dur: Option[Double] =
             for (dur2 <- t2.dur) yield dur1 + dur2
@@ -64,6 +67,15 @@ object Prog {
     for ((t, s) <- m2)
       res.get(t) match {
         case Some(value) => res += t -> (value + "<br>" + s)
+        case None =>res += t->s
+      }
+    res
+  }
+  private def appendW(m1: Map[Double, Set[String]], m2: Map[Double, Set[String]]) = {
+    var res = m1
+    for ((t, s) <- m2)
+      res.get(t) match {
+        case Some(value) => res += t -> (value ++ s)
         case None =>res += t->s
       }
     res

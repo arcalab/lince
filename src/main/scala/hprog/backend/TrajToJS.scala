@@ -10,18 +10,21 @@ object TrajToJS {
   private type TraceVar    = Map[Double,Either[Double,(Double,Double)]] // time -> 1 or 2 points (if boundary)
   private type Boundaries  = Map[String,BoundaryVar]
   private type BoundaryVar = Map[Either[Double,Double],(Double,String)] // left/right of a time t -> value and comment
+  // private type Warnings    = Map[String,WarningVar]
+  // private type WarningVar  = Map[Double,Set[String]] //time -> possible warning
 
 
   def apply(traj:Traj[Valuation],range:Option[(Double,Double)]=None,hideCont:Boolean=true): String = {
 
     val max: Double = traj.dur.getOrElse(10)
     //      val x0 = traj(0)
-    var colorID: Map[String,Int] =
+    var colorIDs: Map[String,Int] =
       traj(0).keys.zipWithIndex.toMap
 
     // traces are mappings from variables t0 lists of "y" values
     var traces:Traces          = Map().withDefaultValue(Map())
     var boundaries: Boundaries = Map().withDefaultValue(Map())
+    // var warnings: Warnings     = Map().withDefaultValue(Map())
 
     // Generate sampling values for time - 100 values from 0 to max
     val (start,end) = range match {
@@ -43,7 +46,8 @@ object TrajToJS {
     // Add starting/ending points with notes when available
     for ((t,beforeVals) <- traj.ends if t>=start && t<=end; (variable,beforeVal) <- beforeVals) {
       val oldNote = boundaries(variable).getOrElse[(Double,String)](Right(t),(0,""))._2
-      boundaries += variable -> (boundaries(variable) + (Right(t) ->(beforeVal, oldNote)))
+      boundaries += variable ->
+        (boundaries(variable) + (Right(t) ->(beforeVal, oldNote)))
       val traceBoundary: Either[Double,(Double,Double)] =
         traj.inits.get(t).flatMap(valuation=>valuation.get(variable)) match {
           case Some(afterVal) if !hideCont || afterVal!=beforeVal => // could be simplified...
@@ -64,6 +68,10 @@ object TrajToJS {
       if (!traj.ends.contains(t))
         traces += variable -> (traces(variable) + (t -> Left(value)))
     }
+    // for ((t,valt) <- traj.warnings) {
+    //   warnings = warnings + //(variable -> Map())
+    //     (warnings(variable)(t) ++ traj.warnings(t))
+    // }
 
     // clean boundaries in continuous points
     if (hideCont) {
@@ -71,11 +79,39 @@ object TrajToJS {
     }
 
     /////
-    /// Build the JavaScript code to generate graph
+    // Build the JavaScript code to generate graph
+    /////
     var js = "var colors = Plotly.d3.scale.category10();\n"
 
-    //      val rangeTxt = "x: "+samples.mkString("[",",","]")
     //      println("e")
+    js += buildTraces(traces,colorIDs)
+    js += buildBoundaries(boundaries,colorIDs)
+    js += buildDeviations(traj,colorIDs)
+
+    //////
+    // Build the boundary nodes 
+    //////
+    //////
+    // build warnings in boundary nodes
+    //////
+    val traceNames = traces.keys.map("t_"+_).toList ++
+                     boundaries.keys.map("b_out_"+_).toList ++
+                     boundaries.keys.map("b_in_"+_).toList ++
+                     boundaries.keys.map("w_"+_).toList
+
+
+    js += s"var data = ${traceNames.mkString("[",",","]")};" +
+      s"\nvar layout = {hovermode:'closest'};" +
+      s"\nPlotly.newPlot('graphic', data, layout, {showSendToCloud: true});"
+
+    js
+  }
+
+
+  ///////
+
+  private def buildTraces(traces: Traces, colorIDs: Map[String, Int]): String = {
+    var js = ""
     for ((variable, values) <- traces) {
       val tr = values.toList.sortWith(_._1 <= _._1).flatMap(expandPoint)
       val (xs,ys) = tr.unzip
@@ -85,39 +121,49 @@ object TrajToJS {
            |   x: ${xs.mkString("[",",","]")},
            |   y: ${ys.mkString("[",",","]")},
            |   mode: 'lines',
-           |   line: {color: colors(${colorID.getOrElse(variable,0)})},
+           |   line: {color: colors(${colorIDs.getOrElse(variable,0)})},
            |   legendgroup: 'g_${variable}',
            |   name: '$variable'
            |};
              """.stripMargin
     }
-    for ((variable, values) <- boundaries) {
-//      val sortedVals = values.sorted
-      val (ins,outs) = values.toList.partition(pair=>pair._1.isLeft)
-      js += mkMarkers(variable,"out",outs,
-              s"""{color: 'rgb(255, 255, 255)',
-                 | size: 10,
-                 | line: {
-                 |   color: colors(${colorID.getOrElse(variable, 0)}),
-                 |   width: 2}}""".stripMargin)
-      js += mkMarkers(variable,"in",ins,
-              s"""{color: colors(${colorID.getOrElse(variable, 0)}),
-                 | size: 10,
-                 | line: {
-                 |   color: colors(${colorID.getOrElse(variable, 0)}),
-                 |   width: 2}}""".stripMargin)
-    }
-    val traceNames = traces.keys.map("t_"+_).toList ++
-                     boundaries.keys.map("b_out_"+_).toList ++
-                     boundaries.keys.map("b_in_"+_).toList
-
-
-    js += s"var data = ${traceNames.mkString("[",",","]")};" +
-      s"\nvar layout = {hovermode:'closest'};" +
-      s"\nPlotly.newPlot('graphic', data, layout, {showSendToCloud: true});"
-
     js
   }
+
+  private def buildBoundaries(boundaries: Boundaries, colorIDs: Map[String, Int]): String = {
+    var js = ""
+    for ((variable, values) <- boundaries) {
+      //      val sortedVals = values.sorted
+      val (ins,outs) = values.toList.partition(pair=>pair._1.isLeft)
+      js += mkMarkers(variable,"out",outs,
+        s"""{color: 'rgb(255, 255, 255)',
+           | size: 10,
+           | line: {
+           |   color: colors(${colorIDs.getOrElse(variable, 0)}),
+           |   width: 2}}""".stripMargin)
+      js += mkMarkers(variable,"in",ins,
+        s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
+           | size: 10,
+           | line: {
+           |   color: colors(${colorIDs.getOrElse(variable, 0)}),
+           |   width: 2}}""".stripMargin)
+    }
+    js
+  }
+
+  private def buildDeviations(traj: Traj[Valuation], colorIDs: Map[String, Int]): String = {
+    var js = ""
+    for (variable <- traj(0).keys) {
+      js += mkWarnings(variable,traj,
+        s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
+           | size: 15,
+           | line: {
+           |   color: 'rgb(0,0,0)',
+           |   width: 2}}""".stripMargin)
+    }
+    js
+  }
+
 
 
   private def expandPoint(point:(Double,Either[Double,(Double,Double)])): List[(Double,String)] =
@@ -156,5 +202,27 @@ object TrajToJS {
        |};""".stripMargin
 
 //  marker: {color: colors(${colorID.getOrElse(variable, 0)})},
+
+  private def mkWarnings(variable: String, traj: Traj[Valuation]
+        , style:String): String = {
+
+    val (x,y,msg) = traj
+      .warnings
+      .toList
+      .map(x=>(x._1,traj(x._1)(variable),x._2.map(w=>s"'$w'").mkString("</br>") ))
+      .unzip3
+
+    s"""var w_$variable = { 
+       |   x: ${x.mkString("[",",","]")},
+       |   y: ${y.mkString("[",",","]")},
+       |   text: ${msg.mkString("[",",","]")},
+       |   mode: 'markers',
+       |   marker: ${style},
+       |   type: 'scatter',
+       |   legendgroup: 'g_$variable',
+       |   name: 'Warning',
+       |   showlegend: false
+       |};""".stripMargin
+  }
 
 }

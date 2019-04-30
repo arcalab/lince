@@ -32,4 +32,16 @@ object Utils {
     case Add(l1, l2) => getVars(l1) ++ getVars(l2)
     case Mult(_, l) => getVars(l)
   }
+
+  def getVars(cond: Cond): Set[String] = cond match {
+    case BVal(b)    => Set()
+    case And(c1,c2) => getVars(c1) ++ getVars(c2)
+    case Or(c1,c2)  => getVars(c1) ++ getVars(c2)
+    case Not(c)     => getVars(c)
+    case EQ(v,l)    => getVars(l) + v.v
+    case GT(v,l)    => getVars(l) + v.v
+    case LT(v,l)    => getVars(l) + v.v
+    case GE(v,l)    => getVars(l) + v.v
+    case LE(v,l)    => getVars(l) + v.v
+  }
 }

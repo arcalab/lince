@@ -26,13 +26,14 @@ object Semantics {
 
 
   def syntaxToValuation(syntax:Syntax,
-                        solver: Solver = new SageSolver("/home/jose/Applications/SageMath")): Prog[Valuation] = {
+                        solver: Solver = new SageSolver("/home/jose/Applications/SageMath"),
+                        eps:Double=0): Prog[Valuation] = {
 //    val solver = new SageSolver("/home/jose/Applications/SageMath")
     solver.++=(syntax)
-    syntaxToValuationAux(syntax,solver)
+    syntaxToValuationAux(syntax,solver,eps)
   }
 
-  def syntaxToValuationTaylor(syntax:Syntax): Prog[Valuation] = {
+  def syntaxToValuationTaylor(syntax:Syntax,eps:Double=0): Prog[Valuation] = {
     val solver = new Solver{
       override def ++=(systems: List[List[DiffEq]]): Unit = {}
       override def ++=(syntax: Syntax): Unit = {}
@@ -45,18 +46,18 @@ object Semantics {
       }
     }
     solver.++=(syntax)
-    syntaxToValuationAux(syntax,solver)
+    syntaxToValuationAux(syntax,solver,eps)
   }
 
-  private def syntaxToValuationAux(syntax:Syntax,sol:Solver): Prog[Valuation] = syntax match {
+  private def syntaxToValuationAux(syntax:Syntax,sol:Solver,eps:Double): Prog[Valuation] = syntax match {
     case a:Assign    => assignmentToValuation(a)
     case d:DiffEqs   => diffEqsToValuation(d,sol)
-    case Seq(Nil)    => syntaxToValuationAux(Skip,sol)
-    case Seq(p::Nil) => syntaxToValuationAux(p,sol)
-    case Seq(p::ps)  => syntaxToValuationAux(p,sol) ++ syntaxToValuationAux(Seq(ps),sol)
+    case Seq(Nil)    => syntaxToValuationAux(Skip,sol,eps)
+    case Seq(p::Nil) => syntaxToValuationAux(p,sol,eps)
+    case Seq(p::ps)  => syntaxToValuationAux(p,sol,eps) ++ syntaxToValuationAux(Seq(ps),sol,eps)
     case Skip        => skipToValuation()
-    case ite:ITE     => iteToValuation(ite,sol)
-    case whil:While  => whileToValuation(whil,sol)
+    case ite:ITE     => iteToValuation(ite,sol,eps)
+    case whil:While  => whileToValuation(whil,sol,eps)
   }
 
   def assignmentToValuation(assign: Assign): Prog[Valuation] = input => {
@@ -130,29 +131,67 @@ object Semantics {
     }
   }
 
-  def iteToValuation(ite: ITE,sol: Solver): Prog[Valuation] = input => {
+  def iteToValuation(ite: ITE,sol: Solver, eps:Double): Prog[Valuation] = input => {
     val ITE(ifS, thenS, elseS) = ite
-    def note(txt:String): Prog[Valuation] = input => {
+    val deviation: Map[Double,Set[String]] = deviate(input,ifS,eps) match {
+      case Some(str) => Map(0.0->Set(str))
+      case _         => Map()
+    }
+    def noteWarn(txt:String,warn:Map[Double,Set[String]])
+        : Prog[Valuation] = input => {
       new Traj[Valuation] {
         override val dur: Option[Double] = Some(0)
         override def apply(t: Double): Valuation = input
         override val notes: Map[Double, String] = Map(0.0->txt)
+        override val warnings: Map[Double, Set[String]] = warn
       }
     }
     if (Eval(input, ifS))
-      note(s"${Show(ifS)}? True").++(syntaxToValuationAux(thenS,sol)).traj(input)
+      noteWarn(s"${Show(ifS)}? True",deviation)
+      .++(syntaxToValuationAux(thenS,sol,eps)).traj(input)
     else
-      note(s"${Show(ifS)}? False").++(syntaxToValuationAux(elseS,sol)).traj(input)
+      noteWarn(s"${Show(ifS)}? False",deviation)
+      .++(syntaxToValuationAux(elseS,sol,eps)).traj(input)
   }
 
-  def whileToValuation(whileStx: While, sol: Solver): Prog[Valuation] = {
+  def whileToValuation(whileStx: While, sol: Solver,eps: Double): Prog[Valuation] = {
 //    val While(c,doP) = whileStx
     whileStx match {
-      case While(Guard(c),doP) => syntaxToValuationAux(ITE(c,doP ~ whileStx, Skip),sol)
-      case While(Counter(0),doP) => syntaxToValuationAux(Skip,sol)
-      case While(Counter(i),doP) => syntaxToValuationAux(doP ~ While(Counter(i-1),doP),sol)
+      case While(Guard(c),doP) => syntaxToValuationAux(ITE(c,doP ~ whileStx, Skip),sol,eps)
+      case While(Counter(0),doP) => syntaxToValuationAux(Skip,sol,eps)
+      case While(Counter(i),doP) => syntaxToValuationAux(doP ~ While(Counter(i-1),doP),sol,eps)
     }
 
+  }
+
+  private def deviate(input:Valuation,pred:Cond,eps:Double): Option[String] = {
+    if (eps==0.0) None
+    else {
+      val vars = Utils.getVars(pred)
+      val ref = Eval(input, pred) // reference value - Boolean
+      runCombinations(input, pred, eps, ref, vars, vars.toList)
+    }
+  }
+
+  private def runCombinations(input:Valuation,pred:Cond,eps:Double
+                             ,ref:Boolean,allVars:Set[String],vars:List[String])
+                             : Option[String] = vars match {
+    case (hd::tl) =>
+      val inp2 = input + (hd -> (input(hd)+eps))
+      runCombinations(inp2,pred,eps,ref,allVars,tl) match {
+        case None =>
+          val inp3 = input + (hd -> (input(hd)-eps))
+          runCombinations(inp3,pred,eps,ref,allVars,tl)
+        case res => res
+      }
+    case Nil =>
+      if (Eval(input,pred) == ref) None
+      else Some(s"Deviation found for ${Show(pred)} when ${
+        input
+          .filter(p=>allVars contains (p._1))
+          .map(p=>s"${p._1}=${p._2}")
+          .mkString(",")
+    }")  
   }
 
 
