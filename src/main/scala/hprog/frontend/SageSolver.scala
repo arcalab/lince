@@ -117,7 +117,7 @@ object SageSolver {
     res
   }
 
-  def callSageSolver(systems: List[List[DiffEq]], path: String): List[String] = {
+  def callSageSolver(systems: List[List[DiffEq]], path: String, timeout:Int = 10): List[String] = {
     if (systems.filter(_.nonEmpty).nonEmpty) {
       //println(s"solving Sage with ${systems}")
       val instructions = systems.map(SageSolver.genSage).mkString("; print(\"§\"); ")
@@ -126,7 +126,7 @@ object SageSolver {
 
       val stdout = new StringBuilder
       val stderr = new StringBuilder
-      val status = s"$path/sage -c $instructions" !
+      val status = s"timeout $timeout $path/sage -c $instructions" !
                    ProcessLogger(stdout append _, stderr append _)
       if (status == 0)
         stdout.split('§').toList
