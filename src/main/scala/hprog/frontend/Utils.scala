@@ -44,4 +44,163 @@ object Utils {
     case GE(v,l)    => getVars(l) + v.v
     case LE(v,l)    => getVars(l) + v.v
   }
+
+
+  //////
+  // inferring open domains...
+  //////
+
+//  type Domains = Set[Domain] // possible domains (disjunction)
+  type Domain = Map[String,VarDomain] // one domain to a set of variables
+  sealed abstract class VarDomain
+  case object All extends VarDomain
+  case class Hole(to:Point, from:Point) extends VarDomain
+  sealed abstract class Point
+  case object Inf            extends Point
+  case class Open(t:Double)  extends Point
+  case class Close(t:Double) extends Point
+
+  def andD(d1:VarDomain,d2:VarDomain): Option[VarDomain] = (d1,d2) match {
+    case (All,_) => Some(d2)
+    case (_,All) => Some(d1)
+    case (h1:Hole,h2:Hole) =>
+      val to = minTo(h1.to,h2.to)
+      val from = maxFrom(h1.from,h2.from)
+      val compat = isLess(h1.to,h2.from) && isLess(h2.to,h1.from)
+      if (compat)
+        (getP(to),getP(from)) match {
+//          case (None, _) => Some(Hole(Inf, from))
+//          case (_, None) => Some(Hole(to, Inf))
+          case (Some(t1), Some(t2)) if t1>t2 => Some(All)
+          case (Some(t1), Some(t2)) if t1==t2 =>
+            if (to == Close(t1) || from == Close(t1)) Some(All)
+            else Some(Hole(to,from))
+          case _ => Some(Hole(to,from))
+        }
+      else None
+  }
+
+  def isLess(p1: Point, p2: Point): Boolean = (getP(p1),getP(p2)) match {
+    case (None,_) => true
+    case (_,None) => true
+    case (Some(t1),Some(t2)) => (t1 < t2) || (p1==Open(t1) && p2==Open(t1))
+  }
+
+  def minTo(p1:Point, p2:Point): Point = (getP(p1),getP(p2)) match {
+    case (None,_) => Inf
+    case (_,None) => Inf
+    case (Some(t1),Some(t2)) =>
+      if (t1<t2) p1
+      else if (t2<t1) p2
+      else if (p1==Close(t1) && p2==Close(t2)) p1
+      else Open(t1)
+  }
+  def maxTo(p1:Point, p2:Point): Point = (getP(p1),getP(p2)) match {
+    case (None,_) => p2
+    case (_,None) => p1
+    case (Some(t1),Some(t2)) =>
+      if (t1>t2) p1
+      else if (t1<t2) p2
+      else if (p1==Open(t1) && p2==Open(t2)) p1
+      else Close(t1)
+  }
+  def maxFrom(p1:Point, p2:Point): Point = invP(minTo(invP(p1),invP(p2)))
+  def minFrom(p1:Point, p2:Point): Point = invP(maxTo(invP(p1),invP(p2)))
+  def invP(point: Utils.Point): Point = point match {
+    case Inf => Inf
+    case Open(t) => Open(-t)
+    case Close(t) => Close(-t)
+  }
+  def getP(point: Point): Option[Double] = point match {
+    case Inf      => None
+    case Open(t)  => Some(t)
+    case Close(t) => Some(t)
+  }
+
+  def orD(d1:VarDomain,d2:VarDomain): VarDomain = (d1,d2) match {
+    case (All,_) => All
+    case (_,All) => All
+    case (Hole(to1,from1),Hole(to2,from2)) =>
+      if (!isLess(to1,from2) || !isLess(to2,from2)) All
+      else Hole(maxTo(to1,to2),minFrom(from1,from2))
+  }
+
+
+  def andD(d1:Domain,d2:Domain): Option[Domain] = {
+    var res = d1
+    for ((k,v) <- d2) {
+      res += k -> (d1.get(k) match { //andD(d1.getOrElse(k,All),v)
+        case Some(vd) => andD(vd, v) match {
+          case Some(vDom) => vDom
+          case None => return None
+        }
+        case _ => v
+      })
+    }
+    Some(res)
+  }
+
+  def orD(d1:Domain,d2:Domain): Domain = {
+    var res = d1
+    for ((k,v) <- d2) {
+      res += k -> (d1.get(k) match { //orD(d1.getOrElse(k,Hole(Inf,Inf)),v)
+        case Some(vd) => orD(vd,v)
+        case _ => v
+      })
+    }
+    res
+  }
+
+  def notD(d:VarDomain): Option[VarDomain] = d match {
+    case Hole(Open(t),Inf) => Some(Hole(Inf,Close(t)))
+    case Hole(Close(t),Inf) => Some(Hole(Inf,Open(t)))
+    case Hole(Inf,Open(t)) => Some(Hole(Close(t),Inf))
+    case Hole(Inf,Close(t)) => Some(Hole(Open(t),Inf))
+    case Hole(Inf,Inf) => Some(All)
+    case All => Some(Hole(Inf,Inf))
+    case _ => None
+  }
+  def notD(d:Domain): Option[Domain] = {
+    val res: Domain = for ((k, v) <- d) yield notD(v) match {
+      case Some(value) => k->value
+      case None        => return None
+    }
+    Some(res)
+  }
+
+
+  // domains = Set() -> no open domains found
+  // domains = Set(Map()) -> One open domain with no restrictions found.
+  private def getDomainAux(cond:Cond): Option[Domain] = cond match {
+    case BVal(true) =>  Some(Map()) //Set(Map())
+    case BVal(false) =>  None
+    case And(c1, c2) =>
+//      (for (d1<-getDomains(c1); d2<-getDomains(c2)) yield andD(d1,d2))
+//        .filter(_.isDefined)
+//        .map(_.get)
+      for (d1<-getDomain(c1); d2<-getDomain(c2); d12 <- andD(d1,d2)) yield d12
+    case Or(c1, c2) =>
+      for (d1<-getDomain(c1); d2<-getDomain(c2)) yield orD(d1,d2)
+    case Not(c) => getDomain(c).flatMap(notD)
+    case GT(Var(v), Value(d)) => Some(Map(v->Hole(Inf,Open(d))))
+    case GE(Var(v), Value(d)) => Some(Map(v->Hole(Inf,Close(d))))
+    case LT(Var(v), Value(d)) => Some(Map(v->Hole(Open(d),Inf)))
+    case LE(Var(v), Value(d)) => Some(Map(v->Hole(Close(d),Inf)))
+    case _ => None
+  }
+
+  def getDomain(cond: Cond): Option[Domain] =
+    getDomainAux(cond).flatMap(filterOneSides)
+
+  def isOneSide(vd:VarDomain): Boolean = vd match {
+    case All => true
+    case Hole(Inf,_) => true
+    case Hole(_,Inf) => true
+    case _ => false
+  }
+
+  def filterOneSides(d:Domain): Option[Domain] = {
+    val allOneSide = d.mapValues(isOneSide).forall(_._2)
+    if (allOneSide) Some(d) else None
+  }
 }

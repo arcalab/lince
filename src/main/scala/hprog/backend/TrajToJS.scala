@@ -1,5 +1,6 @@
 package hprog.backend
 
+import hprog.ast.BVal
 import hprog.frontend.Semantics.Valuation
 import hprog.frontend.Traj
 
@@ -86,7 +87,7 @@ object TrajToJS {
     //      println("e")
     js += buildTraces(traces,colorIDs)
     js += buildBoundaries(boundaries,colorIDs)
-    js += buildDeviations(traj,colorIDs)
+    js += buildDeviations(traj,start,end,colorIDs)
 
     //////
     // Build the boundary nodes 
@@ -104,6 +105,7 @@ object TrajToJS {
       s"\nvar layout = {hovermode:'closest'};" +
       s"\nPlotly.newPlot('graphic', data, layout, {showSendToCloud: true});"
 
+    //println("JS:\n"+js)
     js
   }
 
@@ -151,10 +153,10 @@ object TrajToJS {
     js
   }
 
-  private def buildDeviations(traj: Traj[Valuation], colorIDs: Map[String, Int]): String = {
+  private def buildDeviations(traj: Traj[Valuation], start:Double, end:Double, colorIDs: Map[String, Int]): String = {
     var js = ""
     for (variable <- traj(0).keys) {
-      js += mkWarnings(variable,traj,
+      js += mkWarnings(variable,traj,start,end,
         s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
            | size: 15,
            | line: {
@@ -192,7 +194,7 @@ object TrajToJS {
     s"""var b_${inout}_$variable = {
        |   x: ${data.map(_._1.fold(x=>x,x=>x)).mkString("[", ",", "]")},
        |   y: ${data.map(_._2._1).mkString("[", ",", "]")},
-       |   text: ${data.map("'"+_._2._2.replaceAll("\\\\","\\\\\\\\")+"'").mkString("[",",","]")},
+       |   text: ${data.map(s=>"'" + fixStr(s._2._2) + "'").mkString("[",",","]")},
        |   mode: 'markers',
        |   marker: $style,
        |   type: 'scatter',
@@ -204,12 +206,14 @@ object TrajToJS {
 //  marker: {color: colors(${colorID.getOrElse(variable, 0)})},
 
   private def mkWarnings(variable: String, traj: Traj[Valuation]
-        , style:String): String = {
+                       , start: Double, end: Double
+                       , style:String): String = {
 
     val (x,y,msg) = traj
-      .warnings
+      .warnings(BVal(true))
       .toList
-      .map(x=>(x._1,traj(x._1)(variable),x._2.map(w=>s"'$w'").mkString("</br>") ))
+      .filter(x => x._1 >= start && x._1 <= end)
+      .map(x=>(x._1,traj(x._1)(variable),"'"+x._2.map(w=>s"${fixStr(w)}").mkString("</br>")+"'"))
       .unzip3
 
     s"""var w_$variable = { 
@@ -224,5 +228,8 @@ object TrajToJS {
        |   showlegend: false
        |};""".stripMargin
   }
+
+  private def fixStr(str:String): String =
+    str.replaceAll("\\\\", "\\\\\\\\")
 
 }

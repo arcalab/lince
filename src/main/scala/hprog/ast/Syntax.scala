@@ -81,10 +81,23 @@ case class Mult(v:Value,l:Lin) extends Lin
 
 // Conditions
 sealed abstract class Cond {
-  def &&(that:Cond): Cond  = And(this,that)
-  def ||(that:Cond): Cond  = Or(this,that)
+  def &&(that:Cond): Cond  = (this,that) match {
+    case (BVal(true),_) => that
+    case (_,BVal(true)) => this
+    case (BVal(false),_) => BVal(false)
+    case (_,BVal(false)) => BVal(false)
+    case _ => if (this==that) this else And(this,that)
+  }
+  def ||(that:Cond): Cond  = (this,that) match {
+    case (BVal(true),_) => BVal(true)
+    case (_,BVal(true)) => BVal(true)
+    case (BVal(false),_) => that
+    case (_,BVal(false)) => this
+    case _ => if (this==that) this else Or(this,that)
+  }
   def <=>(that:Cond): Cond =
     (this && that) || (Not(this) && Not(that))
+  def -->(that:Cond): Cond = that || Not(this)
 }
 case class BVal(b:Boolean)      extends Cond
 case class And(c1:Cond,c2:Cond) extends Cond
