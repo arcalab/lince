@@ -26,7 +26,7 @@ object Semantics {
 
 
   def syntaxToValuation(syntax:Syntax,
-                        solver: Solver = new SageSolver("/home/jose/Applications/SageMath"),
+                        solver: Solver , // = new SageSolver("/home/jose/Applications/SageMath"),
                         eps:Double=0): Prog[Valuation] = {
 //    val solver = new SageSolver("/home/jose/Applications/SageMath")
     solver.++=(syntax)

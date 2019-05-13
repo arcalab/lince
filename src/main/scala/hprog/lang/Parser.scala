@@ -76,9 +76,9 @@ object Parser extends RegexParsers {
       }
 
   lazy val diffEqsP: Parser[DiffEqs] =
-    identifier ~ "=" ~ linP ~ opt("," ~> diffEqsP) ^^ {
-      case v ~ _ ~ l ~ Some(eqs) => DiffEqs(List(Var(v) ^= l), Forever) & eqs
-      case v ~ _ ~ l ~ None => DiffEqs(List(Var(v) ^= l), Forever)
+    identifier ~ "'" ~ "=" ~ linP ~ opt("," ~> diffEqsP) ^^ {
+      case v ~ _ ~ _ ~ l ~ Some(eqs) => DiffEqs(List(Var(v) ^= l), Forever) & eqs
+      case v ~ _ ~ _ ~ l ~ None => DiffEqs(List(Var(v) ^= l), Forever)
     }
 
   lazy val durP: Parser[Dur] =
