@@ -27,13 +27,13 @@ object Semantics {
 
   def syntaxToValuation(syntax:Syntax,
                         solver: Solver , // = new SageSolver("/home/jose/Applications/SageMath"),
-                        eps:Double=0): Prog[Valuation] = {
+                        dev: Deviator): Prog[Valuation] = {
 //    val solver = new SageSolver("/home/jose/Applications/SageMath")
     solver.++=(syntax)
-    syntaxToValuationAux(syntax,solver,eps,100)
+    syntaxToValuationAux(syntax,solver,dev,100)
   }
 
-  def syntaxToValuationTaylor(syntax:Syntax,eps:Double=0): Prog[Valuation] = {
+  def syntaxToValuationTaylor(syntax:Syntax,dev:Deviator=Deviator.dummy): Prog[Valuation] = {
     val solver = new Solver{
       override def ++=(systems: List[List[DiffEq]]): Unit = {}
       override def ++=(syntax: Syntax): Unit = {}
@@ -46,21 +46,21 @@ object Semantics {
       }
     }
     solver.++=(syntax)
-    syntaxToValuationAux(syntax,solver,eps,10)
+    syntaxToValuationAux(syntax,solver,dev,100)
   }
 
-  private def syntaxToValuationAux(syntax:Syntax,sol:Solver,eps:Double,bound:Int): Prog[Valuation] = {
-    println(s"current bound: $bound for ${Show(syntax)}")
+  private def syntaxToValuationAux(syntax:Syntax,sol:Solver,dev:Deviator,bound:Int): Prog[Valuation] = {
+    //println(s"current bound: $bound for ${Show(syntax)}")
     if (bound<=0) notes("Reached limit of checks of conditions in while loops.")
     else syntax match {
       case a: Assign => assignmentToValuation(a)
       case d: DiffEqs => diffEqsToValuation(d, sol)
-      case Seq(Nil) => syntaxToValuationAux(Skip, sol, eps,bound)
-      case Seq(p :: Nil) => syntaxToValuationAux(p, sol, eps,bound)
-      case Seq(p :: ps) => syntaxToValuationAux(p, sol, eps,bound) ++ syntaxToValuationAux(Seq(ps), sol, eps,bound)
+      case Seq(Nil) => syntaxToValuationAux(Skip, sol, dev,bound)
+      case Seq(p :: Nil) => syntaxToValuationAux(p, sol, dev,bound)
+      case Seq(p :: ps) => syntaxToValuationAux(p, sol, dev,bound) ++ syntaxToValuationAux(Seq(ps), sol, dev,bound)
       case Skip => skipToValuation()
-      case ite: ITE => iteToValuation(ite, sol, eps, bound)
-      case whil: While => whileToValuation(whil, sol, eps, bound)
+      case ite: ITE => iteToValuation(ite, sol, dev, bound)
+      case whil: While => whileToValuation(whil, sol, dev, bound)
     }
   }
 
@@ -139,68 +139,82 @@ object Semantics {
     }
   }
 
-  def iteToValuation(ite: ITE,sol: Solver, eps:Double, bound:Int): Prog[Valuation] = input => {
+  def iteToValuation(ite: ITE,sol: Solver, dev:Deviator, bound:Int): Prog[Valuation] = input => {
     val ITE(ifS, thenS, elseS) = ite
-    def warnings(pre:Cond): Map[Double,Set[String]] =
-      if (Utils.getDomain(ifS).isEmpty) Map(0.0 -> Set(s"Failed to find an non-ambiguous domain for ${Show(ifS)}"))
-      else deviate(input,ifS,pre,eps) match {
-        case Some(str) => Map(0.0 -> Set(str))
-        case _ => Map()
+
+//    def warnings(pre:Cond): Map[Double,Set[String]] =
+//      if (Utils.getDomain(ifS).isEmpty) Map(0.0 -> Set(s"Failed to find an non-ambiguous domain for ${Show(ifS)}"))
+//      else deviate(input,ifS,pre,eps) match {
+//        case Some(str) => Map(0.0 -> Set(str))
+//        case _ => Map()
+//      }
+
+    def warnings(pre:Cond): Map[Double,Set[String]] = {
+      val cond = if (Eval(input,ifS)) Not(ifS) else ifS
+      dev.closest(input, cond) match {
+        case Some(p2) =>
+          if (input!=p2) Map(0.0 -> Set(s"Perturbation by ${Distance.dist(input,p2)}</br>when testing ${Show(ifS)}</br>${
+            p2.map(kv=>s"${kv._1}:${kv._2}").mkString("</br>")}"))
+          else Map(0.0 -> Set("Perturbation found by any small delta."))
+        case None => Map()
       }
+    }
+
+
     if (Eval(input, ifS))
-      syntaxToValuationAux(thenS,sol,eps,bound).traj(input)
+      syntaxToValuationAux(thenS,sol,dev,bound).traj(input)
         .addNotes(Map(0.0->s"${Show(ifS)}? True"))
         .addWarnings(warnings)
     else
-      syntaxToValuationAux(elseS,sol,eps,bound).traj(input)
+      syntaxToValuationAux(elseS,sol,dev,bound).traj(input)
         .addNotes(Map(0.0->s"${Show(ifS)}? False"))
         .addWarnings(warnings)
   }
 
-  def whileToValuation(whileStx: While, sol: Solver,eps: Double, bound:Int): Prog[Valuation] = {
+  def whileToValuation(whileStx:While, sol:Solver, dev:Deviator, bound:Int): Prog[Valuation] = {
 //    val While(c,doP) = whileStx
     whileStx match {
-      case While(Guard(c),doP) => syntaxToValuationAux(ITE(c,doP ~ whileStx, Skip),sol,eps,bound-1)
-      case While(Counter(0),doP) => syntaxToValuationAux(Skip,sol,eps,bound)
-      case While(Counter(i),doP) => syntaxToValuationAux(doP ~ While(Counter(i-1),doP),sol,eps,bound)
+      case While(Guard(c),doP) => syntaxToValuationAux(ITE(c,doP ~ whileStx, Skip),sol,dev,bound-1)
+      case While(Counter(0),doP) => syntaxToValuationAux(Skip,sol,dev,bound)
+      case While(Counter(i),doP) => syntaxToValuationAux(doP ~ While(Counter(i-1),doP),sol,dev,bound)
     }
 
   }
 
-  private def deviate(input:Valuation,pred:Cond,pre:Cond,eps:Double): Option[String] = {
-    if (eps==0.0) None
-    else {
-      val vars = Utils.getVars(pred)
-      //println(s"verifying deviations in\n  ${Show(pred)}\n  when\n   ${Show(pre)}\n   for $input")
-      val ref = Eval(input, pred) // reference value - Boolean
-      runCombinations(input, pred, pre, eps, ref, vars, vars.toList)
-    }
-  }
-
-  private def runCombinations(input:Valuation,pred:Cond,pre:Cond,eps:Double
-                             ,ref:Boolean,allVars:Set[String],vars:List[String])
-                             : Option[String] = vars match {
-    case (hd::tl) =>
-      val inp2 = input + (hd -> (input(hd)+eps))
-      runCombinations(inp2,pred,pre,eps,ref,allVars,tl) match {
-        case None =>
-          val inp3 = input + (hd -> (input(hd)-eps))
-          runCombinations(inp3,pred,pre,eps,ref,allVars,tl)
-        case res => res
-      }
-    case Nil =>
-      //if (!Eval(input,pre))
-      //  println(s"OUT OF BOUNDS - skipping ${Show(pred)} since ${Show(pre)} does not hold for ${input}")
-      //else
-      //  println(s"Not skipping ${Show(pred)} since ${Show(pre)} holds for ${input}")
-      if (!Eval(input,pre)  ||  (Eval(input,pred) == ref)) None
-      else Some(s"Deviation found for </br> ${Show(pred)} </br>when</br> ${
-        input
-          .filter(p=>allVars contains (p._1))
-          .map(p=>s"${p._1}=${p._2}")
-          .mkString(",")
-    }")  
-  }
+//  private def deviate(input:Valuation,pred:Cond,pre:Cond,eps:Double): Option[String] = {
+//    if (eps==0.0) None
+//    else {
+//      val vars = Utils.getVars(pred)
+//      //println(s"verifying deviations in\n  ${Show(pred)}\n  when\n   ${Show(pre)}\n   for $input")
+//      val ref = Eval(input, pred) // reference value - Boolean
+//      runCombinations(input, pred, pre, eps, ref, vars, vars.toList)
+//    }
+//  }
+//
+//  private def runCombinations(input:Valuation,pred:Cond,pre:Cond,eps:Double
+//                             ,ref:Boolean,allVars:Set[String],vars:List[String])
+//                             : Option[String] = vars match {
+//    case (hd::tl) =>
+//      val inp2 = input + (hd -> (input(hd)+eps))
+//      runCombinations(inp2,pred,pre,eps,ref,allVars,tl) match {
+//        case None =>
+//          val inp3 = input + (hd -> (input(hd)-eps))
+//          runCombinations(inp3,pred,pre,eps,ref,allVars,tl)
+//        case res => res
+//      }
+//    case Nil =>
+//      //if (!Eval(input,pre))
+//      //  println(s"OUT OF BOUNDS - skipping ${Show(pred)} since ${Show(pre)} does not hold for ${input}")
+//      //else
+//      //  println(s"Not skipping ${Show(pred)} since ${Show(pre)} holds for ${input}")
+//      if (!Eval(input,pre)  ||  (Eval(input,pred) == ref)) None
+//      else Some(s"Deviation found for </br> ${Show(pred)} </br>when</br> ${
+//        input
+//          .filter(p=>allVars contains (p._1))
+//          .map(p=>s"${p._1}=${p._2}")
+//          .mkString(",")
+//    }")
+//  }
 
 
   private def notes(str: String): Prog[Valuation] = _ => {

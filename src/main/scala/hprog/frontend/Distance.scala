@@ -1,17 +1,21 @@
 package hprog.frontend
 
-import breeze.numerics.{pow, sqrt}
+//import breeze.numerics.{pow, sqrt}
 import hprog.ast
 import hprog.ast._
-import hprog.frontend.Semantics.Valuation
+import hprog.backend.Show
+import hprog.frontend.Deviator.Point
 import optimus.algebra.{Constraint, Expression}
 import optimus.optimization._
 import optimus.optimization.enums.SolverLib
 import optimus.optimization.model.{MPFloatVar, MPVar}
 
-object Distance {
+class Distance(eps:Double) extends Deviator {
+  override def closest(p: Point, cond: Cond): Option[Point] =
+    Distance.closest(p,cond,eps)
+}
 
-  type Point = Valuation
+object Distance {
 
   /**
     * Find the closest point that satisfies a condition, up to a distance of `max`
@@ -21,12 +25,14 @@ object Distance {
     * @return some closest point within c and not further than `max`
     */
   def closest(p:Point,c:Cond,max:Double): Option[Point] = {
-    if (max<=0) {
+    val res = if (max<=0) {
       if (normaliseCond(c) contains p) Some(p) else None
     }
     else closest(p, normaliseCond(c), max).flatMap(p2 =>
         if (dist(p,p2)<=max) Some(p2) else None
     )
+    //println(s"got closest to ${p} when ${Show(c)} - ${res}")
+    res
   }
 
 
@@ -83,7 +89,7 @@ object Distance {
     case ast.LE(v, l)   => ast.GT(v,l)
   }
 
-  def closest(p:Point, dnf:DNF, max:Double): Option[Point] = dnf.ands.headOption match {
+  private def closest(p:Point, dnf:DNF, max:Double): Option[Point] = dnf.ands.headOption match {
     case Some(and) =>
       closest(p, and, max) match {
         case Some(p1) =>
@@ -104,8 +110,8 @@ object Distance {
   }
 
   def dist(p1:Point,p2:Point): Double = {
-    val sqrs = for ((x,v) <- p1) yield pow(p2.getOrElse(x,v)-v,2)
-    sqrt(sqrs.sum)
+    val sqrs = for ((x,v) <- p1) yield math.pow(p2.getOrElse(x,v)-v,2)
+    math.sqrt(sqrs.sum)
   }
 
 
@@ -119,7 +125,9 @@ object Distance {
 
   def closest(p:Point,ineqs:Set[Ineq],max:Double): Option[Point] = {
     for (ineq <- ineqs) {
+      //println(s"manual closest of ${p} to ${ineq}")
       val p2: Point = closest(p,ineq)
+      //println(s"got ${p2}")
       if (And(ineqs - ineq) contains p2) return Some(p2)
     }
     // no trivial solution; solve quadratic programming optimisation problem
@@ -139,12 +147,16 @@ object Distance {
   }
 
   def closest(p:Point, l1:Lin, l2:Lin): Point = {
-    val p1 = lin2point(l1)
-    val p2 = lin2point(l2)
-    val plane = add(add(p1,neg(p2)),neg(p))
-    val d = 0.0 - plane.getOrElse("",0.0)
-    val plane2 = plane - ""
-    add(closestToOrigin(plane2,d) , p)
+    val delta = neg(p)
+    val p1 = lin2point(shiftLin(l1,delta))
+    val p2 = lin2point(shiftLin(l2,delta))
+    //    val plane = add(add(p1,neg(p2)),neg(p)) // p1-p2 - p
+    val plane = add(p1,neg(p2))
+    val d = 0.0 - plane.getOrElse("",0.0) // extra value without variable from p1-p2
+    val plane2 = plane - "" // take out empty variable
+    val p3 = closestToOrigin(plane2,d) // got closest to origin
+    //println(s"closest to origin solving ${plane2} = $d\n returned $p3")
+    add(p3 , p) // add point p in the end
   }
 
   def lin2point(lin: Lin): Point = lin match {
@@ -161,7 +173,7 @@ object Distance {
 
   // v*d / |v|^2
   def closestToOrigin(plane:Point,d:Double): Point = {
-    val norm = plane.values.map(pow(_,2)).sum
+    val norm = plane.values.map(math.pow(_,2)).sum
     plane.mapValues(x => x*d/norm)
   }
 
@@ -184,11 +196,11 @@ object Distance {
   // need to shift based on `max` because variables will only get positive values
   def quadraticProgrm(p: Point, ineqs: Set[Ineq], max:Double): Option[Point] = {
     val delta = p.mapValues(x => if (x<max) max-x else 0)
-    println(s"before: ${ineqs.mkString(", ")}")
-    println(s"delta: ${delta.map(kv=>kv._1+"->"+kv._2).mkString(", ")}")
+    //println(s"before: ${ineqs.mkString(", ")}")
+    //println(s"delta: ${delta.map(kv=>kv._1+"->"+kv._2).mkString(", ")}")
     val shiftedP = add(p,delta)
     val shiftedIneqs = ineqs.map(i => shiftIneq(i,delta))
-    println(s"after:  ${shiftedIneqs.mkString(", ")}")
+    //println(s"after:  ${shiftedIneqs.mkString(", ")}")
     quadraticProgrm(shiftedP,shiftedIneqs)
       .map(p2 => add(p2,neg(delta)))
   }

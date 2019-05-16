@@ -3,7 +3,7 @@ package hprog
 import hprog.ast._
 import hprog.common.ParserException
 import hprog.frontend.Semantics.Valuation
-import hprog.frontend.{SageSolver, Semantics, Traj}
+import hprog.frontend.{Deviator, Distance, SageSolver, Semantics, Traj}
 import hprog.lang.Parser
 
 import scala.language.implicitConversions
@@ -55,6 +55,6 @@ object DSL {
   val parseWithError: String => Parser.ParseResult[Syntax] = Parser.parse
 
   def parseTraj(s:String,sagePath:String): Traj[Valuation] = // e.g., sagePath = "/home/jose/Applications/SageMath"
-    Semantics.syntaxToValuation(parse(s),new SageSolver(sagePath)).traj(Map())
+    Semantics.syntaxToValuation(parse(s),new SageSolver(sagePath), new Distance(10)).traj(Map())
 
 }
