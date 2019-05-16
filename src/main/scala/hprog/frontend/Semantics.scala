@@ -30,7 +30,7 @@ object Semantics {
                         eps:Double=0): Prog[Valuation] = {
 //    val solver = new SageSolver("/home/jose/Applications/SageMath")
     solver.++=(syntax)
-    syntaxToValuationAux(syntax,solver,eps)
+    syntaxToValuationAux(syntax,solver,eps,100)
   }
 
   def syntaxToValuationTaylor(syntax:Syntax,eps:Double=0): Prog[Valuation] = {
@@ -46,18 +46,22 @@ object Semantics {
       }
     }
     solver.++=(syntax)
-    syntaxToValuationAux(syntax,solver,eps)
+    syntaxToValuationAux(syntax,solver,eps,10)
   }
 
-  private def syntaxToValuationAux(syntax:Syntax,sol:Solver,eps:Double): Prog[Valuation] = syntax match {
-    case a:Assign    => assignmentToValuation(a)
-    case d:DiffEqs   => diffEqsToValuation(d,sol)
-    case Seq(Nil)    => syntaxToValuationAux(Skip,sol,eps)
-    case Seq(p::Nil) => syntaxToValuationAux(p,sol,eps)
-    case Seq(p::ps)  => syntaxToValuationAux(p,sol,eps) ++ syntaxToValuationAux(Seq(ps),sol,eps)
-    case Skip        => skipToValuation()
-    case ite:ITE     => iteToValuation(ite,sol,eps)
-    case whil:While  => whileToValuation(whil,sol,eps)
+  private def syntaxToValuationAux(syntax:Syntax,sol:Solver,eps:Double,bound:Int): Prog[Valuation] = {
+    println(s"current bound: $bound for ${Show(syntax)}")
+    if (bound<=0) notes("Reached limit of checks of conditions in while loops.")
+    else syntax match {
+      case a: Assign => assignmentToValuation(a)
+      case d: DiffEqs => diffEqsToValuation(d, sol)
+      case Seq(Nil) => syntaxToValuationAux(Skip, sol, eps,bound)
+      case Seq(p :: Nil) => syntaxToValuationAux(p, sol, eps,bound)
+      case Seq(p :: ps) => syntaxToValuationAux(p, sol, eps,bound) ++ syntaxToValuationAux(Seq(ps), sol, eps,bound)
+      case Skip => skipToValuation()
+      case ite: ITE => iteToValuation(ite, sol, eps, bound)
+      case whil: While => whileToValuation(whil, sol, eps, bound)
+    }
   }
 
   def assignmentToValuation(assign: Assign): Prog[Valuation] = input => {
@@ -135,7 +139,7 @@ object Semantics {
     }
   }
 
-  def iteToValuation(ite: ITE,sol: Solver, eps:Double): Prog[Valuation] = input => {
+  def iteToValuation(ite: ITE,sol: Solver, eps:Double, bound:Int): Prog[Valuation] = input => {
     val ITE(ifS, thenS, elseS) = ite
     def warnings(pre:Cond): Map[Double,Set[String]] =
       if (Utils.getDomain(ifS).isEmpty) Map(0.0 -> Set(s"Failed to find an non-ambiguous domain for ${Show(ifS)}"))
@@ -144,21 +148,21 @@ object Semantics {
         case _ => Map()
       }
     if (Eval(input, ifS))
-      syntaxToValuationAux(thenS,sol,eps).traj(input)
+      syntaxToValuationAux(thenS,sol,eps,bound).traj(input)
         .addNotes(Map(0.0->s"${Show(ifS)}? True"))
         .addWarnings(warnings)
     else
-      syntaxToValuationAux(elseS,sol,eps).traj(input)
+      syntaxToValuationAux(elseS,sol,eps,bound).traj(input)
         .addNotes(Map(0.0->s"${Show(ifS)}? False"))
         .addWarnings(warnings)
   }
 
-  def whileToValuation(whileStx: While, sol: Solver,eps: Double): Prog[Valuation] = {
+  def whileToValuation(whileStx: While, sol: Solver,eps: Double, bound:Int): Prog[Valuation] = {
 //    val While(c,doP) = whileStx
     whileStx match {
-      case While(Guard(c),doP) => syntaxToValuationAux(ITE(c,doP ~ whileStx, Skip),sol,eps)
-      case While(Counter(0),doP) => syntaxToValuationAux(Skip,sol,eps)
-      case While(Counter(i),doP) => syntaxToValuationAux(doP ~ While(Counter(i-1),doP),sol,eps)
+      case While(Guard(c),doP) => syntaxToValuationAux(ITE(c,doP ~ whileStx, Skip),sol,eps,bound-1)
+      case While(Counter(0),doP) => syntaxToValuationAux(Skip,sol,eps,bound)
+      case While(Counter(i),doP) => syntaxToValuationAux(doP ~ While(Counter(i-1),doP),sol,eps,bound)
     }
 
   }
@@ -199,6 +203,13 @@ object Semantics {
   }
 
 
+  private def notes(str: String): Prog[Valuation] = _ => {
+    val t = new Traj[Valuation] {
+      override val dur: Option[Double] = Some(0.0)
+      override def apply(t: Double): Valuation = Map()
+    }
+    t.addNotes(Map(0.0->str))
+  }
 
   //      // Evaulate "e" under the current valuation
 //      val newv = Eval(current.withDefaultValue(0),e).get

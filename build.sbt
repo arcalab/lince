@@ -34,7 +34,11 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze-natives" % "0.13.2",
   // The visualization library is distributed separately as well.
   // It depends on LGPL code
-  "org.scalanlp" %% "breeze-viz" % "0.13.2"
+  "org.scalanlp" %% "breeze-viz" % "0.13.2",
+
+  // Optimus to solve quadratic programming problem
+  "com.github.vagmcs" %% "optimus" % "3.1.2",
+  "com.github.vagmcs" %% "optimus-solver-oj" % "3.1.2"
 )
 
 // tests cannot be run in parallel, because of the Choco solver
