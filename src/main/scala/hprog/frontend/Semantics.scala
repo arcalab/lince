@@ -153,9 +153,9 @@ object Semantics {
       val cond = if (Eval(input,ifS)) Not(ifS) else ifS
       dev.closest(input, cond) match {
         case Some(p2) =>
-          if (input!=p2) Map(0.0 -> Set(s"Perturbation by ${Distance.dist(input,p2)}</br>when testing ${Show(ifS)}</br>${
+          if (input!=p2) Map(0.0 -> Set(s"Perturbation by ${Distance.dist(input,p2)}</br>when testing ${Show(ifS)} with:</br>${
             p2.map(kv=>s"${kv._1}:${kv._2}").mkString("</br>")}"))
-          else Map(0.0 -> Set("Perturbation found by any small delta."))
+          else Map(0.0 -> Set(s"Perturbation found by any small delta</br>when testing ${Show(ifS)}."))
         case None => Map()
       }
     }
