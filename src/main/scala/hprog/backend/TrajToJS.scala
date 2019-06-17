@@ -210,10 +210,10 @@ object TrajToJS {
                        , style:String): String = {
 
     val (x,y,msg) = traj
-      .warnings(BVal(true))
+      .warnings(Some(Map()))
       .toList
       .filter(x => x._1 >= start && x._1 <= end)
-      .map(x=>(x._1,traj(x._1)(variable),"'"+x._2.map(w=>s"${fixStr(w)}").mkString("</br>")+"'"))
+      .map(x=>(x._1,traj(x._1)(variable),"'"+x._2._1.map(w=>s"${fixStr(w)}").mkString("</br>")+"'"))
       .unzip3
 
     s"""var w_$variable = { 

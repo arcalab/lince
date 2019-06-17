@@ -1,31 +1,44 @@
-package hprog.frontend
+package hprog.frontend.solver
 
 import breeze.linalg._
 import breeze.numerics._
 import hprog.DSL
 import hprog.ast._
-import hprog.frontend.Semantics.Solution
+import hprog.frontend.Semantics.{SFunction, SageSolution, Solution, Valuation}
 
 trait Solver {
-  /**
-    * Precompute and cache several system of equations with a single system call to Sage
-    * @param systems systems of equations to be precomupted
-    */
-  def ++=(systems: List[List[DiffEq]]): Unit
-  def ++=(syntax:Syntax): Unit
-
-  /**
-    * precompute a system of equations using a system call to Sage
-    * @param eqs
-    */
-  def +=(eqs:List[DiffEq]): Unit
+//  /**
+//    * Precompute and cache several system of equations with a single system call to Sage
+//    * @param systems systems of equations to be precomupted
+//    */
+//  def ++=(systems: List[List[DiffEq]]): Unit
+//  def ++=(syntax:Syntax): Unit
+//
+//  /**
+//    * precompute a system of equations using a system call to Sage
+//    * @param eqs
+//    */
+//  def +=(eqs:List[DiffEq]): Unit
+//
+//  def +=(expr:SageExpr): Unit
 
   /** Gets a solution of a system of equations, using system calls to Sage,
     * checking first in its cache.
     * @param eqs System of equations to be retrived
-    * @return Result from Sage
+    * @return Result from Sage as a function
     */
-  def get(eqs:List[DiffEq]): Solution
+  def evalFun(eqs:List[DiffEq]): Solution =
+    solveSymb(eqs).mapValues(evalFun)
+  def evalFun(expr: SageExpr): SFunction
+  def evalVal(expr: SageExpr): Valuation
+
+  /** Gets a symbolic solution of a system of equations, using system calls to Sage,
+    * checking first in its cache.
+    * @param eqs System of equations to be retrived
+    * @return Result from Sage as a symbolic expression
+    */
+  def solveSymb(eqs:List[DiffEq]): SageSolution
+  def solveSymb(expr: SageExpr): SageExpr
 
 }
 
@@ -174,7 +187,7 @@ object Solver {
   /**
     * Returns x(x0,t) = x0*e^At, where e^At is expended to the taylor series:
     *   e^At = I + At + At^2/2! + At^3/3! + At^4/4! + ...
-    * @param mtx
+    * @param a matrix
     * @param precision
     * @return
     */
@@ -186,7 +199,7 @@ object Solver {
     type Matrix=List[Row]
 
     def fact(n:Int):Int = if (n<=0) 1 else n * fact(n-1)
-    def avg(m:Matrix): Double = m.flatten.map(myAbs(_)).sum / (size*size)
+    def avg(m:Matrix): Double = m.flatten.map(myAbs).sum / (size*size)
     def myAbs(d: Double): Double = if(d<0) -d else d
     def myEye(size: Int, step: Int): Matrix = {
       if (step >= size)

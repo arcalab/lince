@@ -2,6 +2,7 @@ package hprog.frontend
 
 import hprog.ast._
 import hprog.backend.Show
+import hprog.frontend.solver.{SimpleSolver, Solver}
 import hprog.lang.SageParser
 
 object Semantics {
@@ -12,17 +13,24 @@ object Semantics {
   type Vars      = String
   /** Maps names of variables or trajectories to their value at a given time */
   type Valuation = Map[Vars,Double]
+
+  /** Maps variables to the symbolic expression of its semantics */
+  type SageSolution  = Map[String,SageExpr]
+  /** Solution and variables for a system of equations */
+  case class SolVars(sol: SageSolution) //{
+//    def ++(that:SolVars): SolVars = {
+//      SolVars( vars ++ that.vars , sol ++ that.sol )
+//    }
+//  }
+
+  type Messages = Set[String]
+  type ToVerify = Set[(Cond,SageSolution)]
+  type Warnings = Map[Double,(Messages,ToVerify)]
+
   /** Maps variables to their semantic functions */
   type Solution  = Map[String,SFunction]
   /** Function, given a time value and an initial valuation */
   type SFunction = Double => Valuation => Double
-  /** Solution and variables for a system of equations */
-  case class SolVars(vars:Set[String],sol: Solution) {
-    def ++(that:SolVars): SolVars = {
-      SolVars( vars ++ that.vars , sol ++ that.sol )
-    }
-  }
-
 
 
   def syntaxToValuation(syntax:Syntax,
@@ -34,17 +42,19 @@ object Semantics {
   }
 
   def syntaxToValuationTaylor(syntax:Syntax,dev:Deviator=Deviator.dummy): Prog[Valuation] = {
-    val solver = new Solver{
-      override def ++=(systems: List[List[DiffEq]]): Unit = {}
-      override def ++=(syntax: Syntax): Unit = {}
-      override def +=(eqs: List[DiffEq]): Unit = {}
-      override def get(eqs: List[DiffEq]): Solution = {
-        val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
-        vars.map(v=> v -> ( (t:Double) => (init:Valuation) =>
-          callTaylorSolver(init,eqs)(t)(v)
-        )).toMap
-      }
-    }
+    val solver = new SimpleSolver
+//        Solver{
+//      override def ++=(systems: List[List[DiffEq]]): Unit = {}
+//      override def ++=(syntax: Syntax): Unit = {}
+//      override def +=(eqs: List[DiffEq]): Unit = {}
+//      override def get(eqs: List[DiffEq]): Solution = {
+//        val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
+//        vars.map(v=> v -> ( (t:Double) => (init:Valuation) =>
+//          callTaylorSolver(init,eqs)(t)(v)
+//        )).toMap
+//      }
+//      override def getSage(eqs: List[DiffEq]): SageSolution = Map()
+//    }
     solver.++=(syntax)
     syntaxToValuationAux(syntax,solver,dev,100)
   }
@@ -71,6 +81,8 @@ object Semantics {
 
       new Traj[Valuation] {
         override val dur: Option[Double] = Some(0)
+        override val symbolic: Option[SageSolution] =
+          Some(Eval.baseSage(input.keys) ++ Map(x.v -> Eval.lin2sage(exp)))
         override def apply(t: Double): Valuation = newValuation
         override val inits: Map[Double, Valuation] = Map(0.0 -> newValuation)
       }
@@ -81,13 +93,15 @@ object Semantics {
     val DiffEqs(eqs,durCond) = diffEqs
 
 //    val sol = callSageSolver(input,eqs,sol)
-    val sol = solver.get(eqs) // maps variables to their solutions (function from t/ctx to value)
+    val sol = solver.evalFun(eqs) // maps variables to their solutions (function from t/ctx to value)
     def guard(c: Cond): Double => Boolean =
       t => Eval(sol.mapValues(fun=>fun(t)(input)),c)
-    val durValue = Solver.solveDur(durCond,input,guard)
+    val durValue = Solver.solveDur(durCond,input,guard) // give value or do jumps searching for duration
+    val symbolicValue = Some(Eval.baseSage(input.keys) ++ solver.solveSymb(eqs))
 
     new Traj[Valuation] {
       override val dur: Option[Double] = durValue
+      override val symbolic: Option[SageSolution] = symbolicValue
       override val inits: Map[Double, Valuation] = Map(0.0 -> input)
       override val ends: Map[Double, Valuation] = durValue match {
         case Some(value) => Map(value -> apply(value))
@@ -103,44 +117,46 @@ object Semantics {
   }
 
 
-  private def callTaylorSolver(input:Valuation, eqs:List[DiffEq]): Double => Valuation = {
-    val (vars,mtx): (List[String],List[List[Double]]) = Solver.getMatrix(eqs)
-    val sol1: (List[Double],Double) => List[Double] = Solver.solveTaylorManual(mtx)
-
-//    println(s"## calling solver" +
-//      s"\neqs:\n  ${eqs.mkString("\n  ")}" +
-//      s"\ninput: ${input.map(p=>s"${p._1}->${p._2}").mkString(", ")}" +
-//      s"\nvars: ${vars.mkString(",")}" +
-//      s"\nmtx:\n  ${mtx.map(_.mkString("\t")).mkString("\n  ")}")
-    //println("## Sage\n"+genSage(eqs))
-    //println(s"calling solver for ${input} and ${eqs.map(Show(_)).mkString(",")}")
-    def sol(t:Double): Valuation = {
-      // "input" should have all variables but no "" - this should be assigned to 0
-      def getDummy(v:String): Double = (vars.indexOf(v),vars.indexOf("_"+v)) match {
-        case (_,-1) => 0.0
-        case (i,j)  =>
-//          println(s"dummy($v) = ${mtx(i)(j)}")
-          //mtx(i)(j)
-          1
-      }
-      val dummies = vars.map(v => ("_"+v) -> getDummy(v))
-      val input2  = vars.map(input ++ dummies)
-//      println("input with dummies: "+input2.mkString(","))
-      val list = sol1(input2, t)
-      (vars zip list).toMap -- vars.map("_"+_)
-    }
-    sol
-  }
+//  private def callTaylorSolver(input:Valuation, eqs:List[DiffEq]): Double => Valuation = {
+//    val (vars,mtx): (List[String],List[List[Double]]) = Solver.getMatrix(eqs)
+//    val sol1: (List[Double],Double) => List[Double] = Solver.solveTaylorManual(mtx)
+//
+////    println(s"## calling solver" +
+////      s"\neqs:\n  ${eqs.mkString("\n  ")}" +
+////      s"\ninput: ${input.map(p=>s"${p._1}->${p._2}").mkString(", ")}" +
+////      s"\nvars: ${vars.mkString(",")}" +
+////      s"\nmtx:\n  ${mtx.map(_.mkString("\t")).mkString("\n  ")}")
+//    //println("## Sage\n"+genSage(eqs))
+//    //println(s"calling solver for ${input} and ${eqs.map(Show(_)).mkString(",")}")
+//    def sol(t:Double): Valuation = {
+//      // "input" should have all variables but no "" - this should be assigned to 0
+//      def getDummy(v:String): Double = (vars.indexOf(v),vars.indexOf("_"+v)) match {
+//        case (_,-1) => 0.0
+//        case (i,j)  =>
+////          println(s"dummy($v) = ${mtx(i)(j)}")
+//          //mtx(i)(j)
+//          1
+//      }
+//      val dummies = vars.map(v => ("_"+v) -> getDummy(v))
+//      val input2  = vars.map(input ++ dummies)
+////      println("input with dummies: "+input2.mkString(","))
+//      val list = sol1(input2, t)
+//      (vars zip list).toMap -- vars.map("_"+_)
+//    }
+//    sol
+//  }
 
   def skipToValuation(): Prog[Valuation] = input => {
     new Traj[Valuation] {
       override val dur: Option[Double] = Some(0)
+      override val symbolic: Option[SageSolution] = Some(Eval.baseSage(input.keys))
       override def apply(t: Double): Valuation = input
     }
   }
 
   def iteToValuation(ite: ITE,sol: Solver, dev:Deviator, bound:Int): Prog[Valuation] = input => {
     val ITE(ifS, thenS, elseS) = ite
+    val ifValue = Eval(input,ifS)
 
 //    def warnings(pre:Cond): Map[Double,Set[String]] =
 //      if (Utils.getDomain(ifS).isEmpty) Map(0.0 -> Set(s"Failed to find an non-ambiguous domain for ${Show(ifS)}"))
@@ -148,20 +164,29 @@ object Semantics {
 //        case Some(str) => Map(0.0 -> Set(str))
 //        case _ => Map()
 //      }
-
-    def warnings(pre:Cond): Map[Double,Set[String]] = {
-      val cond = if (Eval(input,ifS)) Not(ifS) else ifS
-      dev.closest(input, cond) match {
+    // when asking for warnings, this will be called with the current symbolic value
+    def warnings(symb:Option[SageSolution]): Warnings = {
+      val notIf = if (ifValue) Not(ifS) else ifS
+      dev.closest(input, notIf) match {
         case Some(p2) =>
           if (input!=p2) Map(0.0 -> Set(s"Perturbation by ${Distance.dist(input,p2)}</br>when testing ${Show(ifS)}</br>with:</br>${
             p2.map(kv=>s"${kv._1}:${kv._2}").mkString("</br>")}"))
           else Map(0.0 -> Set(s"Perturbation found by any small delta</br>when testing ${Show(ifS)}."))
         case None => Map()
       }
+      ///////// OVERRIDING
+      val msg = s"Iftrue? $ifValue</br>IfStm: ${ifS}</br>Symb. fun: $symb</br>Symb. res: ${
+        symb.get.mapValues(exp => Eval(exp,0.0,Map()))}"
+      val toCheck: Set[(Cond,SageSolution)] = symb match {
+        case Some(sol) => Set((if(ifValue)ifS else Not(ifS)
+                              ,sol.mapValues(e=>Eval.setTime(0.0,e))))
+        case None => Set()
+      }
+      Map(0.0 -> (Set(msg) , toCheck) )
     }
 
 
-    if (Eval(input, ifS))
+    if (ifValue)
       syntaxToValuationAux(thenS,sol,dev,bound).traj(input)
         .addNotes(Map(0.0->s"${Show(ifS)}? True"))
         .addWarnings(warnings)
@@ -216,11 +241,13 @@ object Semantics {
 //    }")
 //  }
 
-
+  // Leftovers - now only used to inform that a trace was trimmed.
   private def notes(str: String): Prog[Valuation] = _ => {
     val t = new Traj[Valuation] {
       override val dur: Option[Double] = Some(0.0)
       override def apply(t: Double): Valuation = Map()
+
+      override val symbolic: Option[SageSolution] = None
     }
     t.addNotes(Map(0.0->str))
   }

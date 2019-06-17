@@ -3,7 +3,8 @@ package hprog
 import hprog.ast._
 import hprog.common.ParserException
 import hprog.frontend.Semantics.Valuation
-import hprog.frontend.{Deviator, Distance, SageSolver, Semantics, Traj}
+import hprog.frontend.solver.SageSolver
+import hprog.frontend.{Deviator, Distance, Semantics, Traj}
 import hprog.lang.Parser
 
 import scala.language.implicitConversions
