@@ -7,10 +7,130 @@ import hprog.frontend.Semantics.{SageSolution, SolVars, Solution}
 import hprog.frontend.{Eval, Utils}
 import hprog.lang.SageParser
 
+import scala.concurrent.{Future, Promise}
 import scala.sys.process._
 
 
 class SageSolver(path:String) extends StaticSageSolver {
+
+  protected val lockRcv = new Object
+  protected val lockSnd = new Object
+  protected var last: Option[String] = None
+  protected val proc = SageSolver.createSageProcess(path,addUpdate)
+
+  // wait for process to be created (and first output out)
+  lockRcv.synchronized{
+    print("(rcv) waiting")
+    if (last==None) // if I'm the first, then wait
+      lockRcv.wait(5000)
+    println(" - done(r)")
+  }
+  // allow sender to continue after startup msg
+  lockSnd.synchronized{
+    print("(rcv) unlocking sender")
+    last = None
+    lockSnd.notify()
+    println(" - done(r)")
+  }
+
+  def addUpdate(s:String): Unit = {
+    //    last = Some(s)
+    lockRcv.synchronized{
+      print(s"(sender) unlocking update: '$s'")
+      last = Some(s)
+      lockRcv.notify()
+      println(" - done(s)")
+      //    lockRcv.synchronized(lockRcv.notifyAll())
+    }
+    lockSnd.synchronized{
+      print(s"(sender) waiting for permission")
+      if (last!=None) // if I'm the first, then wait
+        lockSnd.wait(5000)
+      println(s" - done(s)")
+    }
+    println(s"(sender) continuing")
+    //    l.notify() // null
+  }
+
+  // still unexpectedly locking...
+  def close(): Int = {
+    last = None
+    var r = proc._2() // will trigger outputs
+    lockRcv.synchronized{
+      print("(rcv) waiting")
+      if (last==None)
+        lockRcv.wait(5000)
+      println(" - done(r)")
+    }
+    // allow sender to continue after startup msg
+    lockSnd.synchronized{
+      print("(rcv) unlocking sender")
+      last = None
+      lockSnd.notify()
+      println(" - done(r)")
+    }
+    r
+  }
+
+  def askSage(s:String): Option[String] = {
+    last = None // clear last answer
+    proc._1(s) // put string in input queue of Sage process
+    waitForReply()
+  }
+
+  private def waitForReply(): Option[String] = {
+    var prev = ""
+    var ok = false
+    while (!ok) {
+    // wait for the notification (new value returned)
+      lockRcv.synchronized{
+        if (last == None) // I'm the first - wait
+          lockRcv.wait(5000)
+        println(s"> '${last}'")
+      }
+      last match {
+        case Some("'ok'") =>
+          println(s"moving prev '$prev' to last")
+          last = Some(prev)
+          ok = true
+          lockSnd.synchronized{
+            last = None
+            lockSnd.notify()
+          }
+        case Some(v) =>
+          println(s"adding $v to prev")
+          prev = v.drop(6)
+          lockSnd.synchronized{
+            last = None
+            lockSnd.notify()
+          }
+        case None =>
+          return None
+      }
+    }
+    println(s"returning '${prev}' if '$ok'")
+    if (ok) Some(prev) else None
+  }
+
+
+  ///
+  def askSage(eqs: List[DiffEq]): Option[String] = {
+    val instructions = SageSolver.genSage(eqs) + "; print(\"§\")"
+    println(s"instructions to solve: '$instructions'")
+    val rep = askSage(instructions)
+    println(s"reply: '$rep'")
+    rep
+  }
+
+  def askSage(expr: SageExpr): Option[String] = {
+    val instructions = s"print(\"${Show(expr)}\"); \"ok\""
+    println(s"expression to solve: '$instructions'")
+    val rep = askSage(instructions)
+    println(s"reply: '$rep'")
+    rep
+  }
+
+
 
 
   /**
@@ -19,8 +139,23 @@ class SageSolver(path:String) extends StaticSageSolver {
     */
   override def +=(eqs:List[DiffEq]): Unit =
     if (!cache.contains(eqs)) {
-      val reply = SageSolver.callSageSolver(eqs, path)
-      addToCache(filtered, reply)
+      askSage(eqs) match {
+        case Some(reply) => importDiffEqs(List(eqs), List(reply))
+        case None =>
+          throw new ParserException(s"Failed to solve ${
+            eqs.map(Show(_)).mkString(", ")}.")
+
+      }//SageSolver.callSageSolver(eqs, path)
+    }
+
+  override def +=(expr: SageExpr): Unit =
+    if (!cacheVal.contains(expr)) {
+      askSage(expr) match {
+        case Some(reply) => importExpr(expr,reply)
+        case None =>
+          throw new ParserException(s"Failed to solve ${
+            Show(expr).mkString(", ")}.")
+      }
     }
 
   //      val instr = SageSolver.genSage(eqs)
@@ -57,8 +192,8 @@ class SageSolver(path:String) extends StaticSageSolver {
 //        }
 //        cache += eqs -> resParsed
 //      }
-    }
-  }
+//    }
+//  }
 
 
 //  /** Gets a solution of a system of equations, using system calls to Sage,
@@ -100,6 +235,7 @@ object SageSolver {
       res += s"_de${i}_ = diff(${e.v.v},_t_) == ${Show(e.e)}; "
     res += s"print(expand(desolve_system([${(for(i<-eqs2.indices)yield s"_de${i}_").mkString(",")}]," +
       s"[${eqs2.map(_.v.v).mkString(",")}])))"
+    res += ";\"ok\""
     res
   }
 
@@ -160,6 +296,65 @@ object SageSolver {
     s"${genSage(s)} print(${genSage(c)})"
 
 
+
+  def createSageProcess(path:String, callback: String => Unit):
+  (String=>Unit, ()=>Int) = {
+    var writer: java.io.PrintWriter = null
+
+    // limit scope of any temporary variables
+    // locally {
+    val sage = s"$path/sage"
+    // strings are implicitly converted to ProcessBuilder
+    // via scala.sys.process.ProcessImplicits.stringToProcess(_)
+    val io = new ProcessIO(
+      // Handle subprocess's stdin
+      // (which we write via an OutputStream)
+      in => {
+        writer = new java.io.PrintWriter(in)
+        //println("in stream created")
+        // later do writer.println(..); writer.flush; writer.close()
+      },
+      // Handle subprocess's stdout
+      // (which we read via an InputStream)
+      out => {
+        val src = scala.io.Source.fromInputStream(out)
+        //println("out stream created")
+        for (line <- src.getLines()) {
+          //println("calling callback")
+          callback(line)
+          //println("Answer: " + line)
+        }
+        src.close()
+      },
+      // We don't want to use stderr, so just close it.
+      _.close()
+//      err => {
+//        val src = scala.io.Source.fromInputStream(err)
+//        println("err stream created")
+//        for (line <- src.getLines()) {
+//          println("error: "+line)
+//        }
+//        src.close()
+//      }
+    )
+    val calcProc = sage.run(io)
+
+    // Using ProcessBuilder.run() will automatically launch
+    // a new thread for the input/output routines passed to ProcessIO.
+    // We just need to wait for it to finish.
+
+    def put(value:String): Unit = {
+      writer.println(value)
+      writer.flush()
+    }
+    def finished(): Int = {
+      writer.close()
+      val code = calcProc.exitValue()
+      //println(s"Subprocess exited with code $code.")
+      code
+    }
+    (s=>put(s),()=>finished())
+  }
 
 
 

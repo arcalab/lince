@@ -56,6 +56,18 @@ object Show {
     case _ => apply(exp)
   }
 
+  def apply(expr: SageExpr): String = expr match {
+    case SVal(v) => v.toString
+    case SArg => "_t_"
+    case SVar(v) => v
+    case SFun(f, args) => s"$f(${args.map(apply).mkString(",")})"
+    case SDiv(e1, e2) => s"(${apply(e1)}) / (${apply(e2)})"
+    case SMult(e1, e2) => s"(${apply(e1)}) * (${apply(e2)})"
+    case SPow(e1, e2) => s"(${apply(e1)}) ^ (${apply(e2)})"
+    case SAdd(e1, e2) => s"(${apply(e1)}) + (${apply(e2)})"
+    case SSub(e1, e2) => s"(${apply(e1)}) - (${apply(e2)})"
+  }
+
 
 
 

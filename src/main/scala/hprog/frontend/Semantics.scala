@@ -2,7 +2,7 @@ package hprog.frontend
 
 import hprog.ast._
 import hprog.backend.Show
-import hprog.frontend.solver.{SimpleSolver, Solver}
+import hprog.frontend.solver.{SimpleSolver, Solver, StaticSageSolver}
 import hprog.lang.SageParser
 
 object Semantics {
@@ -34,7 +34,7 @@ object Semantics {
 
 
   def syntaxToValuation(syntax:Syntax,
-                        solver: Solver , // = new SageSolver("/home/jose/Applications/SageMath"),
+                        solver: StaticSageSolver, // = new SageSolver("/home/jose/Applications/SageMath"),
                         dev: Deviator): Prog[Valuation] = {
 //    val solver = new SageSolver("/home/jose/Applications/SageMath")
     solver.++=(syntax)
@@ -55,7 +55,7 @@ object Semantics {
 //      }
 //      override def getSage(eqs: List[DiffEq]): SageSolution = Map()
 //    }
-    solver.++=(syntax)
+    //solver.++=(syntax)
     syntaxToValuationAux(syntax,solver,dev,100)
   }
 

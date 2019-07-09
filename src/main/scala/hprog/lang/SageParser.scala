@@ -21,6 +21,14 @@ object SageParser extends RegexParsers {
     */
   def parse(c: String): ParseResult[SolVars] = parseAll(sols, c)
 
+  /**
+    * Main function that parses a string into a SageExpr.
+    *
+    * @param c string representing a reply from Sage
+    * @return Parse result (parsed(functions) or failure(error))
+    */
+  def parseExpr(c: String): ParseResult[SageExpr] = parseAll(eqExpr, c)
+
   //  def pexp(c:String): ParseResult[Cond] = parseAll(condP,c)
 
   override def skipWhitespace = true

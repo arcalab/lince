@@ -1,6 +1,6 @@
 package hprog.frontend.solver
 
-import hprog.ast.{DiffEq, Syntax}
+import hprog.ast.{DiffEq, SageExpr, Syntax}
 import hprog.frontend.Semantics.{SageSolution, Solution, Valuation}
 
 // Numerical solver, using a naive solution for differencital equations
@@ -8,16 +8,20 @@ import hprog.frontend.Semantics.{SageSolution, Solution, Valuation}
 
 class SimpleSolver extends Solver {
 
-  override def ++=(systems: List[List[DiffEq]]): Unit = {}
-  override def ++=(syntax: Syntax): Unit = {}
-  override def +=(eqs: List[DiffEq]): Unit = {}
+//  override def ++=(systems: List[List[DiffEq]]): Unit = {}
+//  override def ++=(syntax: Syntax): Unit = {}
+//  override def +=(eqs: List[DiffEq]): Unit = {}
   override def evalFun(eqs: List[DiffEq]): Solution = {
     val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
     vars.map(v=> v -> ( (t:Double) => (init:Valuation) =>
       callTaylorSolver(init,eqs)(t)(v)
       )).toMap
   }
-  override def solveSymb(eqs: List[DiffEq]): SageSolution = Map()
+
+  def solveSymb(eqs:List[DiffEq]): SageSolution = Map()
+  def solveSymb(expr: SageExpr): SageExpr = expr
+
+//  override def solveSymb(eqs: List[DiffEq]): SageSolution = Map()
 
 
   private def callTaylorSolver(input:Valuation, eqs:List[DiffEq]): Double => Valuation = {

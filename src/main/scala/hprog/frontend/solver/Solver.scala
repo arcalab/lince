@@ -4,6 +4,7 @@ import breeze.linalg._
 import breeze.numerics._
 import hprog.DSL
 import hprog.ast._
+import hprog.frontend.Eval
 import hprog.frontend.Semantics.{SFunction, SageSolution, Solution, Valuation}
 
 trait Solver {
@@ -29,8 +30,10 @@ trait Solver {
     */
   def evalFun(eqs:List[DiffEq]): Solution =
     solveSymb(eqs).mapValues(evalFun)
-  def evalFun(expr: SageExpr): SFunction
-  def evalVal(expr: SageExpr): Valuation
+  def evalFun(expr: SageExpr): SFunction =
+    (t:Double) => (v:Valuation) => Eval(solveSymb(expr),t,v)
+  def evalVal(expr: SageExpr): Double =
+    evalFun(expr)(0)(Map())
 
   /** Gets a symbolic solution of a system of equations, using system calls to Sage,
     * checking first in its cache.
