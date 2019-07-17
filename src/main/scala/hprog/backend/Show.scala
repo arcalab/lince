@@ -1,6 +1,7 @@
 package hprog.backend
 
 import hprog.ast._
+import hprog.frontend.Semantics.SageSolution
 
 object Show {
 
@@ -16,8 +17,11 @@ object Show {
 
   def apply(a:At): String = a match {
     case Assign(v, e) => s"${v.v} := ${apply(e)}"
-    case DiffEqs(eqs, dur) => eqs.map(apply).mkString(", ")+apply(dur)
+    case DiffEqs(eqs, dur) => apply(eqs)+apply(dur)
   }
+
+  def apply(eqs:List[DiffEq]): String =
+    eqs.map(apply).mkString(", ")
 
   def apply(de: DiffEq): String = de match {
     case DiffEq(v, e) => s"${v.v}' = ${apply(e)}"
@@ -31,7 +35,7 @@ object Show {
 
   def apply(lin: Lin): String = lin match {
     case Var(v) => v
-    case Value(v) => if (v-v.toInt == 0) v.toInt.toString else v.toString
+    case Value(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
     case Add(l1, l2) => s"${apply(l1)} + ${apply(l2)}"
     case Mult(v, l:Add) =>  s"${apply(v)}*(${apply(l)})"
     case Mult(v, l) =>  s"${apply(v)}*${apply(l)}"
@@ -57,7 +61,7 @@ object Show {
   }
 
   def apply(expr: SageExpr): String = expr match {
-    case SVal(v) => v.toString
+    case SVal(v) => floatToFraction(v) //f"$v%1.8f"
     case SArg => "_t_"
     case SVar(v) => v
     case SFun(f, args) => s"$f(${args.map(apply).mkString(",")})"
@@ -68,11 +72,24 @@ object Show {
     case SSub(e1, e2) => s"(${apply(e1)}) - (${apply(e2)})"
   }
 
+  def apply(sol:SageSolution): String =
+    sol.map(kv => s"${kv._1}:${kv._2.toString}").mkString(", ")
+
+
+  def floatToFraction(v: Double): String = {
+    var den = 1
+    var num = v
+    while (num - num.round != 0) {
+      num *= 10
+      den *= 10
+    }
+    if (den == 1) num.toInt.toString
+    else s"${num.toInt.toString}/${den.toInt.toString}"
+  }
 
 
 
-
-//  def apply(p:Progr): String = p match {
+  //  def apply(p:Progr): String = p match {
 //    case Seq(ps) => ps.map(apply).mkString(" ; ")
 //    case Statement(as,Some(dur)) => addPar(as.map(apply)) +" & "+ apply(dur)
 //    case Statement(as,None) => as.map(apply).mkString(", ")

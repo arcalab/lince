@@ -3,8 +3,7 @@ package hprog.frontend
 //import breeze.numerics.{pow, sqrt}
 import hprog.ast
 import hprog.ast._
-import hprog.backend.Show
-import hprog.frontend.Deviator.Point
+import hprog.frontend.Semantics.Point
 import optimus.algebra.{Constraint, Expression}
 import optimus.optimization._
 import optimus.optimization.enums.SolverLib

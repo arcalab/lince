@@ -1,11 +1,12 @@
 package hprog.ast
 
-import hprog.frontend.Semantics.Valuation
+import hprog.backend.Show
 
 sealed abstract class SageExpr {
   override def toString: String = this match {
-    case SVal(v) if (v-v.round)==0 => v.toInt.toString
-    case SVal(v) => v.toString
+//    case SVal(v) if (v-v.round)==0 => v.toInt.toString
+//    case SVal(v) => v.toString
+    case SVal(v) => Show.floatToFraction(v)
     case SArg => "t"
     case SVar(v) => v
     case SFun(f, args) => s"$f(${args.mkString(",")})"
@@ -16,6 +17,12 @@ sealed abstract class SageExpr {
     case SSub(SVal(0.0), e2) => s"-$e2"
     case SSub(e1, e2) => s"$e1-$e2"
   }
+  def +(that: SageExpr): SageExpr = SAdd(this,that)
+  def -(that: SageExpr): SageExpr = SSub(this,that)
+  def *(that: SageExpr): SageExpr = SMult(this,that)
+  def /(that: SageExpr): SageExpr = SDiv(this,that)
+  def ^(that: SageExpr): SageExpr = SPow(this,that)
+
 }
 
 case class SVal(v:Double)                     extends SageExpr

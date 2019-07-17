@@ -1,6 +1,6 @@
 package hprog.lang
 
-import hprog.ast.{SAdd, SArg, SDiv, SFun, SMult, SPow, SSub, SVal, SageExpr}
+import hprog.ast.{SAdd, SArg, SDiv, SFun, SMult, SPow, SSub, SVal, SVar, SageExpr}
 import hprog.common.ParserException
 import hprog.frontend.Semantics.{SFunction, SolVars, Valuation}
 
@@ -88,7 +88,7 @@ object SageParser extends RegexParsers {
     }
 
   lazy val lit: Parser[SageExpr] =
-    function | rational | time | "("~>lit<~")" | negation
+    function | rational | time | "("~>eqExpr<~")" | negation
 
   lazy val negation: Parser[SageExpr] =
     "-"~>lit ^^ (e => SSub(SVal(0.0),e)) // (e => (t: Double) => (ctx: Valuation) => -e(t)(ctx))
@@ -100,12 +100,14 @@ object SageParser extends RegexParsers {
       case f~Some(f2) => SDiv(f,f2) // (_:Double) => (_:Valuation) => f / mbf.getOrElse(1.0)
     }
   lazy val float: Parser[SageExpr] =
-    """-?[0-9]+(\.([0-9]+))?""".r ^^ { s: String => SVal(s.toDouble) }
+    """-?[0-9]+(\.([0-9]+))?(e-?([0-9]+))?""".r ^^ { s: String => SVal(s.toDouble) }
 
   lazy val function: Parser[SageExpr] =
-    identifier~"("~eqExprs~")" ^^ {
-      case name~_~arg~_ =>
+    identifier~opt("("~>eqExprs<~")") ^^ {
+      case name~Some(arg) =>
         SFun(name,arg)
+      case name~_ =>
+        SVar(name)
 //      case name~_~arg~_ => (t:Double)=>(ctx:Valuation)=> (name,arg(t)(ctx)) match {
 //        case (_,0) if ctx.contains(name) => ctx(name)
 //        case ("sin",v) => Math.sin(v)

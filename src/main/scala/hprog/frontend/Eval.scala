@@ -1,18 +1,18 @@
 package hprog.frontend
 
 import hprog.ast._
-import hprog.frontend.Semantics.{SageSolution, Valuation}
+import hprog.frontend.Semantics.{Point, SageSolution, Valuation}
 
 object Eval {
 
-  def apply(state:Map[String,Double], lin: Lin): Double = lin match {
+  def apply(state:Point, lin: Lin): Double = lin match {
     case Var(v) => state(v)
     case Value(v) => v
     case Add(l1, l2) => apply(state,l1) + apply(state,l2)
     case Mult(v, l)  => apply(state,v)  * apply(state,l)
   }
 
-  def apply(state:Map[String,Double], cond: Cond): Boolean =
+  def apply(state:Point, cond: Cond): Boolean =
     cond match {
       case BVal(b) =>  b
       case And(c1, c2) => apply(state,c1) && apply(state,c2)
@@ -28,14 +28,15 @@ object Eval {
   def apply(e:SageExpr, t: Double, x: Valuation): Double = e match {
     case SVal(v) => v
     case SArg => t
-    case SVar(v) => x(v) // not really used - usually v(0) denotes this case
+    case SVar(v) => apply(x(v),t,x) // not really used - usually v(0) denotes this case
+                                    // could create an infinte loop if recursive...
     case SDiv(e1, e2) => apply(e1,t,x) / apply(e2,t,x)
     case SMult(e1, e2) =>apply(e1,t,x) * apply(e2,t,x)
     case SPow(e1, e2) => math.pow(apply(e1,t,x),apply(e2,t,x))
     case SAdd(e1, e2) => apply(e1,t,x) + apply(e2,t,x)
     case SSub(e1, e2) => apply(e1,t,x) - apply(e2,t,x)
     case SFun(f, args) => (f,args) match {
-      case (v,List(SVal(0.0))) if x contains v => x(v)
+      case (v,List(SVal(0.0))) if x contains v => apply(x(v),t,x) // could create infinite loop
       case ("exp",v::Nil) => math.exp(apply(v,t,x))
       case ("sin",v::Nil) => math.sin(apply(v,t,x))
       case ("cos",v::Nil) => math.cos(apply(v,t,x))
@@ -48,6 +49,11 @@ object Eval {
     }
   }
 
+  // Ignore variables x
+  def apply(e:SageExpr,t:Double): Double = apply(e,t,Map())
+
+
+
   /** Replaces in `sol2` its initial values by `sol1`, and shifts time by `r`
     * @param r delay to shift time
     * @param sol1 initial assignment of symbolic functions to variables
@@ -56,7 +62,7 @@ object Eval {
     */
   def compose(r:Double,sol1:SageSolution,sol2:SageSolution): SageSolution = {
     println(s"Composing\n  ${sol1}  with\n  ${sol2}  after\n  $r  got")
-    val res = sol2.mapValues(expr => update(r, expr, sol1))
+    val res = sol2.mapValues(expr => updInput(r, expr, sol1))
     println(s"  ${res}")
     res
   }
@@ -65,16 +71,23 @@ object Eval {
       case (Some(s1),Some(s2)) => Some(compose(r,s1,s2))
       case _ => None
     }
-  private def update(r:Double,e:SageExpr,sol:SageSolution): SageExpr = e match {
+
+  /** Update an expression by replacing initial values v(0)
+    * @param rew time to be subtracted to the input values
+    * @param e expression to be updated
+    * @param sol solution with the new values
+    * @return updated expression
+    */
+  def updInput(rew:Double, e:SageExpr, sol:SageSolution): SageExpr = e match {
     case SFun(v, List(SVal(0.0))) if sol contains v  =>
-      shiftTime(r,sol(v))
+      shiftTime(rew,sol(v))
     //
-    case SFun(f, args) => SFun(f,args.map(e2 =>  update(r,e2,sol)))
-    case SDiv(e1, e2)  => SDiv( update(r,e1,sol),update(r,e2,sol))
-    case SMult(e1, e2) => SMult(update(r,e1,sol),update(r,e2,sol))
-    case SPow(e1, e2)  => SPow( update(r,e1,sol),update(r,e2,sol))
-    case SAdd(e1, e2)  => SAdd( update(r,e1,sol),update(r,e2,sol))
-    case SSub(e1, e2)  => SSub( update(r,e1,sol),update(r,e2,sol))
+    case SFun(f, args) => SFun(f,args.map(e2 =>  updInput(rew,e2,sol)))
+    case SDiv(e1, e2)  => SDiv( updInput(rew,e1,sol),updInput(rew,e2,sol))
+    case SMult(e1, e2) => SMult(updInput(rew,e1,sol),updInput(rew,e2,sol))
+    case SPow(e1, e2)  => SPow( updInput(rew,e1,sol),updInput(rew,e2,sol))
+    case SAdd(e1, e2)  => SAdd( updInput(rew,e1,sol),updInput(rew,e2,sol))
+    case SSub(e1, e2)  => SSub( updInput(rew,e1,sol),updInput(rew,e2,sol))
     case _ => e
   }
   def shiftTime(r: Double, expr: SageExpr): SageExpr =
@@ -86,7 +99,7 @@ object Eval {
   def setTime(r: Double, expr: SageExpr): SageExpr =
     updTime(SVal(r),expr)
 
-  private def updTime(newt: SageExpr, expr: SageExpr): SageExpr = expr match {
+  def updTime(newt: SageExpr, expr: SageExpr): SageExpr = expr match {
     case SArg => newt
     //
     case SFun(f, args) => SFun(f,args.map(e2 =>   updTime(newt,e2)))
@@ -99,7 +112,7 @@ object Eval {
   }
 
   def lin2sage(l:Lin): SageExpr = l match {
-    case Var(v) => SVar(v)
+    case Var(v) => SFun(v,List(SVal(0))) //SVar(v)
     case Value(v) => SVal(v)
     case Add(l1, l2) => SAdd(lin2sage(l1),lin2sage(l2))
     case Mult(v, l) => SMult(SVal(v.v),lin2sage(l))

@@ -11,44 +11,44 @@ import scala.concurrent.{Future, Promise}
 import scala.sys.process._
 
 
-class SageSolver(path:String) extends StaticSageSolver {
+class LiveSageSolver(path:String) extends StaticSageSolver {
 
   protected val lockRcv = new Object
   protected val lockSnd = new Object
   protected var last: Option[String] = None
-  protected val proc = SageSolver.createSageProcess(path,addUpdate)
+  protected val proc = LiveSageSolver.createSageProcess(path,addUpdate)
 
   // wait for process to be created (and first output out)
   lockRcv.synchronized{
-    print("(rcv) waiting")
+    //print("(rcv) waiting")
     if (last==None) // if I'm the first, then wait
       lockRcv.wait(5000)
-    println(" - done(r)")
+    //println(" - done(r)")
   }
   // allow sender to continue after startup msg
   lockSnd.synchronized{
-    print("(rcv) unlocking sender")
+    //print("(rcv) unlocking sender")
     last = None
     lockSnd.notify()
-    println(" - done(r)")
+    //println(" - done(r)")
   }
 
   def addUpdate(s:String): Unit = {
     //    last = Some(s)
     lockRcv.synchronized{
-      print(s"(sender) unlocking update: '$s'")
+      println(s"(sender) sage reply: '$s'")
       last = Some(s)
       lockRcv.notify()
-      println(" - done(s)")
+      //println(" - done(s)")
       //    lockRcv.synchronized(lockRcv.notifyAll())
     }
     lockSnd.synchronized{
-      print(s"(sender) waiting for permission")
+      //print(s"(sender) waiting for permission")
       if (last!=None) // if I'm the first, then wait
         lockSnd.wait(5000)
-      println(s" - done(s)")
+      //println(s" - done(s)")
     }
-    println(s"(sender) continuing")
+    //println(s"(sender) continuing")
     //    l.notify() // null
   }
 
@@ -57,20 +57,22 @@ class SageSolver(path:String) extends StaticSageSolver {
     last = None
     var r = proc._2() // will trigger outputs
     lockRcv.synchronized{
-      print("(rcv) waiting")
+      //print("(rcv) waiting")
       if (last==None)
         lockRcv.wait(5000)
-      println(" - done(r)")
+      //println(" - done(r)")
     }
     // allow sender to continue after startup msg
     lockSnd.synchronized{
-      print("(rcv) unlocking sender")
+      //print("(rcv) unlocking sender")
       last = None
       lockSnd.notify()
-      println(" - done(r)")
+      //println(" - done(r)")
     }
     r
   }
+
+  def closeWithoutWait(): Unit = proc._3()
 
   def askSage(s:String): Option[String] = {
     last = None // clear last answer
@@ -86,11 +88,11 @@ class SageSolver(path:String) extends StaticSageSolver {
       lockRcv.synchronized{
         if (last == None) // I'm the first - wait
           lockRcv.wait(5000)
-        println(s"> '${last}'")
+        //println(s"> '${last}'")
       }
       last match {
         case Some("'ok'") =>
-          println(s"moving prev '$prev' to last")
+          //println(s"moving prev '$prev' to last")
           last = Some(prev)
           ok = true
           lockSnd.synchronized{
@@ -98,7 +100,7 @@ class SageSolver(path:String) extends StaticSageSolver {
             lockSnd.notify()
           }
         case Some(v) =>
-          println(s"adding $v to prev")
+          //println(s"adding $v to prev")
           prev = v.drop(6)
           lockSnd.synchronized{
             last = None
@@ -108,26 +110,42 @@ class SageSolver(path:String) extends StaticSageSolver {
           return None
       }
     }
-    println(s"returning '${prev}' if '$ok'")
+    //println(s"returning '${prev}' if '$ok'")
     if (ok) Some(prev) else None
   }
 
 
   ///
   def askSage(eqs: List[DiffEq]): Option[String] = {
-    val instructions = SageSolver.genSage(eqs) + "; print(\"§\")"
-    println(s"instructions to solve: '$instructions'")
+    val instructions = LiveSageSolver.genSage(eqs) // + "; print(\"§\")"
+//    println(s"instructions to solve: '$instructions'")
+    println(s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
     println(s"reply: '$rep'")
     rep
   }
 
   def askSage(expr: SageExpr): Option[String] = {
-    val instructions = s"print(\"${Show(expr)}\"); \"ok\""
+    val vars = getVars(expr)
+    val instructions = //s"print(\"${Show(expr)}\"); \"ok\""
+      vars.map(v=>s"$v = var('$v'); ").mkString +
+      "print(" + Show(expr) + "); \"ok\""
     println(s"expression to solve: '$instructions'")
     val rep = askSage(instructions)
     println(s"reply: '$rep'")
     rep
+  }
+
+  private def getVars(expr: SageExpr): List[String] = expr match {
+    case SVal(v)       => Nil
+    case SArg          => Nil
+    case SVar(v)       => List(v)
+    case SFun(f, args) => args.flatMap(getVars) //if (args == List(SVal(0)))
+    case SDiv(e1, e2)  => getVars(e1) ++ getVars(e2)
+    case SMult(e1, e2) => getVars(e1) ++ getVars(e2)
+    case SPow(e1, e2)  => getVars(e1) ++ getVars(e2)
+    case SAdd(e1, e2)  => getVars(e1) ++ getVars(e2)
+    case SSub(e1, e2)  => getVars(e1) ++ getVars(e2)
   }
 
 
@@ -142,7 +160,7 @@ class SageSolver(path:String) extends StaticSageSolver {
       askSage(eqs) match {
         case Some(reply) => importDiffEqs(List(eqs), List(reply))
         case None =>
-          throw new ParserException(s"Failed to solve ${
+          throw new ParserException(s"Timed out when solving ${
             eqs.map(Show(_)).mkString(", ")}.")
 
       }//SageSolver.callSageSolver(eqs, path)
@@ -153,8 +171,8 @@ class SageSolver(path:String) extends StaticSageSolver {
       askSage(expr) match {
         case Some(reply) => importExpr(expr,reply)
         case None =>
-          throw new ParserException(s"Failed to solve ${
-            Show(expr).mkString(", ")}.")
+          throw new ParserException(s"Timed out when reducing ${
+            Show(expr)}.")
       }
     }
 
@@ -216,7 +234,7 @@ class SageSolver(path:String) extends StaticSageSolver {
 ///////////////////////////////////////
 ////////// Static functions ///////////
 ///////////////////////////////////////
-object SageSolver {
+object LiveSageSolver {
 
 
   /**
@@ -244,7 +262,7 @@ object SageSolver {
   def callSageSolver(systems: List[List[DiffEq]], path: String, timeout:Int = 10): List[String] = {
     if (systems.filter(_.nonEmpty).nonEmpty) {
       //println(s"solving Sage with ${systems}")
-      val instructions = systems.map(SageSolver.genSage).mkString("; print(\"§\"); ")
+      val instructions = systems.map(LiveSageSolver.genSage).mkString("; print(\"§\"); ")
 
       println(s"instructions to solve: ${instructions}")
 
@@ -255,7 +273,7 @@ object SageSolver {
       if (status == 0)
         stdout.split('§').toList
       else
-        throw new SageSolver.SolvingException(stderr.toString)
+        throw new LiveSageSolver.SolvingException(stderr.toString)
     }
     else
       Nil
@@ -298,7 +316,7 @@ object SageSolver {
 
 
   def createSageProcess(path:String, callback: String => Unit):
-  (String=>Unit, ()=>Int) = {
+  (String=>Unit, ()=>Int, ()=>Unit) = {
     var writer: java.io.PrintWriter = null
 
     // limit scope of any temporary variables
@@ -353,7 +371,8 @@ object SageSolver {
       //println(s"Subprocess exited with code $code.")
       code
     }
-    (s=>put(s),()=>finished())
+    def finished2(): Unit = writer.close()
+    (s=>put(s),()=>finished(),()=>finished2())
   }
 
 

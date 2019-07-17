@@ -5,7 +5,7 @@ import breeze.numerics._
 import hprog.DSL
 import hprog.ast._
 import hprog.frontend.Eval
-import hprog.frontend.Semantics.{SFunction, SageSolution, Solution, Valuation}
+import hprog.frontend.Semantics.{Point, SFunction, SageSolution, Solution}
 
 trait Solver {
 //  /**
@@ -31,7 +31,7 @@ trait Solver {
   def evalFun(eqs:List[DiffEq]): Solution =
     solveSymb(eqs).mapValues(evalFun)
   def evalFun(expr: SageExpr): SFunction =
-    (t:Double) => (v:Valuation) => Eval(solveSymb(expr),t,v)
+    (t:Double) => (v:Point) => Eval(solveSymb(expr),t,v.mapValues(SVal))
   def evalVal(expr: SageExpr): Double =
     evalFun(expr)(0)(Map())
 
@@ -71,15 +71,6 @@ object Solver {
     (  vars
       ,for (v<-vars) yield rows.getOrElse(v,vars.map(_ => 0.0))) // Note: set to 0 when unknown variable
   }
-
-//  def getMatrixAndConstants(eqs: DiffEqs):  (List[String],List[List[Double]],List[Double]) = {
-//    val (vars,mtx) = Solver.getMatrix(eqs)
-//    val i = vars.indexOf("")
-//    if (i == -1)
-//      (vars,mtx,vars.map(_=>0.0))
-//    else
-//      (vars - "" , mtx.map(_.drop(i)) , mtx.map(_(i)))
-//  }
 
   private def getRow(vars:List[String],base:String,e:Lin): List[Double] = {
     val m = getRowValues(e,base)
@@ -338,8 +329,6 @@ object Solver {
     * Assumes that, once the guard it true, it will always be true.
     * @param prevStepSize
     * @param curX
-    * @param dir
-    * @param expanding
     * @param guard
     * @param precision
     * @return

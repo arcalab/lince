@@ -3,7 +3,6 @@ package hprog.frontend
 import hprog.ast._
 import hprog.backend.Show
 import hprog.frontend.solver.{SimpleSolver, Solver, StaticSageSolver}
-import hprog.lang.SageParser
 
 object Semantics {
 
@@ -12,7 +11,8 @@ object Semantics {
     */
   type Vars      = String
   /** Maps names of variables or trajectories to their value at a given time */
-  type Valuation = Map[Vars,Double]
+  type Valuation = Map[Vars,SageExpr] // note: SageExpr without variables nor argument
+  type Point = Map[Vars,Double]
 
   /** Maps variables to the symbolic expression of its semantics */
   type SageSolution  = Map[String,SageExpr]
@@ -23,14 +23,24 @@ object Semantics {
 //    }
 //  }
 
-  type Messages = Set[String]
-  type ToVerify = Set[(Cond,SageSolution)]
-  type Warnings = Map[Double,(Messages,ToVerify)]
+//  type Messages = Set[String]
+//  type ToVerify = Set[(Cond,SageSolution)]
+  type Warnings = //Map[Double,(Messages,ToVerify)]
+                  List[(SageExpr,String)]
+  type Notes = Warnings
 
   /** Maps variables to their semantic functions */
   type Solution  = Map[String,SFunction]
   /** Function, given a time value and an initial valuation */
-  type SFunction = Double => Valuation => Double
+  type SFunction = Double => Point => Double
+
+  trait TrajValuation extends Traj[Valuation] {
+    override def apply(t: Double): Point = {
+      val res = apply(SVal(t)).mapValues(Eval(_,t,Map()))
+      println(s"'${Show(fun)}'($t) = $res")
+      res
+    }
+  }
 
 
   def syntaxToValuation(syntax:Syntax,
@@ -63,56 +73,102 @@ object Semantics {
     //println(s"current bound: $bound for ${Show(syntax)}")
     if (bound<=0) notes("Reached limit of checks of conditions in while loops.")
     else syntax match {
-      case a: Assign => assignmentToValuation(a)
-      case d: DiffEqs => diffEqsToValuation(d, sol)
-      case Seq(Nil) => syntaxToValuationAux(Skip, sol, dev,bound)
+      case a: Assign     => assignmentToValuation(a,sol)
+      case d: DiffEqs    => diffEqsToValuation(d, sol)
+      case Seq(Nil)      => syntaxToValuationAux(Skip, sol, dev,bound)
       case Seq(p :: Nil) => syntaxToValuationAux(p, sol, dev,bound)
-      case Seq(p :: ps) => syntaxToValuationAux(p, sol, dev,bound) ++ syntaxToValuationAux(Seq(ps), sol, dev,bound)
-      case Skip => skipToValuation()
-      case ite: ITE => iteToValuation(ite, sol, dev, bound)
-      case whil: While => whileToValuation(whil, sol, dev, bound)
+      case Seq(p :: ps)  => syntaxToValuationAux(p, sol, dev,bound) ++
+                            syntaxToValuationAux(Seq(ps), sol, dev,bound)
+      case Skip          => skipToValuation()
+      case ite: ITE      => iteToValuation(ite, sol, dev, bound)
+      case whil: While   => whileToValuation(whil, sol, dev, bound)
     }
   }
 
-  def assignmentToValuation(assign: Assign): Prog[Valuation] = input => {
+  // Assignments
+  def assignmentToValuation(assign: Assign, sol: Solver): Prog[Valuation] = input => {
       val Assign(x,exp) = assign
-      val newValue: Double = Eval(input, exp)
+      println(s"& evaluating ${Show(exp)} under $input")
+      val newExpr: SageExpr = Eval.updInput(0.0,Eval.lin2sage(exp),input)
+      println(s"& added input: ${Show(newExpr)}")
+      val newValue: SageExpr = sol.solveSymb(newExpr) // evaluating expression with Sage
       val newValuation: Valuation = input + (x.v -> newValue)
+      println(s"& done: added ${Show(newValue)}")
 
-      new Traj[Valuation] {
-        override val dur: Option[Double] = Some(0)
-        override val symbolic: Option[SageSolution] =
-          Some(Eval.baseSage(input.keys) ++ Map(x.v -> Eval.lin2sage(exp)))
-        override def apply(t: Double): Valuation = newValuation
-        override val inits: Map[Double, Valuation] = Map(0.0 -> newValuation)
+      new TrajValuation {
+        override val dur: Option[SageExpr] = Some(SVal(0))
+//        override val symbolc: Option[SageSolution] =
+//          Some(Eval.baseSage(input.keys) ++ Map(x.v -> Eval.lin2sage(exp)))
+        override def apply(t: SageExpr): Valuation = newValuation
+        override val inits: Map[SageExpr, Valuation] = Map(SVal(0) -> newValuation)
       }
 
   }
 
+  // Differential equations
   def diffEqsToValuation(diffEqs: DiffEqs, solver: Solver): Prog[Valuation] = input => {
     val DiffEqs(eqs,durCond) = diffEqs
 
 //    val sol = callSageSolver(input,eqs,sol)
     val sol = solver.evalFun(eqs) // maps variables to their solutions (function from t/ctx to value)
     def guard(c: Cond): Double => Boolean =
-      t => Eval(sol.mapValues(fun=>fun(t)(input)),c)
+      t => Eval(sol.mapValues(fun=>fun(t)(input.mapValues(Eval.apply(_,t)))),c)
     val durValue = Solver.solveDur(durCond,input,guard) // give value or do jumps searching for duration
-    val symbolicValue = Some(Eval.baseSage(input.keys) ++ solver.solveSymb(eqs))
+//    val symbolicValue = Some(Eval.baseSage(input.keys) ++ solver.solveSymb(eqs))
 
-    new Traj[Valuation] {
-      override val dur: Option[Double] = durValue
-      override val symbolic: Option[SageSolution] = symbolicValue
-      override val inits: Map[Double, Valuation] = Map(0.0 -> input)
-      override val ends: Map[Double, Valuation] = durValue match {
+    // calculate solution for diff eqs using the solver (wrt "t" and initial point)
+    println(s"&& solving ${eqs.size} eq(s): ${Show(eqs)}")
+    val symbSol = solver.solveSymb(eqs)
+    // replace initial point by the input and simplify the result with Sage
+    def updatedSolD(t:Double): Point =
+      symbSol.mapValues(expr => {
+        println(s"&& adding to ${Show(expr)} input ${input}")
+        val addedInput = Eval.updInput(0,expr,input)
+//        val addedTime = Eval.updTime(t,addedInput)
+        println(s"&& calculating expr (from eqs ${
+          Show(eqs)}): ${
+          Show(addedInput)} @ $t")
+        // This needs to be calculated for every new time "t" sampled in the browser
+        // - it cannot use the solver!
+//        solver.solveSymb(addedTime)
+        val res = Eval(addedInput,t)
+        println(s"done: ${res}")
+        res
+      })
+    def updatedSolS(t:SageExpr): Valuation =
+      symbSol.mapValues(expr => {
+        val addedInput = Eval.updInput(0,expr,input)
+        val addedTime = Eval.updTime(t,addedInput)
+        println(s"&& solving expr (from eqs ${Show(eqs)}): ${Show(addedInput)} @ ${Show(t)}")
+        // This needs to be calculated for every new time "t" sampled in the browser
+        // - it cannot use the solver!
+        solver.solveSymb(addedTime)
+//        SVal(Eval(addedInput,Eval(t,0)))
+      })
+    println(s"## updating solution for '${Show(symbSol)}'" +
+      s"\n## using input ${input.mkString(", ")}" +
+      s"\n## got ${updatedSolS(SArg).mkString("/")}")
+
+    new TrajValuation {
+      override val dur: Option[SageExpr] = durValue.map(SVal)
+      //      override val symbolic: Option[SageSolution] = symbolicValue
+      override val fun: SageSolution = symbSol
+      override val inits: Map[SageExpr, Valuation] = Map(SVal(0.0) -> input)
+      override val ends: Map[SageExpr, Valuation] = dur match {
         case Some(value) => Map(value -> apply(value))
         case None => Map()
       }
-      override val post: Cond = durCond match {
-        case Until(c:Cond) => c
-        case _ => BVal(true)
-      }
+//      override val post: Cond = durCond match {
+//        case Until(c:Cond) => c
+//        case _ => BVal(true)
+//      }
 
-      override def apply(t: Double): Valuation = input ++ sol.mapValues(fun=>fun(t)(input))
+      override def apply(t: SageExpr): Valuation =
+        ///input ++ sol.mapValues(fun=>fun(t)(input))
+        input ++ updatedSolS(t)
+      override def apply(t: Double): Point =
+      ///input ++ sol.mapValues(fun=>fun(t)(input))
+        input.mapValues(e=>Eval(e,0.0)) ++ updatedSolD(t)
     }
   }
 
@@ -147,16 +203,19 @@ object Semantics {
 //  }
 
   def skipToValuation(): Prog[Valuation] = input => {
-    new Traj[Valuation] {
-      override val dur: Option[Double] = Some(0)
-      override val symbolic: Option[SageSolution] = Some(Eval.baseSage(input.keys))
-      override def apply(t: Double): Valuation = input
+    new TrajValuation {
+      override val dur: Option[SageExpr] = Some(SVal(0.0))
+//      override val symbolic: Option[SageSolution] = Some(Eval.baseSage(input.keys))
+      override def apply(t: SageExpr): Valuation = input
     }
   }
 
   def iteToValuation(ite: ITE,sol: Solver, dev:Deviator, bound:Int): Prog[Valuation] = input => {
     val ITE(ifS, thenS, elseS) = ite
-    val ifValue = Eval(input,ifS)
+    val inputPoint = input.mapValues(Eval(_,0))
+    val ifValue = Eval(inputPoint,ifS) // approximation (assuming input is simplified)
+//                  sol.solveSymb(  )
+    println(s"%%% ITE ${Show(ifS)} @ ${inputPoint.mkString(",")} - $ifValue")
 
 //    def warnings(pre:Cond): Map[Double,Set[String]] =
 //      if (Utils.getDomain(ifS).isEmpty) Map(0.0 -> Set(s"Failed to find an non-ambiguous domain for ${Show(ifS)}"))
@@ -165,34 +224,40 @@ object Semantics {
 //        case _ => Map()
 //      }
     // when asking for warnings, this will be called with the current symbolic value
-    def warnings(symb:Option[SageSolution]): Warnings = {
+    def warnings: Warnings = {
       val notIf = if (ifValue) Not(ifS) else ifS
-      dev.closest(input, notIf) match {
+      val cls = dev.closest(inputPoint, notIf)
+      println(s"%%% closest point: $cls")
+      cls match {
         case Some(p2) =>
-          if (input!=p2) Map(0.0 -> Set(s"Perturbation by ${Distance.dist(input,p2)}</br>when testing ${Show(ifS)}</br>with:</br>${
-            p2.map(kv=>s"${kv._1}:${kv._2}").mkString("</br>")}"))
-          else Map(0.0 -> Set(s"Perturbation found by any small delta</br>when testing ${Show(ifS)}."))
-        case None => Map()
+          if (input!=p2)
+            List(SVal(0) -> s"Perturbation by ${
+              Distance.dist(inputPoint,p2)}</br>when testing ${
+              Show(ifS)}</br>with:</br>${
+              p2.map(kv=>s"${kv._1}:${kv._2}").mkString("</br>")}")
+          else
+            List(SVal(0) -> s"Perturbation found by any small delta</br>when testing ${Show(ifS)}.")
+        case None => Nil
       }
       ///////// OVERRIDING
-      val msg = s"Iftrue? $ifValue</br>IfStm: ${ifS}</br>Symb. fun: $symb</br>Symb. res: ${
-        symb.get.mapValues(exp => Eval(exp,0.0,Map()))}"
-      val toCheck: Set[(Cond,SageSolution)] = symb match {
-        case Some(sol) => Set((if(ifValue)ifS else Not(ifS)
-                              ,sol.mapValues(e=>Eval.setTime(0.0,e))))
-        case None => Set()
-      }
-      Map(0.0 -> (Set(msg) , toCheck) )
+//      val msg = s"Iftrue? $ifValue</br>IfStm: ${ifS}</br>Symb. fun: $symb</br>Symb. res: ${
+//        symb.get.mapValues(exp => Eval(exp,0.0,Map()))}"
+//      val toCheck: Set[(Cond,SageSolution)] = symb match {
+//        case Some(sol) => Set((if(ifValue)ifS else Not(ifS)
+//                              ,sol.mapValues(e=>Eval.setTime(0.0,e))))
+//        case None => Set()
+//      }
+//      Map(0.0 -> (Set(msg) , toCheck) )
     }
 
 
     if (ifValue)
       syntaxToValuationAux(thenS,sol,dev,bound).traj(input)
-        .addNotes(Map(0.0->s"${Show(ifS)}? True"))
+        .addNotes(List(SVal(0)->s"${Show(ifS)}? True"))
         .addWarnings(warnings)
     else
       syntaxToValuationAux(elseS,sol,dev,bound).traj(input)
-        .addNotes(Map(0.0->s"${Show(ifS)}? False"))
+        .addNotes(List(SVal(0)->s"${Show(ifS)}? False"))
         .addWarnings(warnings)
   }
 
@@ -200,7 +265,7 @@ object Semantics {
 //    val While(c,doP) = whileStx
     whileStx match {
       case While(Guard(c),doP) => syntaxToValuationAux(ITE(c,doP ~ whileStx, Skip),sol,dev,bound-1)
-      case While(Counter(0),doP) => syntaxToValuationAux(Skip,sol,dev,bound)
+      case While(Counter(0),_) => syntaxToValuationAux(Skip,sol,dev,bound)
       case While(Counter(i),doP) => syntaxToValuationAux(doP ~ While(Counter(i-1),doP),sol,dev,bound)
     }
 
@@ -243,13 +308,11 @@ object Semantics {
 
   // Leftovers - now only used to inform that a trace was trimmed.
   private def notes(str: String): Prog[Valuation] = _ => {
-    val t = new Traj[Valuation] {
-      override val dur: Option[Double] = Some(0.0)
-      override def apply(t: Double): Valuation = Map()
-
-      override val symbolic: Option[SageSolution] = None
+    val t = new TrajValuation {
+      override val dur: Option[SageExpr] = Some(SVal(0))
+      override def apply(t: SageExpr): Valuation = Map()
     }
-    t.addNotes(Map(0.0->str))
+    t.addNotes(List(SVal(0)->str))
   }
 
   //      // Evaulate "e" under the current valuation
