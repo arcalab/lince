@@ -1,8 +1,9 @@
 package hprog.lang
 
-import hprog.ast.{SAdd, SArg, SDiv, SFun, SMult, SPow, SSub, SVal, SVar, SageExpr}
+import hprog.ast.SageExpr.{SExprFun, SExprT}
+import hprog.ast._
 import hprog.common.ParserException
-import hprog.frontend.Semantics.{SFunction, SolVars, Valuation}
+import hprog.frontend.Semantics.SageSolution
 
 import scala.util.matching.Regex
 import scala.util.parsing.combinator._
@@ -19,7 +20,7 @@ object SageParser extends RegexParsers {
     * @param c string representing a reply from Sage
     * @return Parse result (parsed(functions) or failure(error))
     */
-  def parse(c: String): ParseResult[SolVars] = parseAll(sols, c)
+  def parse(c: String): ParseResult[SageSolution] = parseAll(sols, c)
 
   /**
     * Main function that parses a string into a SageExpr.
@@ -27,7 +28,7 @@ object SageParser extends RegexParsers {
     * @param c string representing a reply from Sage
     * @return Parse result (parsed(functions) or failure(error))
     */
-  def parseExpr(c: String): ParseResult[SageExpr] = parseAll(eqExpr, c)
+  def parseExpr(c: String): ParseResult[SExprFun] = parseAll(eqExpr, c)
 
   //  def pexp(c:String): ParseResult[Cond] = parseAll(condP,c)
 
@@ -44,25 +45,25 @@ object SageParser extends RegexParsers {
   //   /// Program ///
   //   ///////////////
 
-  lazy val sols: Parser[SolVars] =
+  lazy val sols: Parser[SageSolution] =
     "["~>solsIn<~"]" |
-      eqExpr ^^ (f => SolVars(Map(""->f)))
+      eqExpr ^^ (f => Map(""->f))
 
-  lazy val solsIn: Parser[SolVars] = 
+  lazy val solsIn: Parser[SageSolution] =
     eqDef ~ opt("," ~> solsIn) ^^ {
       case e ~ None => e
-      case e1 ~ Some(e2) => e1.sol.keySet.intersect(e2.sol.keySet).toList match {
-        case Nil => SolVars(e1.sol ++ e2.sol)
+      case e1 ~ Some(e2) => e1.keySet.intersect(e2.keySet).toList match {
+        case Nil => e1 ++ e2
         case shared => throw new ParserException(s"Variable(s) defined more than once: ${
           shared.mkString(",")}")
       }
     }
-  lazy val eqDef: Parser[SolVars] = 
+  lazy val eqDef: Parser[SageSolution] =
     identifier ~ "(_t_) == " ~ eqExpr ^^ {
-      case id ~ _ ~ exp => SolVars(Map(id->exp))
+      case id ~ _ ~ exp => Map(id->exp)
     }
 
-  lazy val eqExpr: Parser[SageExpr] =
+  lazy val eqExpr: Parser[SExprFun] =
     prod ~ opt(("+"~eqExpr)|("-"~eqExpr)) ^^ {
       case e ~ None => e
       case e1 ~ Some("+"~e2) => SAdd(e1,e2)
@@ -70,7 +71,7 @@ object SageParser extends RegexParsers {
       case _ ~ Some(s~_) => throw new ParserException(s"Unknown operator $s")
     }
 
-  lazy val prod: Parser[SageExpr] =
+  lazy val prod: Parser[SExprFun] =
     expn ~ opt(("*"~prod)|("/"~prod)) ^^ {
       case e ~ None => e
       case e1 ~ Some("*"~e2) => SMult(e1,e2)
@@ -78,7 +79,7 @@ object SageParser extends RegexParsers {
       case _ ~ Some(s~_) => throw new ParserException(s"Unknown operator $s")
     }
 
-  lazy val expn: Parser[SageExpr] =
+  lazy val expn: Parser[SExprFun] =
     "e" ~ "^" ~ lit ^^ {
       case _~_~e => SFun("exp",List(e))//(t:Double) => (ctx:Valuation) => Math.exp(e(t)(ctx))
     } |
@@ -87,22 +88,22 @@ object SageParser extends RegexParsers {
       case e1 ~ Some(e2) => SPow(e1,e2)//(t:Double) => (ctx:Valuation) => Math.pow(e1(t)(ctx),e2(t)(ctx))
     }
 
-  lazy val lit: Parser[SageExpr] =
+  lazy val lit: Parser[SExprFun] =
     function | rational | time | "("~>eqExpr<~")" | negation
 
-  lazy val negation: Parser[SageExpr] =
+  lazy val negation: Parser[SExprFun] =
     "-"~>lit ^^ (e => SSub(SVal(0.0),e)) // (e => (t: Double) => (ctx: Valuation) => -e(t)(ctx))
-  lazy val time: Parser[SageExpr] =
-    "_t_" ^^^ SArg // ((t:Double)=>(_:Valuation)=>t)
-  lazy val rational: Parser[SageExpr] =
+  def time: Parser[SExprT] =
+    "_t_" ^^^ SArg() // ((t:Double)=>(_:Valuation)=>t)
+  lazy val rational: Parser[SExprFun] =
     float~opt("/"~>float) ^^ {
       case f~None => f
       case f~Some(f2) => SDiv(f,f2) // (_:Double) => (_:Valuation) => f / mbf.getOrElse(1.0)
     }
-  lazy val float: Parser[SageExpr] =
+  lazy val float: Parser[SExprFun] =
     """-?[0-9]+(\.([0-9]+))?(e-?([0-9]+))?""".r ^^ { s: String => SVal(s.toDouble) }
 
-  lazy val function: Parser[SageExpr] =
+  lazy val function: Parser[SExprFun] =
     identifier~opt("("~>eqExprs<~")") ^^ {
       case name~Some(arg) =>
         SFun(name,arg)
@@ -118,7 +119,7 @@ object SageParser extends RegexParsers {
 //        case (_,v) => throw new ParserException(s"Unknown function '$name($v)'")
 //      }
     }
-  lazy val eqExprs: Parser[List[SageExpr]] =
+  lazy val eqExprs: Parser[List[SExprFun]] =
     eqExpr ~ opt(","~>eqExprs) ^^ {
       case e~None => List(e)
       case e~Some(e2) => e::e2

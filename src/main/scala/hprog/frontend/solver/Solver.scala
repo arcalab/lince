@@ -2,26 +2,12 @@ package hprog.frontend.solver
 
 import breeze.linalg._
 import breeze.numerics._
-import hprog.DSL
+import hprog.ast.SageExpr.{SExpr, SExprFun}
 import hprog.ast._
 import hprog.frontend.Eval
 import hprog.frontend.Semantics.{Point, SFunction, SageSolution, Solution}
 
 trait Solver {
-//  /**
-//    * Precompute and cache several system of equations with a single system call to Sage
-//    * @param systems systems of equations to be precomupted
-//    */
-//  def ++=(systems: List[List[DiffEq]]): Unit
-//  def ++=(syntax:Syntax): Unit
-//
-//  /**
-//    * precompute a system of equations using a system call to Sage
-//    * @param eqs
-//    */
-//  def +=(eqs:List[DiffEq]): Unit
-//
-//  def +=(expr:SageExpr): Unit
 
   /** Gets a solution of a system of equations, using system calls to Sage,
     * checking first in its cache.
@@ -30,10 +16,10 @@ trait Solver {
     */
   def evalFun(eqs:List[DiffEq]): Solution =
     solveSymb(eqs).mapValues(evalFun)
-  def evalFun(expr: SageExpr): SFunction =
-    (t:Double) => (v:Point) => Eval(solveSymb(expr),t,v.mapValues(SVal))
-  def evalVal(expr: SageExpr): Double =
-    evalFun(expr)(0)(Map())
+  def evalFun(expr: SExprFun): SFunction =
+    (t:Double) => (v:Point) => Eval(Eval.update(expr,SVal(t),v.mapValues(SVal)))
+  def evalVal(expr: SExpr): Double =
+    Eval(solveSymb(expr))
 
   /** Gets a symbolic solution of a system of equations, using system calls to Sage,
     * checking first in its cache.
@@ -41,14 +27,15 @@ trait Solver {
     * @return Result from Sage as a symbolic expression
     */
   def solveSymb(eqs:List[DiffEq]): SageSolution
-  def solveSymb(expr: SageExpr): SageExpr
+  def solveSymb(expr: SExpr): SExpr
 
 }
+
 
 object Solver {
   /**
     * collect list of unique variables used by a system of equations, including dummies
-    * @param eqs
+    * @param eqs system of equations
     * @return unique variables
     */
   def getVars(eqs:List[DiffEq]): List[String] =
@@ -177,7 +164,6 @@ object Solver {
   }
 
 
-
   /**
     * Returns x(x0,t) = x0*e^At, where e^At is expended to the taylor series:
     *   e^At = I + At + At^2/2! + At^3/3! + At^4/4! + ...
@@ -253,13 +239,6 @@ object Solver {
   /// TESTING FUNCTIONS //
   ////////////////////////
 
-
-//  def solveEqs(eqs: List[DiffEq]): Trajectory = eqs match {
-//    case Nil => Trajectory.empty
-//    case t1::Nil => solve(t1)
-//    case t1::tl =>
-//  }
-
   def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
     case d@DiffEqs(eqs, dur) => List(eqs)
     //    case Seq(Nil) => Nil
@@ -271,56 +250,56 @@ object Solver {
     case While(c, doP) => getDiffEqs(doP)
     case _ => Nil
   }
-
-
-  def getFstDiffEq(prog:Syntax): DiffEqs  = prog match {
-//    case Assign(v, e) => Nil
-    case d@DiffEqs(eqs, dur) => d
-//    case Seq(Nil) => Nil
-    case Seq(p::ps) =>
-      try getFstDiffEq(p)
-      catch {
-        case _: Throwable => getFstDiffEq(Seq(ps))
-      }
-//    case Skip => Nil
-    case ITE(ifP, thenP, elseP) =>
-      try getFstDiffEq(thenP)
-      catch {
-        case _: Throwable => getFstDiffEq(elseP)
-      }
-    case While(c, doP) => getFstDiffEq(doP)
-    case _ => throw new RuntimeException("no diff. eq. found")
-  }
-
-  def getFstMatrix(prog:Syntax): List[List[Double]] =
-    getMatrix(getFstDiffEq(prog).eqs)._2
-
-  def tryM(prog:String): List[List[Double]] = getFstMatrix(DSL.parse(prog))
-
-
-
-  /**
-    * Performs a gradient descent, i.e., searches for an argument "t" of "function" s.t. function(t) = 0.
-    * From wikipedia - not in use.
-    * @param previousStepSize how closer it got since the last try
-    * @param curX initial value
-    * @param function to find a 0
-    * @param precision goal (the new step being smaller than the precision)
-    * @param gamma difference used to calculate derivative
-    * @return the argument of the function that yields 0
-    */
-  def gradientDescent(previousStepSize: Double= 1/0.000001, curX: Double = 0,
-                      function: Double => Double,
-                      precision: Double = 0.000001, gamma: Double = 0.01): Double = {
-    if (previousStepSize > precision) {
-      val newX = curX + -gamma * function(curX)
-      println(curX)
-      // update previousStepSize and curX
-      gradientDescent(abs(newX - curX), newX, function, precision, gamma)
-    } else curX
-  }
-//  val ans = gradientDescent(previousStepSize, curX, precision, gamma)
-//  println(s"The local minimum occurs at $ans")
+//
+//
+//  def getFstDiffEq(prog:Syntax): DiffEqs  = prog match {
+////    case Assign(v, e) => Nil
+//    case d@DiffEqs(eqs, dur) => d
+////    case Seq(Nil) => Nil
+//    case Seq(p::ps) =>
+//      try getFstDiffEq(p)
+//      catch {
+//        case _: Throwable => getFstDiffEq(Seq(ps))
+//      }
+////    case Skip => Nil
+//    case ITE(ifP, thenP, elseP) =>
+//      try getFstDiffEq(thenP)
+//      catch {
+//        case _: Throwable => getFstDiffEq(elseP)
+//      }
+//    case While(c, doP) => getFstDiffEq(doP)
+//    case _ => throw new RuntimeException("no diff. eq. found")
+//  }
+//
+//  def getFstMatrix(prog:Syntax): List[List[Double]] =
+//    getMatrix(getFstDiffEq(prog).eqs)._2
+//
+//  def tryM(prog:String): List[List[Double]] = getFstMatrix(DSL.parse(prog))
+//
+//
+//
+//  /**
+//    * Performs a gradient descent, i.e., searches for an argument "t" of "function" s.t. function(t) = 0.
+//    * From wikipedia - not in use.
+//    * @param previousStepSize how closer it got since the last try
+//    * @param curX initial value
+//    * @param function to find a 0
+//    * @param precision goal (the new step being smaller than the precision)
+//    * @param gamma difference used to calculate derivative
+//    * @return the argument of the function that yields 0
+//    */
+//  def gradientDescent(previousStepSize: Double= 1/0.000001, curX: Double = 0,
+//                      function: Double => Double,
+//                      precision: Double = 0.000001, gamma: Double = 0.01): Double = {
+//    if (previousStepSize > precision) {
+//      val newX = curX + -gamma * function(curX)
+//      println(curX)
+//      // update previousStepSize and curX
+//      gradientDescent(abs(newX - curX), newX, function, precision, gamma)
+//    } else curX
+//  }
+////  val ans = gradientDescent(previousStepSize, curX, precision, gamma)
+////  println(s"The local minimum occurs at $ans")
 
   /**
     * Searches for the earliest value at which a given guard becomes true.

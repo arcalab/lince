@@ -1,8 +1,8 @@
 package hprog.frontend.solver
 
-import hprog.ast.{DiffEq, SageExpr}
-import hprog.frontend.Eval
-import hprog.frontend.Semantics.{Point, SageSolution, Solution, Valuation}
+import hprog.ast.DiffEq
+import hprog.ast.SageExpr.SExpr
+import hprog.frontend.Semantics.{Point, SageSolution, Solution}
 
 // Numerical solver, using a naive solution for differencital equations
 // based on Taylor series
@@ -20,8 +20,8 @@ class SimpleSolver extends Solver {
       )).toMap
   }
 
-  def solveSymb(eqs:List[DiffEq]): SageSolution = Map()
-  def solveSymb(expr: SageExpr): SageExpr = expr
+  override def solveSymb(eqs:List[DiffEq]): SageSolution = Map()
+  override def solveSymb(expr: SExpr): SExpr = expr
 
 //  override def solveSymb(eqs: List[DiffEq]): SageSolution = Map()
 

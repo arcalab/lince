@@ -1,13 +1,12 @@
 package hprog.frontend.solver
 
+import hprog.ast.SageExpr.{SExpr, SExprFun}
 import hprog.ast._
 import hprog.backend.Show
 import hprog.common.ParserException
-import hprog.frontend.Semantics.{SageSolution, SolVars, Solution}
-import hprog.frontend.{Eval, Utils}
-import hprog.lang.SageParser
+import hprog.frontend.Semantics.SageSolution
+import hprog.frontend.Utils
 
-import scala.concurrent.{Future, Promise}
 import scala.sys.process._
 
 
@@ -22,33 +21,33 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   lockRcv.synchronized{
     //print("(rcv) waiting")
     if (last==None) // if I'm the first, then wait
-      lockRcv.wait(5000)
-    //println(" - done(r)")
+      lockRcv.wait(10000)
+    //debug(()=>" - done(r)")
   }
   // allow sender to continue after startup msg
   lockSnd.synchronized{
     //print("(rcv) unlocking sender")
     last = None
     lockSnd.notify()
-    //println(" - done(r)")
+    //debug(()=>" - done(r)")
   }
 
   def addUpdate(s:String): Unit = {
     //    last = Some(s)
     lockRcv.synchronized{
-      println(s"(sender) sage reply: '$s'")
+      debug(()=>s"(sender) sage reply: '$s'")
       last = Some(s)
       lockRcv.notify()
-      //println(" - done(s)")
+      //debug(()=>" - done(s)")
       //    lockRcv.synchronized(lockRcv.notifyAll())
     }
     lockSnd.synchronized{
       //print(s"(sender) waiting for permission")
       if (last!=None) // if I'm the first, then wait
-        lockSnd.wait(5000)
-      //println(s" - done(s)")
+        lockSnd.wait(10000)
+      //debug(()=>s" - done(s)")
     }
-    //println(s"(sender) continuing")
+    //debug(()=>s"(sender) continuing")
     //    l.notify() // null
   }
 
@@ -60,14 +59,14 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       //print("(rcv) waiting")
       if (last==None)
         lockRcv.wait(5000)
-      //println(" - done(r)")
+      //debug(()=>" - done(r)")
     }
     // allow sender to continue after startup msg
     lockSnd.synchronized{
       //print("(rcv) unlocking sender")
       last = None
       lockSnd.notify()
-      //println(" - done(r)")
+      //debug(()=>" - done(r)")
     }
     r
   }
@@ -88,11 +87,11 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       lockRcv.synchronized{
         if (last == None) // I'm the first - wait
           lockRcv.wait(5000)
-        //println(s"> '${last}'")
+        //debug(()=>s"> '${last}'")
       }
       last match {
         case Some("'ok'") =>
-          //println(s"moving prev '$prev' to last")
+          //debug(()=>s"moving prev '$prev' to last")
           last = Some(prev)
           ok = true
           lockSnd.synchronized{
@@ -100,7 +99,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
             lockSnd.notify()
           }
         case Some(v) =>
-          //println(s"adding $v to prev")
+          //debug(()=>s"adding $v to prev")
           prev = v.drop(6)
           lockSnd.synchronized{
             last = None
@@ -110,7 +109,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
           return None
       }
     }
-    //println(s"returning '${prev}' if '$ok'")
+    //debug(()=>s"returning '${prev}' if '$ok'")
     if (ok) Some(prev) else None
   }
 
@@ -118,27 +117,27 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   ///
   def askSage(eqs: List[DiffEq]): Option[String] = {
     val instructions = LiveSageSolver.genSage(eqs) // + "; print(\"§\")"
-//    println(s"instructions to solve: '$instructions'")
-    println(s"solving: ${Show(eqs)}")
+//    debug(()=>s"instructions to solve: '$instructions'")
+    debug(()=>s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
-    println(s"reply: '$rep'")
+    debug(()=>s"reply: '$rep'")
     rep
   }
 
-  def askSage(expr: SageExpr): Option[String] = {
+  def askSage[E<:SExprFun](expr: E): Option[String] = {
     val vars = getVars(expr)
     val instructions = //s"print(\"${Show(expr)}\"); \"ok\""
       vars.map(v=>s"$v = var('$v'); ").mkString +
       "print(" + Show(expr) + "); \"ok\""
-    println(s"expression to solve: '$instructions'")
+    debug(()=>s"expression to solve: '$instructions'")
     val rep = askSage(instructions)
-    println(s"reply: '$rep'")
+    debug(()=>s"reply: '$rep'")
     rep
   }
 
-  private def getVars(expr: SageExpr): List[String] = expr match {
+  private def getVars(expr: SExprFun): List[String] = expr match {
     case SVal(v)       => Nil
-    case SArg          => Nil
+    case _:SArg        => Nil
     case SVar(v)       => List(v)
     case SFun(f, args) => args.flatMap(getVars) //if (args == List(SVal(0)))
     case SDiv(e1, e2)  => getVars(e1) ++ getVars(e2)
@@ -166,7 +165,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       }//SageSolver.callSageSolver(eqs, path)
     }
 
-  override def +=(expr: SageExpr): Unit =
+  override def +=(expr: SExpr): Unit =
     if (!cacheVal.contains(expr)) {
       askSage(expr) match {
         case Some(reply) => importExpr(expr,reply)
@@ -297,11 +296,11 @@ object LiveSageSolver {
     case Add(l1, l2) => s"(${genSage(l1)} + ${genSage(l2)}"
     case Mult(v, l) => s"(${v.v} * ${genSage(l)}"
   }
-  private def genSage(e: SageExpr): String = e match {
+  private def genSage(e: SExprFun): String = e match {
     case SVal(v) => v.toString
-    case SArg => "_t_"
+    case _:SArg => "_t_"
     case SVar(v) => "__"+v
-    case SFun(f, args) => s"$f(${args.map(genSage).mkString(",")})"
+    case SFun(f,args) => s"$f(${args.map(genSage).mkString(",")})"
     case SDiv(e1, e2) => s"(${genSage(e1)} / ${genSage(e2)})"
     case SMult(e1, e2) =>s"(${genSage(e1)} * ${genSage(e2)})"
     case SPow(e1, e2) => s"(${genSage(e1)} ^ ${genSage(e2)})"
@@ -329,18 +328,18 @@ object LiveSageSolver {
       // (which we write via an OutputStream)
       in => {
         writer = new java.io.PrintWriter(in)
-        //println("in stream created")
+        //debug(()=>"in stream created")
         // later do writer.println(..); writer.flush; writer.close()
       },
       // Handle subprocess's stdout
       // (which we read via an InputStream)
       out => {
         val src = scala.io.Source.fromInputStream(out)
-        //println("out stream created")
+        //debug(()=>"out stream created")
         for (line <- src.getLines()) {
-          //println("calling callback")
+          //debug(()=>"calling callback")
           callback(line)
-          //println("Answer: " + line)
+          //debug(()=>"Answer: " + line)
         }
         src.close()
       },
@@ -348,13 +347,14 @@ object LiveSageSolver {
       _.close()
 //      err => {
 //        val src = scala.io.Source.fromInputStream(err)
-//        println("err stream created")
+//        debug(()=>"err stream created")
 //        for (line <- src.getLines()) {
-//          println("error: "+line)
+//          debug(()=>"error: "+line)
 //        }
 //        src.close()
 //      }
     )
+    //println("/ calling Sage")
     val calcProc = sage.run(io)
 
     // Using ProcessBuilder.run() will automatically launch
@@ -366,12 +366,17 @@ object LiveSageSolver {
       writer.flush()
     }
     def finished(): Int = {
+      //println("\\_closing Sage")
       writer.close()
       val code = calcProc.exitValue()
-      //println(s"Subprocess exited with code $code.")
+      //debug(()=>s"Subprocess exited with code $code.")
       code
     }
-    def finished2(): Unit = writer.close()
+    def finished2(): Unit = {
+      //println("\\_closing Sage")
+      writer.close()
+    }
+
     (s=>put(s),()=>finished(),()=>finished2())
   }
 

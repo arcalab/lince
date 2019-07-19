@@ -1,6 +1,6 @@
 package hprog.backend
 
-import hprog.ast.{BVal, SVal}
+import hprog.ast.SVal
 import hprog.frontend.Semantics.Valuation
 import hprog.frontend.{Eval, Traj}
 
@@ -19,7 +19,7 @@ object TrajToJS {
 
     val max: Double = Eval(traj.dur.getOrElse(SVal(10)),0)
     //      val x0 = traj(0)
-    var colorIDs: Map[String,Int] =
+    val colorIDs: Map[String,Int] =
       traj(0).keys.zipWithIndex.toMap
 
     // traces are mappings from variables t0 lists of "y" values
@@ -39,7 +39,7 @@ object TrajToJS {
           (s max 0, e max 0)
       case None => if (max<=0) (0.0,0.0) else (0.0,max)
     }
-    val samples = if ((end-start)<=0) List(start) else start to end by ((end-start) / 10)
+    val samples = if ((end-start)<=0) List(start) else start to end by ((end-start) / 100)
 
     // checks if a time value is within the scope
     def inScope(t:Double): Boolean = t>=start && t<=end
@@ -67,7 +67,7 @@ object TrajToJS {
 //        }
 //      traces += variable -> (traces(variable) + (t2->traceBoundary))
       traces     += variable -> (traces(variable)     + (t2->Left(endValue2)))
-      boundaries += variable -> (boundaries(variable) + (Right(t2)->(endValue2,"")))
+      boundaries += variable -> (boundaries(variable) + (Left(t2)->(endValue2,"")))
     }
 
     // add init points to boundaries and traces
@@ -82,21 +82,27 @@ object TrajToJS {
         case None => Left(initValue2)
       }
       traces     += variable -> (traces(variable)     + (t2->nextTraceT))
-      boundaries += variable -> (boundaries(variable) + (Left(t2)->(initValue2,"")))
+      boundaries += variable -> (boundaries(variable) + (Right(t2)->(initValue2,"")))
     }
 
-    println(s"all notes: ${traj.notes.mkString("/")}")
+    // adding notes to boundary points
+    //println(s"all notes: ${traj.notes.mkString("/")}")
     for ((expr,note) <- traj.notes) {
-      boundaries = boundaries.mapValues(vals => addNote(Eval(expr,0),note,vals))
+      val t = Eval(expr)
+      if (inScope(t))
+        boundaries = boundaries.mapValues(vals => addNote(t,note,vals))
     }
     def addNote(t: Double, n: String, vals: BoundaryVar): BoundaryVar = {
       vals.get(Right(t)) match {
         case Some((value,n2)) => vals + (Right(t)->(value,n2++n++"<br>"))
-        case None => vals + (Left(t)->(0,n)) // should not happen...
+        case None => vals.get(Left(t)) match {
+          case Some((value,n2)) => vals + (Left(t) -> (value,n2++n++"<br>"))
+          case None => vals + (Left(t)->(0,n)) // should not happen...
+        }
       }
     }
-    println(s"boundaries with notes: ${boundaries}")
-    println(s"all warnings: ${traj.warnings.mkString("/")}")
+    //println(s"boundaries with notes: $boundaries")
+    //println(s"[T2T] all warnings: ${traj.warnings.mkString("/")}")
 
 
     // Add starting/ending points with notes when available
@@ -164,12 +170,12 @@ object TrajToJS {
       val (xs,ys) = tr.unzip
       ////   ${ys.map(_.map(_.toString()).getOrElse("null")).mkString("[", ",", "]")},
       js +=
-        s"""var t_${variable} = {
+        s"""var t_$variable = {
            |   x: ${xs.mkString("[",",","]")},
            |   y: ${ys.mkString("[",",","]")},
            |   mode: 'lines',
            |   line: {color: colors(${colorIDs.getOrElse(variable,0)})},
-           |   legendgroup: 'g_${variable}',
+           |   legendgroup: 'g_$variable',
            |   name: '$variable'
            |};
              """.stripMargin
@@ -181,7 +187,7 @@ object TrajToJS {
     var js = ""
     for ((variable, values) <- boundaries) {
       //      val sortedVals = values.sorted
-      val (ins,outs) = values.toList.partition(pair=>pair._1.isLeft)
+      val (outs,ins) = values.toList.partition(pair=>pair._1.isLeft)
       js += mkMarkers(variable,"out",outs,
         s"""{color: 'rgb(255, 255, 255)',
            | size: 10,
@@ -271,7 +277,7 @@ object TrajToJS {
        |   y: ${y.mkString("[",",","]")},
        |   text: ${msg.mkString("[",",","]")},
        |   mode: 'markers',
-       |   marker: ${style},
+       |   marker: $style,
        |   type: 'scatter',
        |   legendgroup: 'g_$variable',
        |   name: 'Warning',

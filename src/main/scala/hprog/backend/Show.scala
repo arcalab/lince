@@ -1,5 +1,6 @@
 package hprog.backend
 
+import hprog.ast.SageExpr.SExprFun
 import hprog.ast._
 import hprog.frontend.Semantics.SageSolution
 
@@ -60,16 +61,20 @@ object Show {
     case _ => apply(exp)
   }
 
-  def apply(expr: SageExpr): String = expr match {
+  def apply[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
     case SVal(v) => floatToFraction(v) //f"$v%1.8f"
-    case SArg => "_t_"
-    case SVar(v) => v
-    case SFun(f, args) => s"$f(${args.map(apply).mkString(",")})"
-    case SDiv(e1, e2) => s"(${apply(e1)}) / (${apply(e2)})"
-    case SMult(e1, e2) => s"(${apply(e1)}) * (${apply(e2)})"
-    case SPow(e1, e2) => s"(${apply(e1)}) ^ (${apply(e2)})"
-    case SAdd(e1, e2) => s"(${apply(e1)}) + (${apply(e2)})"
-    case SSub(e1, e2) => s"(${apply(e1)}) - (${apply(e2)})"
+    case _:SArg  => "_t_"
+    case s:SVar  => s.v
+    case s:SFun[E]  => s"${s.f}(${s.args.map(apply[E]).mkString(",")})"
+    case s:SDiv[E]  => s"${applyP[E](s.e1)}/${applyP[E](s.e2)}"
+    case s:SMult[E] => s"${applyP[E](s.e1)}*${applyP[E](s.e2)}"
+    case s:SPow[E]  => s"${applyP[E](s.e1)}^${applyP[E](s.e2)}"
+    case s:SAdd[E]  => s"${applyP[E](s.e1)}+${applyP[E](s.e2)}"
+    case s:SSub[E]  => s"${applyP[E](s.e1)}-${applyP[E](s.e2)}"
+  }
+  private def applyP[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
+    case _:SVal | _:SArg | _:SVar | _:SFun[E] => apply(expr)
+    case _ => "("+apply[E](expr)+")"
   }
 
   def apply(sol:SageSolution): String =
@@ -77,14 +82,16 @@ object Show {
 
 
   def floatToFraction(v: Double): String = {
-    var den = 1
-    var num = v
-    while (num - num.round != 0) {
+    var den: BigInt = 1
+    var num: BigDecimal = v
+    while (num.toBigIntExact().isEmpty) { // && num < BigDecimal.apply("100000000000000000000000")) {
       num *= 10
       den *= 10
+      //println(s"   - $num/$den")
     }
-    if (den == 1) num.toInt.toString
-    else s"${num.toInt.toString}/${den.toInt.toString}"
+    //println(s"-- $v -> ${num.toBigInt.toString}/${den.toString}")
+    if (den == 1) num.toBigInt.toString
+    else s"${num.toBigInt.toString}/${den.toString}"
   }
 
 
