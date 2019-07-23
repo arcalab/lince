@@ -21,7 +21,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   lockRcv.synchronized{
     //print("(rcv) waiting")
     if (last==None) // if I'm the first, then wait
-      lockRcv.wait(10000)
+      lockRcv.wait(20000)
     //debug(()=>" - done(r)")
   }
   // allow sender to continue after startup msg
@@ -44,7 +44,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     lockSnd.synchronized{
       //print(s"(sender) waiting for permission")
       if (last!=None) // if I'm the first, then wait
-        lockSnd.wait(10000)
+        lockSnd.wait(20000)
       //debug(()=>s" - done(s)")
     }
     //debug(()=>s"(sender) continuing")
@@ -86,7 +86,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     // wait for the notification (new value returned)
       lockRcv.synchronized{
         if (last == None) // I'm the first - wait
-          lockRcv.wait(5000)
+          lockRcv.wait(10000)
         //debug(()=>s"> '${last}'")
       }
       last match {

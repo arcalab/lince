@@ -1,9 +1,9 @@
 package hprog.frontend
 
-import hprog.ast.SageExpr.SExpr
-import hprog.ast.{SSub, SVal}
+import hprog.ast.SageExpr.{SExpr, SExprT}
+import hprog.ast.{SArg, SSub, SVal}
 import hprog.backend.Show
-import hprog.frontend.Semantics.{Notes, Point, SageSolution, Warnings}
+import hprog.frontend.Semantics.{Notes, Point, SageSolution, TimeSolution, Warnings}
 import hprog.frontend.solver.Solver
 
 /**
@@ -17,6 +17,8 @@ trait Traj[X] {
   def apply(t:Double): Point // real     values at time instant t
 
   val fun: SageSolution = Map() // only for pretty printing...
+  def fun(t:SExpr)(implicit s:Solver): TimeSolution // only for debugging...
+
   val inits:Map[SExpr,X] = Map() // starting points of sub-trajectories
   val ends: Map[SExpr,X] = Map() // ending   points of sub-trajectories
   val notes: Notes = Nil         // text notes to add at trajectory points.
@@ -32,6 +34,7 @@ trait Traj[X] {
       override def apply(x:Double): Point  = t.apply(x)
 
       override val fun: SageSolution = t.fun
+      override def fun(e:SExpr)(implicit s:Solver): TimeSolution = t.fun(e)
       override val inits:Map[SExpr,X] = t.inits
       override val ends: Map[SExpr,X] = t.ends
       override val notes: List[(SExpr,String)] = t.notes
@@ -48,6 +51,7 @@ trait Traj[X] {
       override def apply(x:Double): Point  = t.apply(x)
 
       override val fun: SageSolution = t.fun
+      override def fun(e:SExpr)(implicit s:Solver): TimeSolution = t.fun(e)
       override val inits:Map[SExpr,X] = t.inits
       override val ends: Map[SExpr,X] = t.ends
       override val warnings: List[(SExpr, String)] = t.warnings
@@ -85,6 +89,10 @@ object Traj {
           for (dur2 <- t2.dur) yield add(dur1, dur2)
 
 
+        override def fun(t:SExpr)(implicit s:Solver): TimeSolution =
+          if (Eval(t) < Eval(dur1)) t1.fun(t)
+          else t2.fun(SSub(t, dur1)).mapValues(e=>Eval.updTimeT( SSub(SArg(),dur1), e))
+
         override def apply(t: SExpr)(implicit s: Solver): X =
           if (Eval(t) < Eval(dur1)) { // Need solver?
             //println(s"[Traj] L ${Show(t1.fun)}")
@@ -94,7 +102,6 @@ object Traj {
             //println(s"[Traj] R ${Show(t2.fun)}")
             t2(s.solveSymb(SSub(t, dur1)))
           }
-
         override def apply(t: Double): Point =
           if (t < Eval(dur1)) t1(t)
           else t2(t - Eval(dur1))
@@ -124,7 +131,8 @@ object Prog {
       // Traj1 ends at dur1
       case Some(dur1) =>
         val input2: X = t1(dur1) // returns new valuation for what t1 knows
-        //println(s"... joining ${Show(t1.fun)} at ${Show(dur1)} where ${input2}")
+        //println(s"... t1 using input ${input}")
+        //println(s"... joining ${Show(t1.fun((SVal(0.2))))} at ${Show(dur1)} where ${input2}")
         Traj.join(t1, p2.traj(input2))
     }
   }

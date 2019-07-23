@@ -85,15 +85,38 @@ object Eval {
     case v => throw new RuntimeException(s"updating variable in ${Show(e)} does nt yield an SExpr (${Show(v)}).")
   }
 
-  def updTime(newt: SExpr, expr: SExprFun): SExprV = expr match {
+  def updTime(newt: SExprV, expr: SExprFun): SExprV = updTimeFun(newt, expr) match {
+    case e: SExprV => e
+    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does nt yield an SExprV (${Show(v)}).")
+//    case _:SArg => newt
+//    //
+//    case sf:SFun[SageExpr.All]  => SFun(sf.f,sf.args.map((e2:SExprFun) => updTime(newt,e2)))
+//    case SDiv(e1, e2)  => SDiv( updTime(newt,e1), updTime(newt,e2))
+//    case SMult(e1, e2) => SMult(updTime(newt,e1), updTime(newt,e2))
+//    case SPow(e1, e2)  => SPow( updTime(newt,e1), updTime(newt,e2))
+//    case SAdd(e1, e2)  => SAdd( updTime(newt,e1), updTime(newt,e2))
+//    case SSub(e1, e2)  => SSub( updTime(newt,e1), updTime(newt,e2))
+//    case e:SVal => e
+//    case e:SVar => e
+  }
+  def updTimeV(newt: SExprT, expr: SExprV): SExprV = updTimeFun(newt, expr) match {
+    case e: SExprV => e
+    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does nt yield an SExprV (${Show(v)}).")
+  }
+  def updTimeT(newt: SExprT, expr: SExprT): SExprT = updTimeFun(newt, expr) match {
+    case e: SExprT => e
+    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does nt yield an SExprT (${Show(v)}).")
+  }
+  def updTimeFun(newt: SExprFun, expr:SExprFun): SExprFun = expr match {
     case _:SArg => newt
     //
-    case sf:SFun[SageExpr.All]  => SFun(sf.f,sf.args.map((e2:SExprFun) => updTime(newt,e2)))
-    case SDiv(e1, e2)  => SDiv( updTime(newt,e1), updTime(newt,e2))
-    case SMult(e1, e2) => SMult(updTime(newt,e1), updTime(newt,e2))
-    case SPow(e1, e2)  => SPow( updTime(newt,e1), updTime(newt,e2))
-    case SAdd(e1, e2)  => SAdd( updTime(newt,e1), updTime(newt,e2))
-    case SSub(e1, e2)  => SSub( updTime(newt,e1), updTime(newt,e2))
+    case sf:SFun[SageExpr.All]  =>
+      SFun(sf.f,sf.args.map((e2:SExprFun) => updTimeFun(newt,e2)))
+    case SDiv(e1, e2)  => SDiv( updTimeFun(newt,e1), updTimeFun(newt,e2))
+    case SMult(e1, e2) => SMult(updTimeFun(newt,e1), updTimeFun(newt,e2))
+    case SPow(e1, e2)  => SPow( updTimeFun(newt,e1), updTimeFun(newt,e2))
+    case SAdd(e1, e2)  => SAdd( updTimeFun(newt,e1), updTimeFun(newt,e2))
+    case SSub(e1, e2)  => SSub( updTimeFun(newt,e1), updTimeFun(newt,e2))
     case e:SVal => e
     case e:SVar => e
   }
@@ -108,5 +131,47 @@ object Eval {
   def baseSage(vs:Iterable[String]): SageSolution =
     vs.map(v => v -> SFun(v,List(SVal(0.0)))).toMap
 
+
+  def simplifyMan(e:SExprFun): SExprFun = e match {
+    case SVal(v) => e
+    case SArg() => e
+    case SVar(v) => e
+    case SFun(f, args) => SFun(f,args.map(simplifyMan))
+    case SDiv(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
+      case (x,SVal(1)) => x
+      case (SVal(0),_) => SVal(0)
+      case (SVal(x),SVal(y)) => SVal(x/y)
+      case (x,y) => SDiv(x,y)
+    }
+    case SMult(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
+      case (x,SVal(1)) => x
+      case (SVal(1),x) => x
+      case (SVal(0),_) => SVal(0)
+      case (_,SVal(0)) => SVal(0)
+      case (SVal(x),SVal(y)) => SVal(x*y)
+      case (x,y) => SMult(x,y)
+    }
+    case SPow(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
+      case (x,SVal(1)) => x
+      case (x,SVal(0)) => SVal(1)
+      case (SVal(0),_) => SVal(0)
+      case (SVal(1),_) => SVal(1)
+      case (SVal(x),SVal(y)) => SVal(math.pow(x,y))
+      case (x,y) => SPow(x,y)
+    }
+    case SAdd(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
+      case (x,SVal(0)) => x
+      case (SVal(0),x) => x
+      case (SVal(x),SVal(y)) => SVal(x+y)
+      case (SAdd(e11,e12),e21) => simplifyMan(SAdd(e11,SAdd(e12,e21)))
+      case (x,y) => SAdd(x,y)
+    }
+    case SSub(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
+      case (x,SVal(0)) => x
+      case (SVal(x),SVal(y)) => SVal(x-y)
+      case (SSub(e11,e12),e21) => simplifyMan(SSub(e11,SSub(e12,e21)))
+      case (x,y) => SSub(x,y)
+    }
+  }
 
 }

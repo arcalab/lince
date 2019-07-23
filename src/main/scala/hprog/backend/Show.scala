@@ -73,9 +73,36 @@ object Show {
     case s:SSub[E]  => s"${applyP[E](s.e1)}-${applyP[E](s.e2)}"
   }
   private def applyP[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
-    case _:SVal | _:SArg | _:SVar | _:SFun[E] => apply(expr)
+    case SVal(v) =>
+      val res = floatToFraction(v)
+      if (res.contains('/')) s"($res)" else res
+    case _:SArg | _:SVar | _:SFun[E] => apply(expr)
     case _ => "("+apply[E](expr)+")"
   }
+
+
+  def pp[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
+    case SVal(v) => v.toString // f"$v%1.8f"
+    case _:SArg  => "t"
+    case s:SVar  => s.v
+    case SMult(e1,e2@SAdd(_,_))=> s"${pp[E](e1)}*${pp[E](e2)}"
+    case SAdd(e1,e2@SAdd(_,_)) => s"${pp[E](e1)}+${pp[E](e2)}"
+    case SSub(e1,e2@SAdd(_,_)) => s"${pp[E](e1)}-${pp[E](e2)}"
+    case SMult(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}*${pp[E](e2)}"
+    case SAdd(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}+${pp[E](e2)}"
+    case SSub(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}-${pp[E](e2)}"
+    case s:SFun[E]  => s"${s.f}(${s.args.map(apply[E]).mkString(",")})"
+    case s:SDiv[E]  => s"${ppP[E](s.e1)}/${ppP[E](s.e2)}"
+    case s:SMult[E] => s"${ppP[E](s.e1)}*${ppP[E](s.e2)}"
+    case s:SPow[E]  => s"${ppP[E](s.e1)}^${ppP[E](s.e2)}"
+    case s:SAdd[E]  => s"${ppP[E](s.e1)}+${ppP[E](s.e2)}"
+    case s:SSub[E]  => s"${ppP[E](s.e1)}-${ppP[E](s.e2)}"
+  }
+  private def ppP[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
+    case _:SVal | _:SArg | _:SVar | _:SFun[E] => pp(expr)
+    case _ => "("+pp[E](expr)+")"
+  }
+
 
   def apply(sol:SageSolution): String =
     sol.map(kv => s"${kv._1}:${kv._2.toString}").mkString(", ")

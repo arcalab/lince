@@ -1,6 +1,6 @@
 package hprog.frontend
 
-import hprog.ast.SageExpr.{SExpr, SExprFun}
+import hprog.ast.SageExpr.{SExpr, SExprFun, SExprT}
 import hprog.ast._
 import hprog.backend.Show
 import hprog.frontend.solver.{SimpleSolver, Solver, StaticSageSolver}
@@ -11,6 +11,7 @@ object Semantics {
   type Valuation = Map[String,SExpr] // note: SageExpr without variables nor argument
   /** Maps variables to the symbolic expression (function) of its semantics */
   type SageSolution  = Map[String,SExprFun]
+  type TimeSolution = Map[String,SExprT]
 
   // Reals level
   type Point = Map[String,Double]
@@ -73,6 +74,7 @@ object Semantics {
 
     new TrajValuation {
       override val dur: Option[SExpr] = Some(SVal(0))
+      override def fun(t: SExpr)(implicit s:Solver): TimeSolution = newValuation
       override def apply(t: SExpr)(implicit s:Solver): Valuation = newValuation
       override def apply(t: Double): Point = newValuation.mapValues(Eval(_))
       override val inits: Map[SExpr, Valuation] = Map(SVal(0) -> newValuation)
@@ -109,13 +111,26 @@ object Semantics {
         case None => Map()
       }
 
-      override def apply(t: SExpr)(implicit s:Solver): Valuation =
+      override def fun(t: SExpr)(implicit s:Solver): TimeSolution =
         input  ++  symbSol.mapValues(expr => {
-          val addedTime = Eval.updTime(t,expr)
-          val addedInput = Eval.updInput(addedTime,input)
-          debug(()=>s"&& solving expr (from eqs ${Show(eqs)}) @ ${Show(t)}: ${Show(addedTime)} -> ${Show(addedInput)}")
-          solver.solveSymb(addedInput)
+          val addedInput = Eval.updInputFun(expr,input)
+          addedInput
         })
+
+      override def apply(t: SExpr)(implicit s:Solver): Valuation = {
+        val newVal = input ++ symbSol.mapValues(expr => {
+          val addedTime = Eval.updTime(t, expr)
+          val addedInput = Eval.updInput(addedTime, input)
+          val res = solver.solveSymb(addedInput)
+          debug(()=>s"&& solving expr (from eqs ${Show(eqs)}) @ ${Show(t)}:\n   - ${
+            Show(addedTime)}\n   - ${
+            Show(addedInput)}\n   - ${
+            Show(res)
+          }")
+          res
+        })
+        newVal
+      }
 
       override def apply(t: Double): Point =
         input.mapValues(Eval(_))  ++  symbSol.mapValues(expr => {
@@ -138,7 +153,9 @@ object Semantics {
   def skipToValuation(): Prog[Valuation] = input => {
     new TrajValuation {
       override val dur: Option[SExpr] = Some(SVal(0.0))
-//      override val symbolic: Option[SageSolution] = Some(Eval.baseSage(input.keys))
+
+      //      override val symbolic: Option[SageSolution] = Some(Eval.baseSage(input.keys))
+      override def fun(t: SExpr)(implicit s: Solver): TimeSolution = input
       override def apply(t: SExpr)(implicit s:Solver): Valuation = input
       override def apply(t: Double): Point = Eval(input)
     }
@@ -200,6 +217,7 @@ object Semantics {
   private def notes(str: String): Prog[Valuation] = _ => {
     val t = new TrajValuation {
       override val dur: Option[SExpr] = Some(SVal(0))
+      override def fun(t: SExpr)(implicit s:Solver): TimeSolution= Map()
       override def apply(t: SExpr)(implicit s:Solver): Valuation = Map()
       override def apply(t: Double): Point = Map()
     }
