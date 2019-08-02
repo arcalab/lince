@@ -1,8 +1,9 @@
 package hprog.backend
 
-import hprog.ast.SageExpr.SExprFun
+import hprog.ast.SageExpr.{Pure, SExpr, SExprFun}
 import hprog.ast._
-import hprog.frontend.Semantics.SageSolution
+import hprog.frontend.Eval
+import hprog.frontend.Semantics.{SageSolution, Valuation}
 
 object Show {
 
@@ -34,31 +35,43 @@ object Show {
     case Forever => ""
   }
 
-  def apply(lin: Lin): String = lin match {
-    case Var(v) => v
+  def apply(lin: Lin): String = apply(lin,Map():Valuation)
+
+  def apply(lin: Lin, vl: Valuation): String = lin match {
+    case v:Var => showVar(v,vl,apply[Pure])
     case Value(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
-    case Add(l1, l2) => s"${apply(l1)} + ${apply(l2)}"
-    case Mult(v, l:Add) =>  s"${apply(v)}*(${apply(l)})"
-    case Mult(v, l) =>  s"${apply(v)}*${apply(l)}"
+    case Add(l1, l2)    => s"${apply(l1,vl)} + ${apply(l2,vl)}"
+    case Mult(v, l:Add) => s"${apply(v,vl)}*(${apply(l,vl)})"
+    case Mult(v, l)     => s"${apply(v,vl)}*${apply(l,vl)}"
   }
 
-  def apply(cond: Cond): String = cond match {
+  // show a condition parseable by Sage
+  def apply(cond: Cond, vl:Valuation = Map()): String = cond match {
     case BVal(b)     => b.toString
-    case And(And(e1,e2),e3) => apply(And(e1,And(e2,e3)))
-    case And(e1,e2:And)     => s"${showP(e1)} /\\ ${apply(e2)}"
-    case And(e1, e2) => s"${showP(e1)} /\\ ${showP(e2)}"
-    case Or(e1, e2)  => s"${showP(e1)} \\/ ${showP(e2)}"
-    case Not(e1)     => s"!${showP(e1)}"
-    case EQ(v, l)    => s"${v.v} = ${apply(l)}"
-    case GT(v, l)    => s"${v.v} > ${apply(l)}"
-    case LT(v, l)    => s"${v.v} < ${apply(l)}"
-    case GE(v, l)    => s"${v.v} >= ${apply(l)}"
-    case LE(v, l)    => s"${v.v} <= ${apply(l)}"
+    case And(And(e1,e2),e3) => apply(And(e1,And(e2,e3)),vl)
+    case And(e1,e2:And)     => s"${showP(e1,vl)} & ${showP(e2,vl)}"
+    case And(e1, e2) => s"${showP(e1,vl)} & ${showP(e2,vl)}"
+    case Or(e1, e2)  => s"${showP(e1,vl)} | ${showP(e2,vl)}"
+    case Not(e1)     => s"!${showP(e1,vl)}"
+    case EQ(v, l)    => s"${showVar(v,vl,applyP)} == ${apply(l,vl)}"
+    case GT(v, l)    => s"${showVar(v,vl,applyP)} > ${apply(l,vl)}"
+    case LT(v, l)    => s"${showVar(v,vl,applyP)} < ${apply(l,vl)}"
+    case GE(v, l)    => s"${showVar(v,vl,applyP)} >= ${apply(l,vl)}"
+    case LE(v, l)    => s"${showVar(v,vl,applyP)} <= ${apply(l,vl)}"
   }
 
-  private def showP(exp:Cond):String = exp match {
-    case _:Or | _:And => s"(${apply(exp)})"
-    case _ => apply(exp)
+  private def showP(exp:Cond, vl:Valuation):String = exp match {
+//    case _:Or | _:And => s"(${apply(exp,vl)})"
+//    case _ => apply(exp,vl)
+    case BVal(b) => b.toString
+    case _ => s"(${apply(exp,vl)})"
+  }
+
+  private def showVar(v: Var, valuation: Valuation,cont:SExpr => String): String = {
+    valuation.get(v.v) match {
+      case Some(exp) => cont(Eval.updInput(exp,valuation))
+      case None => v.v
+    }
   }
 
   def apply[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {

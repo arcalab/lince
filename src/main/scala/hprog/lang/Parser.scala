@@ -19,6 +19,14 @@ object Parser extends RegexParsers {
     */
   def parse(c: String): ParseResult[Syntax] = parseAll(progP, c)
 
+  /**
+    * Main function that parses a string into a Condition.
+    *
+    * @param c string representing the condition
+    * @return Parse result (parsed(cond) or failure(error))
+    */
+  def parseCond(c: String): ParseResult[Cond] = parseAll(condP, c)
+
   //  def pexp(c:String): ParseResult[Cond] = parseAll(condP,c)
 
   override def skipWhitespace = true

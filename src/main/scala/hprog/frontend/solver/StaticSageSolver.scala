@@ -4,7 +4,7 @@ import hprog.ast.SageExpr.SExpr
 import hprog.ast._
 import hprog.backend.Show
 import hprog.common.ParserException
-import hprog.frontend.Semantics.{SageSolution, Warnings}
+import hprog.frontend.Semantics.{SageSolution, Valuation, Warnings}
 import hprog.frontend.{Eval, Utils}
 import hprog.lang.SageParser
 
@@ -13,13 +13,17 @@ class StaticSageSolver extends Solver {
 
   type DiffCache = (SageSolution,String) // one SageExpr for each variable
   type ExprCache = (SExpr,String) // simplified version
+  type BoolCache = (Boolean,String) // simplified version
 
   protected var cache:
     Map[List[DiffEq], DiffCache]  =  Map(Nil->(Map(),""))
   protected var cacheVal:
     Map[SExpr    , ExprCache]  =  Map()
-  protected var cacheStr:    Map[String,DiffCache] = Map()
-  protected var cacheStrVal: Map[String,ExprCache] = Map()
+  protected var cacheBool:
+    Map[(Cond,Valuation), BoolCache]  =  Map()
+  protected var cacheStr:     Map[String,DiffCache] = Map()
+  protected var cacheStrVal:  Map[String,ExprCache] = Map()
+  protected var cacheStrBool: Map[String,BoolCache] = Map()
   protected var warnings: Warnings = Nil
 
   override def toString: String =
@@ -28,14 +32,20 @@ class StaticSageSolver extends Solver {
        |${cache.map(kv => " - "+
           kv._1.map(Show(_)).mkString(", ") + " ->\n"+showCache(kv._2)).mkString("\n")}
        |values:
-       |${cacheVal.map(kv => " - "+
-          Show(kv._1)+" ->\n    <"+Show(kv._2._1)+">\n    "+kv._2._2).mkString("\n")}
+       |${cacheVal.map(kv => " - " +
+          Show (kv._1) + " ->\n    <" + Show(kv._2._1) + ">\n    " + kv._2._2).mkString("\n")}
+       |booleans:
+       |${cacheBool.map(kv => " - "+
+          Show(kv._1._1,kv._1._2)+" ->\n    <"+(kv._2._1)+">\n    "+kv._2._2).mkString("\n")}
        |diffEqsStr:
        |${cacheStr.map(kv => " - "+
           kv._1 + " ->\n"+showCache(kv._2)).mkString("\n")}
        |valuesStr:
        |${cacheStrVal.map(kv => " - "+
           kv._1+" ->\n    <"+Show(kv._2._1)+">\n    "+kv._2._2).mkString("\n")}
+       |boolsStr:
+       |${cacheStrBool.map(kv => " - " +
+          kv._1 + " ->\n    <" + (kv._2._1) + ">\n    " + kv._2._2).mkString("\n")}
      """.stripMargin
 
   protected def showCache(sols: DiffCache): String =
@@ -45,7 +55,7 @@ class StaticSageSolver extends Solver {
 
   def getWarnings: Warnings = warnings
 
-  def +=(w:(SExpr,String)): Unit = warnings ::= w
+  def +=(we:SExpr, ws:String): Unit = warnings ::= (we,ws)
 
   /**
     * Throw an error if a system of equations was not precomputed
@@ -73,9 +83,25 @@ class StaticSageSolver extends Solver {
       //          "' - known: "+cacheVal.keys.map(ex => Show(ex)).mkString(" / ") +
       //          " - also known: "+cacheStrVal.keys.mkString(" / "))
       val est = Eval(expr)
-      println(s"static solver failed. Using estination $est instead.")
+      println(s"static solver failed. Using estinmation $est instead.")
     }
 
+
+  /**
+    * Throw an error if a condition was not precomputed
+    * @param cond Condition to check if it is in cache
+    * @param valua valuation to apply to condition
+    */
+  def +=(cond: Cond, valua: Valuation): Unit = {
+    if (!cacheBool.contains(cond, valua) && !cacheStrBool.contains(Show(cond, valua))) {
+      //      throw new LiveSageSolver.SolvingException(
+      //        s"Static solver failed: unknown expr: $expr." +
+      //          "' - known: "+cacheVal.keys.map(ex => Show(ex)).mkString(" / ") +
+      //          " - also known: "+cacheStrVal.keys.mkString(" / "))
+      val est = Eval(valua.mapValues(Eval(_, 0)), cond)
+      println(s"static solver failed. Using estinmation $est instead.")
+    }
+  }
 
 
   override def solveSymb(expr: SExpr): SExpr = {
@@ -88,13 +114,22 @@ class StaticSageSolver extends Solver {
       }
     }
   }
-  def solveSymb(eqs:List[DiffEq]): SageSolution = {
+  override def solveSymb(eqs:List[DiffEq]): SageSolution = {
     this += eqs
     cache.get(eqs) match {
       case Some(c) => c._1
       case None => cacheStr(Show(eqs))._1
     }
   }
+
+  override def solveSymb(cond: Cond, valua: Valuation): Boolean = {
+    this += (cond,valua)
+    cacheBool.get((cond,valua)) match {
+      case Some(c) => c._1
+      case None => cacheStrBool(Show(cond,valua))._1
+    }
+  }
+
 
 
 
@@ -132,6 +167,28 @@ class StaticSageSolver extends Solver {
     }
   }
 
+  /**
+    * Import the reply from Sage from evaluating a boolean expression
+    */
+  def importBool(c:Cond, vl: Valuation, sageReply:String): Unit =
+    if (!cacheBool.contains(c,vl))
+      cacheBool += (c,vl) -> replyToBoolCache(sageReply)
+
+
+  def importBoolStr(bool:String, sageReply: String): Unit =
+    if (!cacheStrBool.contains(bool))
+      cacheStrBool += bool -> replyToBoolCache(sageReply)
+
+  private def replyToBoolCache(sageReply:String): BoolCache = {
+    sageReply match {
+      case "True" => (true,sageReply)
+      case "False" => (false,sageReply)
+      case _ =>
+        throw new ParserException(s"Failed to parse Boolean reply '$sageReply'.")
+    }
+  }
+
+
 
   /**
     * Import the reply from Sage from solving a system of equations
@@ -161,8 +218,6 @@ class StaticSageSolver extends Solver {
     res
   }
 
-
-
   def replyToDiffCache(vars:List[String], sageReply:String): DiffCache = {
     if (sageReply.nonEmpty) {
       val resParsed = SageParser.parse(sageReply) match {
@@ -184,6 +239,8 @@ class StaticSageSolver extends Solver {
       (Map(),"")
   }
 
+///////////////////////////////////
+
   /**
     * Build a string with all replies from Sage, after sorting by key
     * @return
@@ -195,10 +252,16 @@ class StaticSageSolver extends Solver {
     cacheStr
       .map(it => it._1+"§"+it._2._2).mkString("§§") +
     "§§§" +
-    cacheVal
+      cacheVal
+        //      .toList.sortWith((e1,e2)=>lt(e1._1,e2._1))
+        .map(it => Show(it._1)+"§"+it._2._2).mkString("§§") +
+      cacheStrVal
+        .map(it => it._1+"§"+it._2._2).mkString("§§") +
+    "§§§" +
+    cacheBool
 //      .toList.sortWith((e1,e2)=>lt(e1._1,e2._1))
-      .map(it => Show(it._1)+"§"+it._2._2).mkString("§§") +
-    cacheStrVal
+      .map(it => Show(it._1._1,it._1._2)+"§"+it._2._2).mkString("§§") +
+    cacheStrBool
       .map(it => it._1+"§"+it._2._2).mkString("§§") +
     "§§§" +
      warnings.map(kv => s"${Show(kv._1)}§${kv._2}").mkString("§§")
@@ -213,8 +276,8 @@ class StaticSageSolver extends Solver {
     * Loads replies compiled with "exportAll", knowing the equations and expressions
     */
   def importAll(replies: String): Unit = {
-    replies.split("§§§",3) match {
-      case Array(eqsRepl,exprRepl,warns) =>
+    replies.split("§§§",4) match {
+      case Array(eqsRepl,exprRepl,boolRepl,warns) =>
         val eqsRepl2 = eqsRepl.split("§§")
         for (er <- eqsRepl2)
           er.split("§",2) match {
@@ -226,8 +289,17 @@ class StaticSageSolver extends Solver {
         val exprRepl2 = exprRepl.split("§§")
         for (er <- exprRepl2)
           er.split("§",2) match {
+            case Array("") =>
             case Array(e,r) => importExprStr(e,r)
             case _ => throw new ParserException(s"Failed to parse reply '$er' for sage expr.")
+          }
+
+        val boolRepl2 = boolRepl.split("§§")
+        for (br <- boolRepl2)
+          br.split("§",2) match {
+            case Array("") =>
+            case Array(b,r) => importBoolStr(b,r)
+            case _ => throw new ParserException(s"Failed to parse reply '$br' for boolean.")
           }
 
         val warns2 = warns.split("§§")
@@ -241,7 +313,7 @@ class StaticSageSolver extends Solver {
   }
 
   protected def debug(s:()=>String): Unit = {
-    //println("[Solver] " s())
+    //println("[Solver] "+s())
   }
 
 }

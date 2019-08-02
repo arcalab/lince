@@ -3,8 +3,8 @@ package hprog.frontend.solver
 import hprog.ast.SageExpr.{SExpr, SExprFun}
 import hprog.ast._
 import hprog.backend.Show
-import hprog.common.ParserException
-import hprog.frontend.Semantics.SageSolution
+import hprog.common.{ParserException, TimeoutException}
+import hprog.frontend.Semantics.{SageSolution, Valuation}
 import hprog.frontend.Utils
 
 import scala.sys.process._
@@ -135,6 +135,19 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     rep
   }
 
+  def askSage(c:Cond,vl:Valuation): Option[String] = {
+    val vars = getVars(c)
+    val instructions = //s"print(\"${Show(expr)}\"); \"ok\""
+      //vars.map(v=>s"$v = var('$v'); ").mkString +
+      "x = var('x'); "+
+        "solve([" + Show(c,vl) + " , x==1],x) != []; \"ok\""
+    debug(()=>s"expression to solve: '$instructions'")
+    val rep = askSage(instructions)
+    debug(()=>s"reply: '$rep'")
+    rep
+
+  }
+
   private def getVars(expr: SExprFun): List[String] = expr match {
     case SVal(v)       => Nil
     case _:SArg        => Nil
@@ -145,6 +158,24 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     case SPow(e1, e2)  => getVars(e1) ++ getVars(e2)
     case SAdd(e1, e2)  => getVars(e1) ++ getVars(e2)
     case SSub(e1, e2)  => getVars(e1) ++ getVars(e2)
+  }
+  private def getVars(c: Cond): List[String] = c match {
+    case BVal(b) => Nil
+    case And(c1, c2) => getVars(c1) ++ getVars(c2)
+    case Or(c1, c2)  => getVars(c1) ++ getVars(c2)
+    case Not(c2)     => getVars(c2)
+    case EQ(v, l) => v.v :: getVars(l)
+    case GT(v, l) => v.v :: getVars(l)
+    case LT(v, l) => v.v :: getVars(l)
+    case GE(v, l) => v.v :: getVars(l)
+    case LE(v, l) => v.v :: getVars(l)
+  }
+
+  private def getVars(lin: Lin): List[String] = lin match {
+    case Var(v)      => List(v)
+    case Value(v)    => Nil
+    case Add(l1, l2) => getVars(l1) ++ getVars(l2)
+    case Mult(v, l)  => getVars(l)
   }
 
 
@@ -159,7 +190,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       askSage(eqs) match {
         case Some(reply) => importDiffEqs(List(eqs), List(reply))
         case None =>
-          throw new ParserException(s"Timed out when solving ${
+          throw new TimeoutException(s"Timed out while solving ${
             eqs.map(Show(_)).mkString(", ")}.")
 
       }//SageSolver.callSageSolver(eqs, path)
@@ -170,10 +201,22 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       askSage(expr) match {
         case Some(reply) => importExpr(expr,reply)
         case None =>
-          throw new ParserException(s"Timed out when reducing ${
+          throw new TimeoutException(s"Timed out while reducing ${
             Show(expr)}.")
       }
     }
+
+  override def +=(cond:Cond, valua:Valuation): Unit = {
+    if (!cacheBool.contains(cond,valua)) {
+      askSage(cond,valua) match {
+        case Some(reply) => importBool(cond, valua, reply)
+        case None =>
+          throw new TimeoutException(s"Timed out while solving condition ${
+            Show(cond,valua)
+          }.")
+      }
+    }
+  }
 
   //      val instr = SageSolver.genSage(eqs)
   //      cache += (eqs -> (s"$path/sage -c $instr".!!))

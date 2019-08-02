@@ -163,8 +163,13 @@ object Semantics {
 
   def iteToValuation(ite: ITE,sol: Solver, dev:Deviator, bound:Int): Prog[Valuation] = input => {
     val ITE(ifS, thenS, elseS) = ite
-    val inputPoint = input.mapValues(Eval(_,0))
-    val ifValue = Eval(inputPoint,ifS) // approximation (assuming input is simplified)
+
+    val inputPoint = input.mapValues(Eval(_,0)) // needed for searching for deviations
+
+    //val ifValue = Eval(inputPoint,ifS) // approximation (assuming input is simplified)
+    val ifValue = sol.solveSymb(ifS,input)
+
+
     debug(()=>s"%%% ITE ${Show(ifS)} @ ${inputPoint.mkString(",")} - $ifValue")
 
     val warnings: Warnings = {

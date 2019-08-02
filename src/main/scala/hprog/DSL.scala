@@ -71,6 +71,23 @@ object DSL {
     }
   }
 
+  /**
+    * Parses a string into an expression.
+    * @param s string representing an expression
+    * @return parsed expression
+    */
+  def parseCond(s:String): Cond =  {
+    //println("parsing...")
+    Parser.parseCond(s) match {
+      case Parser.Success(result, _) =>
+        //println("parsed")
+        result
+      case f: Parser.NoSuccess =>
+        //println("failed")
+        throw new ParserException(f.toString)
+    }
+  }
+
   val parseWithError: String => Parser.ParseResult[Syntax] = Parser.parse
 
   def parseTraj(s:String,sagePath:String): Traj[Valuation] = // e.g., sagePath = "/home/jose/Applications/SageMath"

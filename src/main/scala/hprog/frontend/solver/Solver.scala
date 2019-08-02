@@ -5,7 +5,7 @@ import breeze.numerics._
 import hprog.ast.SageExpr.{SExpr, SExprFun}
 import hprog.ast._
 import hprog.frontend.Eval
-import hprog.frontend.Semantics.{Point, SFunction, SageSolution, Solution}
+import hprog.frontend.Semantics.{Point, SFunction, SageSolution, Solution, Valuation}
 
 trait Solver {
 
@@ -28,6 +28,7 @@ trait Solver {
     */
   def solveSymb(eqs:List[DiffEq]): SageSolution
   def solveSymb(expr: SExpr): SExpr
+  def solveSymb(cond: Cond, valua: Valuation): Boolean
 
 }
 
