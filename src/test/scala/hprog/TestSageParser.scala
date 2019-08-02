@@ -4,6 +4,7 @@ import org.scalatest.FlatSpec
 import hprog.DSL._
 import hprog.ast._
 import hprog.backend.Show
+import hprog.frontend.Eval
 import hprog.lang.SageParser
 
 
@@ -37,13 +38,13 @@ class TestSageParser extends FlatSpec {
 //    Map("p"->100, "v"->500),List(0.0->0.0,1.0->0.0,2.0->0.0))
 
 
-  private def testOk(in:String,ctx:frontend.Semantics.Valuation,res:List[(Double,Map[String,Double])]) =
+  private def testOk(in:String,ctx:frontend.Semantics.Point,res:List[(Double,Map[String,Double])]) =
     for ((t,mp) <- res; (vv,va) <- mp) {
       s"Parsing '${in}'\n for $vv, t=$t with ${ctx.mkString(";")}" should s"""be $va"""" in {
 //      s"Parsing something" should s"""be $va"""" in {
         SageParser.parse(in) match {
           case SageParser.Success(result, _) =>
-            assertResult(va)(result.sol(vv)(t)(ctx))
+            assertResult(va)(Eval.apply(result(vv),t,ctx.mapValues(SVal(_))))
           //          assert(s"Wrong parsed value. Got\n  $result\nexpected\n  $res",result,res)
           case err: SageParser.NoSuccess =>
             fail("Parse error: " + err)
