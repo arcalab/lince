@@ -95,16 +95,22 @@ object Show {
 
 
   def pp[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
-    case SVal(v) => v.toString // f"$v%1.8f"
+    case SVal(v) => if (v.round == v) v.toInt.toString else v.toString // f"$v%1.8f"
     case _:SArg  => "t"
     case s:SVar  => s.v
+    case SMult(SVal(-1),e)=> s"-${ppP[E](e)}"
+    case SMult(e,SVal(-1))=> s"-${ppP[E](e)}"
+    case SMult(SVar(x),d@SVal(_))=> s"${pp[E](d)}$x"
+    case SMult(SArg(),d@SVal(_))=> s"${pp[E](d)}t"
+    case SMult(d@SVal(_),SVar(x))=> s"${pp[E](d)}$x"
+    case SMult(d@SVal(_),SArg())=> s"${pp[E](d)}t"
     case SMult(e1,e2@SAdd(_,_))=> s"${pp[E](e1)}*${pp[E](e2)}"
     case SAdd(e1,e2@SAdd(_,_)) => s"${pp[E](e1)}+${pp[E](e2)}"
     case SSub(e1,e2@SAdd(_,_)) => s"${pp[E](e1)}-${pp[E](e2)}"
     case SMult(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}*${pp[E](e2)}"
     case SAdd(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}+${pp[E](e2)}"
     case SSub(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}-${pp[E](e2)}"
-    case s:SFun[E]  => s"${s.f}(${s.args.map(apply[E]).mkString(",")})"
+    case s:SFun[E]  => s"${s.f}(${s.args.map(pp[E]).mkString(",")})"
     case s:SDiv[E]  => s"${ppP[E](s.e1)}/${ppP[E](s.e2)}"
     case s:SMult[E] => s"${ppP[E](s.e1)}*${ppP[E](s.e2)}"
     case s:SPow[E]  => s"${ppP[E](s.e1)}^${ppP[E](s.e2)}"
@@ -112,13 +118,16 @@ object Show {
     case s:SSub[E]  => s"${ppP[E](s.e1)}-${ppP[E](s.e2)}"
   }
   private def ppP[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
-    case _:SVal | _:SArg | _:SVar | _:SFun[E] => pp(expr)
+    case _:SVal | _:SArg | _:SVar | _:SFun[E] |
+         SMult(SArg(),SVal(_))  |  SMult(SVal(_),SArg())  |
+         SMult(SVar(_),SVal(_))  |  SMult(SVal(_),SVar(_)) |
+         SMult(SVal(-1),_) | SMult(_,SVal(-1))  => pp(expr)
     case _ => "("+pp[E](expr)+")"
   }
 
 
   def apply(sol:SageSolution): String =
-    sol.map(kv => s"${kv._1}:${kv._2.toString}").mkString(", ")
+    sol.map(kv => s"${kv._1}:${apply(kv._2)}").mkString(", ")
 
 
   def floatToFraction(v: Double): String = {

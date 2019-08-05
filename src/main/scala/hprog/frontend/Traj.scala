@@ -90,8 +90,21 @@ object Traj {
 
 
         override def fun(t:SExpr)(implicit s:Solver): TimeSolution =
-          if (Eval(t) < Eval(dur1)) t1.fun(t)
-          else t2.fun(SSub(t, dur1)).mapValues(e=>Eval.updTimeT( SSub(SArg(),dur1), e))
+          if (Eval(t) < Eval(dur1)) {
+//            println(s"[F] @${Eval(t)} L - reached ${Show.pp(t)}\n - at ${Show(t1.fun)}\n - not at ${Show(t2.fun)}.")
+            t1.fun(t)
+          }
+          else {
+//            println(s"[F] @${Eval(t)} R - reached ${Show.pp(t)} \n - not at ${Show(t1.fun)}\n - going to ${Show(t2.fun)}\n"+
+//                s" - updating time to ${Eval(SSub(t, dur1))}  ~  ${Show(SSub(t, dur1))}")
+            val f1 = t2.fun(SSub(t, dur1))
+            val f2 = f1.mapValues(e=>Eval.updTimeT( SSub(SArg(),dur1), e))
+//            println(s" - pre mapValues: ${Show(f1)}")
+//            println(s" - pos mapValues: ${Show(f2)}")
+//            println(s" - simpl 'v': ${Eval.simplifyMan(f2.getOrElse("v",SVal(0)))}")
+//            println(s" - pp    'v': ${Show.pp(Eval.simplifyMan(f2.getOrElse("v",SVal(0))))}")
+            f2
+          }
 
         override def apply(t: SExpr)(implicit s: Solver): X =
           if (Eval(t) < Eval(dur1)) { // Need solver?

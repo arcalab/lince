@@ -42,6 +42,10 @@ object Eval {
       case ("exp",v::Nil) => math.exp(apply(v,t,x))
       case ("sin",v::Nil) => math.sin(apply(v,t,x))
       case ("cos",v::Nil) => math.cos(apply(v,t,x))
+      case ("tan",v::Nil) => math.atan(apply(v,t,x))
+      case ("arcsin",v::Nil) => math.asin(apply(v,t,x))
+      case ("arccos",v::Nil) => math.acos(apply(v,t,x))
+      case ("arctan",v::Nil) => math.atan(apply(v,t,x))
       case ("sqrt",v::Nil) => math.sqrt(apply(v,t,x))
       case ("log",v::Nil) => math.log(apply(v,t,x))
       case ("log10",v::Nil) => math.log10(apply(v,t,x))
@@ -169,7 +173,7 @@ object Eval {
     case SSub(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
       case (x,SVal(0)) => x
       case (SVal(x),SVal(y)) => SVal(x-y)
-      case (SSub(e11,e12),e21) => simplifyMan(SSub(e11,SSub(e12,e21)))
+      case (SSub(e11,e12),e21) => simplifyMan(SSub(e11,SAdd(e12,e21)))
       case (x,y) => SSub(x,y)
     }
   }
