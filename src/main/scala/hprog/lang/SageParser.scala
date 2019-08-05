@@ -20,7 +20,15 @@ object SageParser extends RegexParsers {
     * @param c string representing a reply from Sage
     * @return Parse result (parsed(functions) or failure(error))
     */
-  def parse(c: String): ParseResult[SageSolution] = parseAll(sols, c)
+  def parse(c: String): ParseResult[SageSolution] = {
+    val res = parseAll(sols, c)
+//    res match {
+//      case Success(result, _) =>
+//        println(s"[ParserS] $c  -->  ${hprog.backend.Show(result)}")
+//      case _ =>
+//    }
+    res
+  }
 
   /**
     * Main function that parses a string into a SageExpr.
@@ -28,7 +36,15 @@ object SageParser extends RegexParsers {
     * @param c string representing a reply from Sage
     * @return Parse result (parsed(functions) or failure(error))
     */
-  def parseExpr(c: String): ParseResult[SExprFun] = parseAll(eqExpr, c)
+  def parseExpr(c: String): ParseResult[SExprFun] = {
+    val res = parseAll(eqExpr, c)
+//    res match {
+//      case Success(result, _) =>
+//        println(s"[Parser] $c  -->  ${hprog.backend.Show.pp(result)}")
+//      case _ =>
+//    }
+    res
+  }
 
   //  def pexp(c:String): ParseResult[Cond] = parseAll(condP,c)
 
@@ -64,12 +80,22 @@ object SageParser extends RegexParsers {
     }
 
   lazy val eqExpr: Parser[SExprFun] =
-    prod ~ opt(("+"~eqExpr)|("-"~eqExpr)) ^^ {
+    prod ~ opt(("+"~eqExpr)|("-"~negEqExpr)) ^^ {
       case e ~ None => e
       case e1 ~ Some("+"~e2) => SAdd(e1,e2)
-      case e1 ~ Some("-"~e2) => SSub(e1,e2)
+      case e1 ~ Some("-"~e2) => SAdd(e1,e2)
       case _ ~ Some(s~_) => throw new ParserException(s"Unknown operator $s")
     }
+
+  // negate first part of a sum
+  lazy val negEqExpr: Parser[SExprFun] =
+    prod ~ opt(("+"~eqExpr)|("-"~negEqExpr)) ^^ {
+      case e ~ None => invert(e)
+      case e1 ~ Some("+"~e2) => SAdd(invert(e1),e2)
+      case e1 ~ Some("-"~e2) => SAdd(invert(e1),e2)
+      case _ ~ Some(s~_) => throw new ParserException(s"Unknown operator $s")
+    }
+
 
   lazy val prod: Parser[SExprFun] =
     expn ~ opt(("*"~prod)|("/"~prod)) ^^ {
@@ -124,5 +150,19 @@ object SageParser extends RegexParsers {
       case e~None => List(e)
       case e~Some(e2) => e::e2
     }
-}
+
+  def invert(e: SExprFun): SExprFun =
+    e match {
+      case SVal(v) =>  SVal(-v)
+      case SArg()     => SMult(SVal(-1),e)
+      case SVar(_)    => SMult(SVal(-1),e)
+      case SFun(_, _) => SMult(SVal(-1),e)
+      case SPow(_, _) => SMult(SVal(-1),e)
+      case SDiv(e1, e2)  => SDiv(invert(e1),e2)
+      case SMult(e1, e2) => SMult(invert(e1),e2)
+      case SAdd(e1, e2)  => SAdd(invert(e1),invert(e2))
+      case SSub(e1, e2)  => SSub(e2,e1)
+    }
+
+  }
 
