@@ -106,8 +106,9 @@ object SageParser extends RegexParsers {
     }
 
   lazy val expn: Parser[SExprFun] =
-    "e" ~ "^" ~ lit ^^ {
-      case _~_~e => SFun("exp",List(e))//(t:Double) => (ctx:Valuation) => Math.exp(e(t)(ctx))
+    opt("-") ~ "e" ~ "^" ~ lit ^^ {
+      case None~_~_~e => SFun("exp",List(e))//(t:Double) => (ctx:Valuation) => Math.exp(e(t)(ctx))
+      case _~_~_~e => invert(SFun("exp",List(e)))//(t:Double) => (ctx:Valuation) => Math.exp(e(t)(ctx))
     } |
     lit ~ opt("^"~>lit) ^^ {
       case e ~ None => e
