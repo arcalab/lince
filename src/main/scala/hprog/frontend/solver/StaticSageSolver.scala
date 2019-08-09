@@ -83,7 +83,10 @@ class StaticSageSolver extends Solver {
       //          "' - known: "+cacheVal.keys.map(ex => Show(ex)).mkString(" / ") +
       //          " - also known: "+cacheStrVal.keys.mkString(" / "))
       val est = Eval(expr)
-      println(s"static solver failed. Using estinmation $est instead.")
+      println(s"static solver failed for ${Show(expr)}. " +
+        s"Know only ${cacheStrVal.keys.map("'"+_+"'").mkString(", ")}. " +
+        s"Using estimation $est instead.")
+      cacheStrVal += (Show(expr) -> ((SVal(est),"")))
     }
 
 
@@ -99,7 +102,10 @@ class StaticSageSolver extends Solver {
       //          "' - known: "+cacheVal.keys.map(ex => Show(ex)).mkString(" / ") +
       //          " - also known: "+cacheStrVal.keys.mkString(" / "))
       val est = Eval(valua.mapValues(Eval(_, 0)), cond)
-      println(s"static solver failed. Using estinmation $est instead.")
+      println(s"static solver failed for '${Show(cond,valua)}'. " +
+      s"Know only ${cacheStrBool.keys.map("'"+_+"'").mkString(", ")}. " +
+      s"Using estimation $est instead.")
+      cacheStrBool += Show(cond,valua) -> (est,"")
     }
   }
 

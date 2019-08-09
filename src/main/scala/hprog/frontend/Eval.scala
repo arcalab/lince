@@ -137,9 +137,9 @@ object Eval {
 
 
   def simplifyMan(e:SExprFun): SExprFun = e match {
-    case SVal(v) => e
+    case SVal(_) => e
     case SArg() => e
-    case SVar(v) => e
+    case SVar(_) => e
     case SFun(f, args) => SFun(f,args.map(simplifyMan))
     case SDiv(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
       case (x,SVal(1)) => x
@@ -157,7 +157,7 @@ object Eval {
     }
     case SPow(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
       case (x,SVal(1)) => x
-      case (x,SVal(0)) => SVal(1)
+      case (_,SVal(0)) => SVal(1)
       case (SVal(0),_) => SVal(0)
       case (SVal(1),_) => SVal(1)
       case (SVal(x),SVal(y)) => SVal(math.pow(x,y))
