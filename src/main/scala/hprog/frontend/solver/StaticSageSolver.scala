@@ -1,30 +1,30 @@
 package hprog.frontend.solver
 
-import hprog.ast.SageExpr.SExpr
+import hprog.ast.SymbolicExpr.SyExpr
 import hprog.ast._
 import hprog.backend.Show
 import hprog.common.ParserException
-import hprog.frontend.Semantics.{SageSolution, Valuation, Warnings}
+import hprog.frontend.CommonTypes.{SySolution, Valuation, Warnings}
 import hprog.frontend.{Eval, Utils}
 import hprog.lang.SageParser
 
 
 class StaticSageSolver extends Solver {
 
-  type DiffCache = (SageSolution,String) // one SageExpr for each variable
-  type ExprCache = (SExpr,String) // simplified version
+  type DiffCache = (SySolution,String) // one SageExpr for each variable
+  type ExprCache = (SyExpr,String) // simplified version
   type BoolCache = (Boolean,String) // simplified version
 
   protected var cache:
     Map[List[DiffEq], DiffCache]  =  Map(Nil->(Map(),""))
   protected var cacheVal:
-    Map[SExpr    , ExprCache]  =  Map()
+    Map[SyExpr    , ExprCache]  =  Map()
   protected var cacheBool:
     Map[(Cond,Valuation), BoolCache]  =  Map()
   protected var cacheStr:     Map[String,DiffCache] = Map()
   protected var cacheStrVal:  Map[String,ExprCache] = Map()
   protected var cacheStrBool: Map[String,BoolCache] = Map()
-  protected var warnings: Warnings = Nil
+  protected var warnings: Warnings = Set()
 
   override def toString: String =
     s"""
@@ -55,7 +55,8 @@ class StaticSageSolver extends Solver {
 
   def getWarnings: Warnings = warnings
 
-  def +=(we:SExpr, ws:String): Unit = warnings ::= (we,ws)
+  def addWarning(we:SyExpr, ws:String): Unit = warnings += we->ws
+  def addWarnings(wrs:List[(SyExpr, String)]): Unit = warnings ++= wrs
 
   /**
     * Throw an error if a system of equations was not precomputed
@@ -76,16 +77,12 @@ class StaticSageSolver extends Solver {
     * Throw an error if an expression was not precomputed
     * @param expr SageExpression to check if it is in cache
     */
-  def +=(expr: SExpr): Unit =
+  def +=(expr: SyExpr): Unit =
     if (!cacheVal.contains(expr) && !cacheStrVal.contains(Show(expr))) {
-      //      throw new LiveSageSolver.SolvingException(
-      //        s"Static solver failed: unknown expr: $expr." +
-      //          "' - known: "+cacheVal.keys.map(ex => Show(ex)).mkString(" / ") +
-      //          " - also known: "+cacheStrVal.keys.mkString(" / "))
       val est = Eval(expr)
-      println(s"static solver failed for ${Show(expr)}. " +
-        s"Know only ${cacheStrVal.keys.map("'"+_+"'").mkString(", ")}. " +
-        s"Using estimation $est instead.")
+//      println(s"static solver failed for ${Show(expr)}. " +
+//        s"Know only ${cacheStrVal.keys.map("'"+_+"'").mkString(", ")}. " +
+//        s"Using estimation $est instead.")
       cacheStrVal += (Show(expr) -> ((SVal(est),"")))
     }
 
@@ -97,20 +94,16 @@ class StaticSageSolver extends Solver {
     */
   def +=(cond: Cond, valua: Valuation): Unit = {
     if (!cacheBool.contains(cond, valua) && !cacheStrBool.contains(Show(cond, valua))) {
-      //      throw new LiveSageSolver.SolvingException(
-      //        s"Static solver failed: unknown expr: $expr." +
-      //          "' - known: "+cacheVal.keys.map(ex => Show(ex)).mkString(" / ") +
-      //          " - also known: "+cacheStrVal.keys.mkString(" / "))
       val est = Eval(valua.mapValues(Eval(_, 0)), cond)
-      println(s"static solver failed for '${Show(cond,valua)}'. " +
-      s"Know only ${cacheStrBool.keys.map("'"+_+"'").mkString(", ")}. " +
-      s"Using estimation $est instead.")
+//      println(s"static solver failed for '${Show(cond,valua)}'. " +
+//      s"Know only ${cacheStrBool.keys.map("'"+_+"'").mkString(", ")}. " +
+//      s"Using estimation $est instead.")
       cacheStrBool += Show(cond,valua) -> (est,"")
     }
   }
 
 
-  override def solveSymb(expr: SExpr): SExpr = {
+  override def solveSymb(expr: SyExpr): SyExpr = {
     this += expr
     cacheVal.get(expr) match {
       case Some(c) => c._1
@@ -120,7 +113,7 @@ class StaticSageSolver extends Solver {
       }
     }
   }
-  override def solveSymb(eqs:List[DiffEq]): SageSolution = {
+  override def solveSymb(eqs:List[DiffEq]): SySolution = {
     this += eqs
     cache.get(eqs) match {
       case Some(c) => c._1
@@ -155,7 +148,7 @@ class StaticSageSolver extends Solver {
   /**
     * Import the reply from Sage from evaluating an expression
     */
-  def importExpr(expr:SExpr, sageReply:String): Unit =
+  def importExpr(expr:SyExpr, sageReply:String): Unit =
     if (!cacheVal.contains(expr))
       cacheVal += expr -> replyToExprCache(sageReply)
 
@@ -167,6 +160,7 @@ class StaticSageSolver extends Solver {
     val resParsed = SageParser.parseExpr(sageReply)
     resParsed match {
       case SageParser.Success(newExpr, _) =>
+        //val fixed = Utils.fixVars(newExpr)
         (Eval.update(newExpr,SVal(0),Map()),sageReply)
       case _: SageParser.NoSuccess =>
         throw new ParserException(s"Failed to parse Sage reply '$sageReply'.")
@@ -231,12 +225,13 @@ class StaticSageSolver extends Solver {
         case SageParser.Success(sol, _) if sol.keySet == Set("") =>
 //          val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
           vars match {
-            case List(variable) => Map(variable -> sol(""))
+            case List(variable) => Map(variable -> Utils.fixVars(sol("")))
             case _ => throw new ParserException(s"Failed to parse $sageReply - " +
               s"only one variable expected, but found [${vars.mkString(",")}].")
           }
         // if more than one variable exists, all is good
-        case SageParser.Success(result, _) => result
+        case SageParser.Success(result, _) =>
+          result.mapValues(Utils.fixVars)
         case _: SageParser.NoSuccess => throw new ParserException(s"Failed to parse '$sageReply'.")
       }
       (resParsed,sageReply)
@@ -312,7 +307,10 @@ class StaticSageSolver extends Solver {
         for (w <-warns2)
           w.split("§",2) match {
             case Array("") =>
-            case Array(t,wn) => this += (Eval.update(hprog.DSL.parseExpr(t),SVal(0),Map()),wn)
+            case Array(t,wn) => this addWarning (Eval.update(hprog.DSL.parseExpr(t)
+                                                    ,SVal(0):SyExpr
+                                                    ,Map():Valuation)
+                                        ,wn)
             case _ => throw new ParserException(s"Failed to parse reply '$w' for a warning.")
           }
     }

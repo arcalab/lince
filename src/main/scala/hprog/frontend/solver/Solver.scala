@@ -2,10 +2,11 @@ package hprog.frontend.solver
 
 import breeze.linalg._
 import breeze.numerics._
-import hprog.ast.SageExpr.{SExpr, SExprFun}
+import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll}
 import hprog.ast._
+import hprog.backend.Show
 import hprog.frontend.Eval
-import hprog.frontend.Semantics.{Point, SFunction, SageSolution, Solution, Valuation}
+import hprog.frontend.CommonTypes.{Point, SFunction, Solution, SySolution, Valuation}
 
 trait Solver {
 
@@ -16,9 +17,9 @@ trait Solver {
     */
   def evalFun(eqs:List[DiffEq]): Solution =
     solveSymb(eqs).mapValues(evalFun)
-  def evalFun(expr: SExprFun): SFunction =
+  def evalFun(expr: SyExprAll): SFunction =
     (t:Double) => (v:Point) => Eval(Eval.update(expr,SVal(t),v.mapValues(SVal)))
-  def evalVal(expr: SExpr): Double =
+  def evalVal(expr: SyExpr): Double =
     Eval(solveSymb(expr))
 
   /** Gets a symbolic solution of a system of equations, using system calls to Sage,
@@ -26,9 +27,11 @@ trait Solver {
     * @param eqs System of equations to be retrived
     * @return Result from Sage as a symbolic expression
     */
-  def solveSymb(eqs:List[DiffEq]): SageSolution
-  def solveSymb(expr: SExpr): SExpr
+  def solveSymb(eqs:List[DiffEq]): SySolution
+  def solveSymb(expr: SyExpr): SyExpr
   def solveSymb(cond: Cond, valua: Valuation): Boolean
+
+  def solveSymb(valua:Valuation,sol:Solver): Valuation = valua.mapValues(sol.solveSymb)
 
 }
 
@@ -89,11 +92,26 @@ object Solver {
   }
 
 
-  def solveDur[X](dur:Dur, input:X, guard:Cond=>Double=>Boolean) = dur match {
-    case For(t) => Some(t.v)
-    case Until(c) => if (guard(c)(0)) Some(0.0)
-                     else logSearch(1, 0, None, guard(c))
-    case Forever => None
+
+  def estimateDur(durCond:Cond,eqs:List[DiffEq],x:Valuation,solver:Solver): Option[Double] = {
+    val sol = solver.evalFun(eqs) // maps variables to their solutions (function from t/ctx to value)
+//    println(s"Estimating duration using point ${Show(x)}.")
+    def guard(c: Cond): Double => Boolean =
+      t => {
+//        println(s" - guard ${c} @ $t")
+        Eval(sol.mapValues(fun=>fun(t)(Eval(x))),c)
+      }
+//    println(" - going")
+    val durValue = searchCond(durCond,guard) // give value or do jumps searching for duration
+    //debug(()=>s"Solving duration for ${Show(eqs)} & ${Show(diffEqs.dur)} - ${durValue}")
+    //debug(()=>s"knowing ${Show(input)}")
+//    println(s" - done $durValue")
+    durValue
+  }
+
+  def searchCond[X](c:Cond, guard:Cond=>Double=>Boolean): Option[Double] = {
+    if (guard(c)(0)) Some(0.0)
+       else logSearch(1, 0, None, guard(c))
   }
 
 
@@ -240,17 +258,19 @@ object Solver {
   /// TESTING FUNCTIONS //
   ////////////////////////
 
-  def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
-    case d@DiffEqs(eqs, dur) => List(eqs)
-    //    case Seq(Nil) => Nil
-    case Seq(p::ps) =>
-      getDiffEqs(p) ::: getDiffEqs(Seq(ps))
-    //    case Skip => Nil
-    case ITE(ifP, thenP, elseP) =>
-      getDiffEqs(thenP) ++ getDiffEqs(elseP)
-    case While(c, doP) => getDiffEqs(doP)
-    case _ => Nil
-  }
+//  def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
+//    case d@DiffEqs(eqs, dur) => List(eqs)
+//    //    case Seq(Nil) => Nil
+//    case Seq(p::ps) =>
+//      getDiffEqs(p) ::: getDiffEqs(Seq(ps))
+//    //    case Skip => Nil
+//    case ITE(ifP, thenP, elseP) =>
+//      getDiffEqs(thenP) ++ getDiffEqs(elseP)
+//    case While(c, doP) => getDiffEqs(doP)
+//    case _ => Nil
+//  }
+
+
 //
 //
 //  def getFstDiffEq(prog:Syntax): DiffEqs  = prog match {

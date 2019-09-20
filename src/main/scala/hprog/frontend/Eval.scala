@@ -1,11 +1,17 @@
 package hprog.frontend
 
-import hprog.ast.SageExpr.{SExpr, SExprFun, SExprT, SExprV}
+import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime, SyExprVar}
 import hprog.ast._
 import hprog.backend.Show
-import hprog.frontend.Semantics.{Point, SageSolution, Valuation}
+import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, Valuation}
+import hprog.frontend.solver.Solver
 
 object Eval {
+
+//  private type ST = SyExprTime
+//  private type SE = SyExpr
+//  private type SA = SyExprAll
+//  private type SV = SyExprVar
 
   def apply(state:Point, lin: Lin): Double = lin match {
     case Var(v) => state(v)
@@ -27,17 +33,18 @@ object Eval {
       case LE(v, l) => apply(state,v) <= apply(state,l)
     }
 
-  def apply(e:SExprFun, t: Double, x: Valuation): Double = e match {
+  def apply(e:SyExprAll, t: Double, x: Valuation): Double = e match {
     case SVal(v) => v
     case _:SArg => t
-    case SVar(v) => apply(x(v),t,x) // not really used - usually v(0) denotes this case
+    case s:SVar => apply(x(s.v),t,x)
+//    case SVar(v) => apply(x(v),t,x) // not really used - usually v(0) denotes this case
                                            // could create an infinte loop if recursive (not anymore with SExpr)
     case SDiv(e1, e2) => apply(e1,t,x) / apply(e2,t,x)
     case SMult(e1, e2) =>apply(e1,t,x) * apply(e2,t,x)
     case SPow(e1, e2) => math.pow(apply(e1,t,x),apply(e2,t,x))
     case SAdd(e1, e2) => apply(e1,t,x) + apply(e2,t,x)
     case SSub(e1, e2) => apply(e1,t,x) - apply(e2,t,x)
-    case s:SFun[SageExpr.All] => (s.f,s.args) match {
+    case s:SFun[SymbolicExpr.All] => (s.f,s.args) match {
       case (v,List(SVal(0.0))) if x contains v => apply(x(v),t,x) // could create infinite loop
       case ("exp",v::Nil) => math.exp(apply(v,t,x))
       case ("sin",v::Nil) => math.sin(apply(v,t,x))
@@ -56,25 +63,29 @@ object Eval {
   }
 
   // Ignore variables or time arguments
-  def apply(e:SExprT, t:Double): Double = apply(e,t,Map())
-  def apply(e:SExprV, x:Valuation): Double = apply(e,0,x)
-  def apply(e:SExpr): Double = apply(e,0,Map())
+  def apply(e:SyExprTime, t:Double): Double = apply(e,t,Map())
+  def apply(e:SyExprVar, x:Valuation): Double = apply(e,0,x)
+  def apply(e:SyExpr): Double = apply(e,0,Map())
 
   def apply(v: Valuation): Point = v.mapValues(apply)
 
-  def update(e:SExprFun,t:SExpr,v:Valuation): SExpr =
+  def update(e:SyExprAll, t:SyExpr, v:Valuation): SyExpr =
     updInput(Eval.updTime(t,e),v)
+
+  def update(phi:SySolution, t:SyExpr, v:Valuation): Valuation =
+    updInput(v,Eval.updTime(t,phi))
 
   /** Update an expression by replacing initial values v(0)
     * @param e expression to be updated
     * @param sol solution with the new values
     * @return updated expression
     */
-  def updInputFun(e:SExprFun, sol:Valuation): SExprT = e match {
-    case SFun(v, List(SVal(0.0))) if sol contains v  => sol(v)
-    case SVar(v)                                     => sol(v)
+  def updInputFun(e:SyExprAll, sol:Valuation): SyExprTime = e match {
+//    case SFun(v, List(SVal(0.0))) if sol contains v  => sol(v)
+    case s:SVar                                      => sol(s.v)
     //
-    case s:SFun[SageExpr.Var] => SFun(s.f,s.args.map(e2 =>  updInputFun(e2,sol)))
+    case s:SFun[SymbolicExpr.All] =>
+      SFun[SymbolicExpr.Time](s.f,s.args.map(e2 =>  updInputFun(e2,sol)))
     case SDiv(e1, e2)  => SDiv( updInputFun(e1,sol),updInputFun(e2,sol))
     case SMult(e1, e2) => SMult(updInputFun(e1,sol),updInputFun(e2,sol))
     case SPow(e1, e2)  => SPow( updInputFun(e1,sol),updInputFun(e2,sol))
@@ -84,13 +95,22 @@ object Eval {
     case t:SArg  => t
   }
 
-  def updInput(e:SExprV,sol:Valuation): SExpr = updInputFun(e,sol) match {
-    case t:SExpr => t
+  def updInput(e:SyExprVar, sol:Valuation): SyExpr = updInputFun(e,sol) match {
+    case t:SyExpr @unchecked => t // guaranteed to succeed (but type eliminated by erasure)
     case v => throw new RuntimeException(s"updating variable in ${Show(e)} does nt yield an SExpr (${Show(v)}).")
   }
 
-  def updTime(newt: SExprV, expr: SExprFun): SExprV = updTimeFun(newt, expr) match {
-    case e: SExprV => e
+  def updTime(t:SyExpr, phi:SySolution): SySolutionVar =
+    phi.mapValues(updTime(t,_))
+  def updInput(input:Valuation,phi:SySolutionVar): Valuation =
+    phi.mapValues(updInput(_,input))
+  def updInputFun(input:Valuation,phi:SySolution): SySolutionTime =
+    phi.mapValues(updInputFun(_,input))
+  def solveValues(s:Solver,phi:Valuation): Valuation =
+    phi.mapValues(s.solveSymb)
+
+  def updTime(newt: SyExprVar, expr: SyExprAll): SyExprVar = updTimeFun(newt, expr) match {
+    case e: SyExprVar @unchecked => e  // guaranteed to succeed (but type eliminated by erasure)
     case v => throw new RuntimeException(s"updating time in ${Show(expr)} does nt yield an SExprV (${Show(v)}).")
 //    case _:SArg => newt
 //    //
@@ -103,19 +123,19 @@ object Eval {
 //    case e:SVal => e
 //    case e:SVar => e
   }
-  def updTimeV(newt: SExprT, expr: SExprV): SExprV = updTimeFun(newt, expr) match {
-    case e: SExprV => e
-    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does nt yield an SExprV (${Show(v)}).")
-  }
-  def updTimeT(newt: SExprT, expr: SExprT): SExprT = updTimeFun(newt, expr) match {
-    case e: SExprT => e
-    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does nt yield an SExprT (${Show(v)}).")
-  }
-  def updTimeFun(newt: SExprFun, expr:SExprFun): SExprFun = expr match {
+//  def updTimeV(newt: SyExprTime, expr: SyExprVar): SyExprVar = updTimeFun(newt, expr) match {
+//    case e: SyExprVar => e
+//    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does nt yield an SExprV (${Show(v)}).")
+//  }
+//  def updTimeT(newt: SyExprTime, expr: SyExprTime): SyExprTime = updTimeFun(newt, expr) match {
+//    case e: SyExprTime => e
+//    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does not yield an SExprT (${Show(v)}).")
+//  }
+  def updTimeFun(newt: SyExprAll, expr:SyExprAll): SyExprAll = expr match {
     case _:SArg => newt
     //
-    case sf:SFun[SageExpr.All]  =>
-      SFun(sf.f,sf.args.map((e2:SExprFun) => updTimeFun(newt,e2)))
+    case sf:SFun[SymbolicExpr.All]  =>
+      SFun(sf.f,sf.args.map((e2:SyExprAll) => updTimeFun(newt,e2)))
     case SDiv(e1, e2)  => SDiv( updTimeFun(newt,e1), updTimeFun(newt,e2))
     case SMult(e1, e2) => SMult(updTimeFun(newt,e1), updTimeFun(newt,e2))
     case SPow(e1, e2)  => SPow( updTimeFun(newt,e1), updTimeFun(newt,e2))
@@ -125,21 +145,72 @@ object Eval {
     case e:SVar => e
   }
 
-  def lin2sage(l:Lin): SExprV = l match {
-    case Var(v) => SFun(v,List(SVal(0))) //SVar(v)
+  // replace variables by their expression in programs
+//  def updInput(syntax:Syntax,x:Valuation): Syntax = syntax match {
+//    case Atomic(as, de) => Atomic(as.map(a=>Assign(a.v,updInput(a.e,x))), updInput(de,x))
+//    case Seq(p, q) => Seq(updInput(p,x),updInput(q,x))
+//    case ITE(ifP, thenP, elseP) => ITE(updInput(ifP,x),updInput(thenP,x),updInput(elseP,x))
+//    case While(pre, d, doP) => While(updInput(pre,x),updInput(d,x),updInput(doP,x))
+//  }
+
+  // replace variables by their expression in boolean conditions
+//  def updInput(cond: Cond, x: Valuation) : Cond = cond match {
+//    case BVal(b) => cond
+//    case And(c1, c2) => And(updInput(c1,x),updInput(c2,x))
+//    case Or(c1, c2) => Or(updInput(c1,x),updInput(c2,x))
+//    case Not(c) => Not(updInput(c,x))
+//    case EQ(l1, l2) => EQ(updInput(l1,x),updInput(l2,x))
+//    case GT(l1, l2) => GT(updInput(l1,x),updInput(l2,x))
+//    case LT(l1, l2) => LT(updInput(l1,x),updInput(l2,x))
+//    case GE(l1, l2) => GE(updInput(l1,x),updInput(l2,x))
+//    case LE(l1, l2) => LE(updInput(l1,x),updInput(l2,x))
+//  }
+
+//  def updInput(lin: Lin, x: Valuation): Lin = lin match {
+//    case Var(v) => x.get(v) match {
+//      case Some(e) => syExpToLin(e)
+//      case None => lin
+//    }
+//    case Value(_) => lin
+//    case Add(l1, l2) => Add(updInput(l1,x),updInput(l2,x))
+//    case Mult(v, l) => Mult(v,updInput(l,x))
+//  }
+
+//  def syExpToLin(expr: SyExpr): Lin = expr match {
+//    case SVal(v) => Var(v)
+//  }
+
+  def lin2sage(l:Lin): SyExprVar = l match {
+    case Var(v) => SVar(v) //SFun(v,List(SVal(0))) //SVar(v)
     case Value(v) => SVal(v)
     case Add(l1, l2) => SAdd(lin2sage(l1),lin2sage(l2))
     case Mult(v, l2) => SMult(SVal(v.v),lin2sage(l2))
   }
 
-  def baseSage(vs:Iterable[String]): SageSolution =
+  //def syExprToLin(e:SyExpr): Lin =
+
+
+  def sFunToSVar(e: SyExprVar): SyExprVar = e match {
+    case _:SVal => e
+    case _:SArg => e
+    case _:SVar => e
+//    case sf:SFun[_] => SVar(sf.f): SymbolicExpr[SymbolicExpr.Var]
+    case SFun(f, List(SVal(0))) => SVar(f)
+    case SDiv(e1, e2) => SDiv(sFunToSVar(e1),sFunToSVar(e2))
+    case SMult(e1, e2) => SMult(sFunToSVar(e1),sFunToSVar(e2))
+    case SPow(e1, e2) => SPow(sFunToSVar(e1),sFunToSVar(e2))
+    case SAdd(e1, e2) => SAdd(sFunToSVar(e1),sFunToSVar(e2))
+    case SSub(e1, e2) => SSub(sFunToSVar(e1),sFunToSVar(e2))
+  }
+
+  def baseSage(vs:Iterable[String]): SySolution =
     vs.map(v => v -> SFun(v,List(SVal(0.0)))).toMap
 
 
-  def simplifyMan(e:SExprFun): SExprFun = e match {
-    case SVal(_) => e
-    case SArg() => e
-    case SVar(_) => e
+  def simplifyMan(e:SyExprAll): SyExprAll = e match {
+    case _:SVal => e
+    case _:SArg => e
+    case _:SVar => e
     case SFun(f, args) => SFun(f,args.map(simplifyMan))
     case SDiv(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
       case (x,SVal(1)) => x

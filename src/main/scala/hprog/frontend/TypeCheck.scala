@@ -21,17 +21,17 @@ object TypeCheck {
   //  }
   //  def seqUnit(x:Result[Unit],y:Result[Unit]): Result[Unit] = seq((_,_)=>())(x,y)
 
-  def findProblems(f:Syntax=>Result, prog:Syntax): Result =
-    f(prog) ++
-      (prog match {
-        //        case Assign(v, e) => Result(None)
-        //        case DiffEqs(eqs, dur) => Result(None)
-        case Seq(ps) => ps.map(findProblems(f,_)).foldRight(Result(None))(_++_)
-        //        case Skip => Result(None)
-        case ITE(_, thenP, elseP) => findProblems(f,thenP) ++ findProblems(f,elseP)
-        case While(_, doP) => findProblems(f,doP)
-        case _ => Result(None)
-      })
+//  def findProblems(f:Syntax=>Result, prog:Syntax): Result =
+//    f(prog) ++
+//      (prog match {
+//        //        case Assign(v, e) => Result(None)
+//        //        case DiffEqs(eqs, dur) => Result(None)
+//        case Seq(ps) => ps.map(findProblems(f,_)).foldRight(Result(None))(_++_)
+//        //        case Skip => Result(None)
+//        case ITE(_, thenP, elseP) => findProblems(f,thenP) ++ findProblems(f,elseP)
+//        case While(_, doP) => findProblems(f,doP)
+//        case _ => Result(None)
+//      })
 
   def isDur(c:Cond): Boolean = c match {
     case And(c1, c2) => isDur(c1) && isDur(c2)
@@ -46,9 +46,9 @@ object TypeCheck {
     case _ => false
   }
 
-  def validDur(prog: Syntax): Result = findProblems({
-    case DiffEqs(_,Until(cond)) if !isDur(cond) => Result(Some(List(s"invalid duration condition: ${Show(cond)}")))
-    case _ => Result(None)
-  },prog
-  )
+//  def validDur(prog: Syntax): Result = findProblems({
+//    case DiffEqs(_,Until(cond)) if !isDur(cond) => Result(Some(List(s"invalid duration condition: ${Show(cond)}")))
+//    case _ => Result(None)
+//  },prog
+//  )
 }

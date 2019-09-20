@@ -3,7 +3,7 @@ package hprog.frontend
 //import breeze.numerics.{pow, sqrt}
 import hprog.ast
 import hprog.ast._
-import hprog.frontend.Semantics.Point
+import hprog.frontend.CommonTypes.Point
 import optimus.algebra.{Constraint, Expression}
 import optimus.optimization._
 import optimus.optimization.enums.SolverLib
@@ -136,7 +136,7 @@ object Distance {
   // replace < by <= and > by >=
   def closeIneq(i:Ineq): Ineq = i match {
     case GT(l1, l2) => GE(l1,l2)
-    case LT(l1, l2) => LT(l1,l2)
+    case LT(l1, l2) => LE(l1,l2)
     case _ => i
   }
 
@@ -292,16 +292,6 @@ release()
     val small:Point = lin2point(smallPart(ineq))
     val big:Point   = lin2point(bigPart(ineq))
 
-//    println(s"converting ineq $ineq")
-//    println(s"small: $small  --  ${point2Expr(small,vars)}")
-//    println(s"big: $big  --  ${point2Expr(big,vars)}")
-//    println(s"vars: ${vars.map(xy=>xy._1 + "->"+xy._2).mkString(", ")}")
-
-//    val left1 = add(small,neg(big))
-//    val left2 = left1 - ""
-//    val right = -left1.getOrElse("",0.0)
-//
-//    point2Expr(left2,vars) <:= right
     point2Expr(small,vars) <:= point2Expr(big,vars)
   }
 
@@ -318,14 +308,10 @@ release()
     case LE(_, l2) => l2
   }
   def point2Expr(p: Point, vars:Map[String,MPVar]): Expression = {
-    //println(s"x: ${vars.getOrElse("x",888)}")
-    //println(s"y: ${vars.getOrElse("y",888)}")
     val x = p.map(kv => vars.get(kv._1) match {
       case Some(mpvar:MPVar) => mpvar * kv._2
       case None => kv._2:Expression
     } )
-//      vars.getOrElse(kv._1,1.0:Expression) * kv._2)
-//    val x = vars.map(kv => kv._2 * p.getOrElse[Double](kv._1,0.0))
     x.fold(0:Expression)(_+_)
   }
 

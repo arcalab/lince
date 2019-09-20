@@ -1,23 +1,60 @@
 package hprog.frontend
 
+import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprVar}
 import hprog.ast._
+import hprog.frontend.CommonTypes.Valuation
 
 object Utils {
-  def replaceVar(by:String=>String,e:Lin): Lin = e match {
-    case Var(v) => Var(by(v))
-    case Value(v) => e
-    case Add(l1, l2) => Add(replaceVar(by,l1),replaceVar(by,l2))
-    case Mult(v, l) => Mult(v,replaceVar(by,l))
-  }
+
+//  def replaceVar(by:String=>String,e:Lin): Lin = e match {
+//    case Var(v) => Var(by(v))
+//    case Value(v) => e
+//    case Add(l1, l2) => Add(replaceVar(by,l1),replaceVar(by,l2))
+//    case Mult(v, l) => Mult(v,replaceVar(by,l))
+//  }
 
   def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
-    case d@DiffEqs(eqs, _) => List(eqs)
-    case hprog.ast.Seq(p :: ps) =>
-      getDiffEqs(p) ::: getDiffEqs(hprog.ast.Seq(ps))
-    case ITE(_, thenP, elseP) =>
-      getDiffEqs(thenP) ++ getDiffEqs(elseP)
-    case While(c, doP) => getDiffEqs(doP)
-    case _ => Nil // Seq(Nil) and Skip
+    case Atomic(a, DiffEqs(eqs,_)) => List(eqs)
+    case Seq(p, q) => getDiffEqs(p) ::: getDiffEqs(q)
+    case ITE(ifP, thenP, elseP) => getDiffEqs(thenP) ::: getDiffEqs(elseP)
+    case While(pre, d, doP) => getDiffEqs(pre) ::: getDiffEqs(doP)
+  }
+
+//    prog match {
+//    case d@DiffEqs(eqs, _) => List(eqs)
+//    case hprog.ast.Seq(p :: ps) =>
+//      getDiffEqs(p) ::: getDiffEqs(hprog.ast.Seq(ps))
+//    case ITE(_, thenP, elseP) =>
+//      getDiffEqs(thenP) ++ getDiffEqs(elseP)
+//    case While(c, doP) => getDiffEqs(doP)
+//    case _ => Nil // Seq(Nil) and Skip
+//  }
+
+  /**
+    * Collect the free variables, following the "free variable rules" (Lince paper)
+    * @param prog
+    * @return
+    */
+  def getFstFreeVars(prog:Syntax): Set[String] = prog match {
+    case Atomic(as, _) => as.toSet.flatMap((a:Assign)=>getVars(a.e))
+    case Seq(p, _) => getFstFreeVars(p)
+    case ITE(ifP, thenP, elseP) => getVars(ifP) ++ getFstFreeVars(thenP) ++ getFstFreeVars(elseP)
+    case While(pre, d, doP) => getFstFreeVars(pre)
+  }
+
+  def isClosed(prog:Syntax): Either[String,Unit] = {
+    val declVar = getFstDeclVars(prog)
+    val initFreeVars = getFstFreeVars(prog)
+    val usedVars = getUsedVars(prog)
+    if (initFreeVars.nonEmpty)
+      Left(s"Initial declaration has free variables: ${initFreeVars.mkString(", ")}")
+    else if (!usedVars.forall(declVar))
+      Left(s"Variable(s) not declared: ${(usedVars -- declVar).mkString(", ")}")
+    else
+      Right(())
+//    val vars = getDeclVars(prog)
+//    val free = getFreeVars(prog)
+//    free.forall(f => vars contains f)
   }
 
   def getDefVars(eqs: List[DiffEq]): Set[String] =
@@ -25,6 +62,34 @@ object Utils {
 
   def getUsedVars(eqs: List[DiffEq]): Set[String] =
     eqs.flatMap(eq => getVars(eq.e)).toSet
+
+  def getUsedVars(prog:Syntax): Set[String] = prog match {
+    case Atomic(as, de) => as.toSet.flatMap((a:Assign)=>getVars(a.e)+a.v.v) ++ getUsedVars(de)
+    case Seq(p, q) => getUsedVars(p) ++ getUsedVars(q)
+    case ITE(ifP, thenP, elseP) => getVars(ifP) ++ getUsedVars(thenP) ++ getUsedVars(elseP)
+    case While(pre, d, doP) => getUsedVars(pre) ++ getVars(d) ++ getUsedVars(doP)
+  }
+
+  def getUsedVars(eqs: DiffEqs): Set[String] =
+    getUsedVars(eqs.eqs) ++ getUsedVars(eqs.dur)
+
+  def getUsedVars(dur: Dur): Set[String] = dur match {
+    case Until(c) =>getVars(c)
+    case _ => Set()
+  }
+
+  @scala.annotation.tailrec
+  def getFstDeclVars(prog:Syntax): Set[String] = prog match {
+    case Atomic(a, _)     => a.map(_.v.v).toSet
+    case Seq(p, _)        => getFstDeclVars(p)
+    case ITE(_, thenP, _) => getFstDeclVars(thenP)
+    case While(pre, _, _) => getFstDeclVars(pre)
+  }
+
+  def getVars(guard: LoopGuard): Set[String] = guard match {
+    case Counter(_) => Set()
+    case Guard(c) => getVars(c)
+  }
 
   def getVars(lin: Lin): Set[String] = lin match {
     case Var(v) => Set(v)
@@ -38,17 +103,48 @@ object Utils {
     case And(c1,c2) => getVars(c1) ++ getVars(c2)
     case Or(c1,c2)  => getVars(c1) ++ getVars(c2)
     case Not(c)     => getVars(c)
-    case EQ(v,l)    => getVars(l) + v.v
-    case GT(v,l)    => getVars(l) + v.v
-    case LT(v,l)    => getVars(l) + v.v
-    case GE(v,l)    => getVars(l) + v.v
-    case LE(v,l)    => getVars(l) + v.v
+    case EQ(l1,l2)    => getVars(l1) ++ getVars(l2)
+    case GT(l1,l2)    => getVars(l1) ++ getVars(l2)
+    case LT(l1,l2)    => getVars(l1) ++ getVars(l2)
+    case GE(l1,l2)    => getVars(l1) ++ getVars(l2)
+    case LE(l1,l2)    => getVars(l1) ++ getVars(l2)
   }
 
+
+  def toValuation(as:List[Assign],prev:Valuation): Valuation =
+    as.map(kv => kv.v.v -> Eval.lin2sage(kv.e))
+      .toMap
+      .mapValues(e => exprVarToExpr(e,prev))
+
+  def exprVarToExpr(e:SyExprVar,prev:Valuation): SyExpr = e match {
+    case SVal(v) => SVal(v)
+    case SVar(v) => prev(v) //throw new RuntimeException(s"Cannot convert a var ($v) to a SyExpr.")
+    case SFun(f, args:List[SyExprVar]) => SFun(f,args.map(exprVarToExpr(_,prev)))
+    case SDiv(e1, e2) => SDiv( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
+    case SMult(e1, e2)=> SMult(exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
+    case SPow(e1, e2) => SPow( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
+    case SAdd(e1, e2) => SAdd( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
+    case SSub(e1, e2) => SSub( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
+  }
 
   //////
   // inferring open domains...
   //////
+
+  def fixVars(e:SyExprAll): SyExprAll = e match {
+    case SVal(_) => e
+    case SVar(_) => e
+    case SArg() => e
+    case SFun(f, List(SVal(0))) => SVar(f)
+    case SFun(f, args) => SFun(f,args.map(fixVars))
+    case SDiv(e1, e2) => SDiv( fixVars(e1),fixVars(e2))
+    case SMult(e1, e2)=> SMult(fixVars(e1),fixVars(e2))
+    case SPow(e1, e2) => SPow( fixVars(e1),fixVars(e2))
+    case SAdd(e1, e2) => SAdd( fixVars(e1),fixVars(e2))
+    case SSub(e1, e2) => SSub( fixVars(e1),fixVars(e2))
+  }
+
+
 
 //  type Domains = Set[Domain] // possible domains (disjunction)
   type Domain = Map[String,VarDomain] // one domain to a set of variables

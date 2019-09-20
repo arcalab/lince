@@ -1,26 +1,37 @@
 package hprog.backend
 
-import hprog.ast.SageExpr.{Pure, SExpr, SExprFun}
+import hprog.ast.SymbolicExpr.{Pure, SyExpr, SyExprAll}
 import hprog.ast._
 import hprog.frontend.Eval
-import hprog.frontend.Semantics.{SageSolution, Valuation}
+import hprog.frontend.CommonTypes.{SySolution, Valuation}
 
 object Show {
 
+//  def apply(p:Syntax): String = p match {
+//    case a: At    => apply(a)
+////    case Seq(p::Nil) => apply(p)
+//    case Seq(ps) => ps.map(apply).mkString("\n")
+//    case Skip    => "skip"
+//    case ITE(ifP, thenP, elseP) => s"if ${apply(ifP)} then ${apply(thenP)} else ${apply(elseP)} "
+//    case While(Guard(c), doP)   => s"while (${apply(c)}) { ${apply(doP)} }"
+//    case While(Counter(i), doP) => s"while ($i) { ${apply(doP)} }"
+//  }
+
+//  def apply(a:At): String = a match {
+//    case Assign(v, e) => s"${v.v} := ${apply(e)}"
+//    case DiffEqs(eqs, dur) => apply(eqs)+apply(dur)
+//  }
+
   def apply(p:Syntax): String = p match {
-    case a: At    => apply(a)
-//    case Seq(p::Nil) => apply(p)
-    case Seq(ps) => ps.map(apply).mkString("\n")
-    case Skip    => "skip"
-    case ITE(ifP, thenP, elseP) => s"if ${apply(ifP)} then ${apply(thenP)} else ${apply(elseP)} "
-    case While(Guard(c), doP)   => s"while (${apply(c)}) { ${apply(doP)} }"
-    case While(Counter(i), doP) => s"while ($i) { ${apply(doP)} }"
+    case Atomic(as, de) =>
+      List(as.map(a => s"${a.v.v} := ${apply(a.e)}").mkString(", ")
+        , apply(de.eqs)+apply(de.dur)).filter(_.nonEmpty).mkString(", ")
+    case Seq(p, q) => List(apply(p),apply(q)).filter(_.nonEmpty).mkString("; ")
+    case ITE(ifP, thenP, elseP) =>  s"if ${apply(ifP)} then ${apply(thenP)} else ${apply(elseP)} "
+    case While(pre, Guard(c), doP) => apply(pre) + s"while (${apply(c)}) { ${apply(doP)} }"
+    case While(pre, Counter(i), doP) => apply(pre) + s"while ($i) { ${apply(doP)} }"
   }
 
-  def apply(a:At): String = a match {
-    case Assign(v, e) => s"${v.v} := ${apply(e)}"
-    case DiffEqs(eqs, dur) => apply(eqs)+apply(dur)
-  }
 
   def apply(eqs:List[DiffEq]): String =
     eqs.map(apply).mkString(", ")
@@ -30,8 +41,8 @@ object Show {
   }
 
   def apply(dur: Dur): String = dur match {
-    case For(t)  => s" & ${apply(t)}"
-    case Until(c) => s" & ${apply(c)}"
+    case For(t)  => s" FOR ${apply(t)}"
+    case Until(c) => s" UNTIL ${apply(c)}"
     case Forever => ""
   }
 
@@ -53,11 +64,11 @@ object Show {
     case And(e1, e2) => s"${showP(e1,vl)} & ${showP(e2,vl)}"
     case Or(e1, e2)  => s"${showP(e1,vl)} | ${showP(e2,vl)}"
     case Not(e1)     => s"!${showP(e1,vl)}"
-    case EQ(v, l)    => s"${showVar(v,vl,applyP)} == ${apply(l,vl)}"
-    case GT(v, l)    => s"${showVar(v,vl,applyP)} > ${apply(l,vl)}"
-    case LT(v, l)    => s"${showVar(v,vl,applyP)} < ${apply(l,vl)}"
-    case GE(v, l)    => s"${showVar(v,vl,applyP)} >= ${apply(l,vl)}"
-    case LE(v, l)    => s"${showVar(v,vl,applyP)} <= ${apply(l,vl)}"
+    case EQ(l1, l2)    => s"${apply(l1,vl)} == ${apply(l2,vl)}"
+    case GT(l1, l2)    => s"${apply(l1,vl)} >  ${apply(l2,vl)}"
+    case LT(l1, l2)    => s"${apply(l1,vl)} <  ${apply(l2,vl)}"
+    case GE(l1, l2)    => s"${apply(l1,vl)} >= ${apply(l2,vl)}"
+    case LE(l1, l2)    => s"${apply(l1,vl)} <= ${apply(l2,vl)}"
   }
 
   private def showP(exp:Cond, vl:Valuation):String = exp match {
@@ -67,14 +78,14 @@ object Show {
     case _ => s"(${apply(exp,vl)})"
   }
 
-  private def showVar(v: Var, valuation: Valuation,cont:SExpr => String): String = {
+  private def showVar(v: Var, valuation: Valuation,cont:SyExpr => String): String = {
     valuation.get(v.v) match {
       case Some(exp) => cont(Eval.updInput(exp,valuation))
       case None => v.v
     }
   }
 
-  def apply[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
+  def apply[E<:SymbolicExpr.All](expr: SymbolicExpr[E]): String = expr match {
     case SVal(v) => floatToFraction(v) //f"$v%1.8f"
     case _:SArg  => "_t_"
     case s:SVar  => s.v
@@ -85,7 +96,7 @@ object Show {
     case s:SAdd[E]  => s"${applyP[E](s.e1)}+${applyP[E](s.e2)}"
     case s:SSub[E]  => s"${applyP[E](s.e1)}-${applyP[E](s.e2)}"
   }
-  private def applyP[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
+  private def applyP[E<:SymbolicExpr.All](expr: SymbolicExpr[E]): String = expr match {
     case SVal(v) =>
       val res = floatToFraction(v)
       if (res.contains('/')) s"($res)" else res
@@ -94,7 +105,7 @@ object Show {
   }
 
 
-  def pp[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
+  def pp[E<:SymbolicExpr.All](expr: SymbolicExpr[E]): String = expr match {
     case SVal(v) => if (v.round == v) v.toInt.toString else v.toString // f"$v%1.8f"
     case _:SArg  => "t"
     case s:SVar  => s.v
@@ -117,7 +128,7 @@ object Show {
     case s:SAdd[E]  => s"${ppP[E](s.e1)}+${ppP[E](s.e2)}"
     case s:SSub[E]  => s"${ppP[E](s.e1)}-${ppP[E](s.e2)}"
   }
-  private def ppP[E<:SageExpr.All](expr: SageExpr[E]): String = expr match {
+  private def ppP[E<:SymbolicExpr.All](expr: SymbolicExpr[E]): String = expr match {
     case _:SVal | _:SArg | _:SVar | _:SFun[E] |
          SMult(SArg(),SVal(_))  |  SMult(SVal(_),SArg())  |
          SMult(SVar(_),SVal(_))  |  SMult(SVal(_),SVar(_)) |
@@ -126,7 +137,7 @@ object Show {
   }
 
 
-  def apply(sol:SageSolution): String =
+  def apply(sol:SySolution): String =
     sol.map(kv => s"${kv._1}:${apply(kv._2)}").mkString(", ")
 
 

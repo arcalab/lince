@@ -23,24 +23,41 @@ New version - correct one:
  */
 
 sealed abstract class Syntax {
-  def ~(other:Syntax) = (this,other) match {
-    case (Seq(p1), Seq(p2)) => Seq(p1 ::: p2)
-    case (Seq(p1), p2) => Seq(p1 ::: List(p2))
-    case (p1, Seq(p2)) => Seq(p1 :: p2)
-    case (p1, p2) => Seq(List(p1, p2))
+  def ~(other:Syntax): Syntax = other match {
+    case While(pre,d,doP) => While(this~pre,d,doP)
+    case _ => Seq(this,other)
   }
+//  def ~(other:Syntax): Syntax = Seq(this,other)
+//  def ~(other:Syntax) = (this,other) match {
+//    case (Seq(p1), Seq(p2)) => Seq(p1 ::: p2)
+//    case (Seq(p1), p2) => Seq(p1 ::: List(p2))
+//    case (p1, Seq(p2)) => Seq(p1 :: p2)
+//    case (p1, p2) => Seq(List(p1, p2))
+//  }
 }
 // programs
-sealed abstract class At                                        extends Syntax
-case class            Seq(ps:List[Syntax])                      extends Syntax
-case object           Skip                                      extends Syntax
-case class            ITE(ifP:Cond, thenP:Syntax, elseP:Syntax) extends Syntax
-case class            While(d:LoopGuard,doP:Syntax)             extends Syntax
+case class Atomic(as:List[Assign],de:DiffEqs)        extends Syntax {
+  override def ~(p:Syntax): Syntax = (de.dur,p) match {
+    case (_,Seq(p,q)) => Seq(this~p,q)
+    case (_,While(pre, d, doP)) => While(this~pre,d,doP)
+    case (For(Value(0)),Atomic(as2,de)) => Atomic(as++as2,de)
+    case (_,_) => Seq(this,p)
+  }
+//  def ~(a:Assign): Syntax = this ~ Atomic(List(a),DiffEqs(Nil,For(Value(0))))
+//  def ~(de:DiffEq): Syntax = this ~ Atomic(Nil,DiffEqs(List(de),Forever))
+}
+case class Seq(p:Syntax,q:Syntax)                    extends Syntax
+case class ITE(ifP:Cond, thenP:Syntax, elseP:Syntax) extends Syntax
+case class While(pre:Syntax,d:LoopGuard,doP:Syntax)  extends Syntax
+//case object           Skip                                      extends Syntax
 //case class            SPosition(s1:Syntax,s2:Syntax)            extends Syntax
 
 // atoms
-case class Assign(v:Var,e:Lin)               extends At
-case class DiffEqs(eqs:List[DiffEq],dur:Dur) extends At {
+case class Assign(v:Var,e:Lin) {
+//  def ~(p:Syntax): Syntax = Atomic(List(this),DiffEqs(Nil,For(Value(0)))) ~ p
+//  def ~(a:Assign): Syntax = A
+}
+case class DiffEqs(eqs:List[DiffEq],dur:Dur) {
   def &(dur:Dur) = DiffEqs(eqs,dur) // override dur
   def &(diffEq: DiffEq)   = DiffEqs(eqs++List(diffEq),dur) // add eq
   def &(diffEqs: DiffEqs) = DiffEqs(eqs++diffEqs.eqs,diffEqs.dur) // add eqs and override dur
@@ -103,11 +120,16 @@ case class BVal(b:Boolean)      extends Cond
 case class And(c1:Cond,c2:Cond) extends Cond
 case class Or(c1:Cond,c2:Cond)  extends Cond
 case class Not(c:Cond)          extends Cond
-case class EQ(v:Var,l:Lin)      extends Cond
-case class GT(v:Var,l:Lin)      extends Cond
-case class LT(v:Var,l:Lin)      extends Cond
-case class GE(v:Var,l:Lin)      extends Cond
-case class LE(v:Var,l:Lin)      extends Cond
+case class EQ(l1:Lin,l2:Lin)    extends Cond
+case class GT(l1:Lin,l2:Lin)    extends Cond
+case class LT(l1:Lin,l2:Lin)    extends Cond
+case class GE(l1:Lin,l2:Lin)    extends Cond
+case class LE(l1:Lin,l2:Lin)    extends Cond
+//case class EQ(v:Var,l:Lin)      extends Cond
+//case class GT(v:Var,l:Lin)      extends Cond
+//case class LT(v:Var,l:Lin)      extends Cond
+//case class GE(v:Var,l:Lin)      extends Cond
+//case class LE(v:Var,l:Lin)      extends Cond
 
 
 

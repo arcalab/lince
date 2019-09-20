@@ -1,6 +1,8 @@
 package hprog.lang
 
 import hprog.ast._
+import hprog.common.ParserException
+import hprog.frontend.Utils
 
 import scala.util.matching.Regex
 import scala.util.parsing.combinator._
@@ -37,37 +39,48 @@ object Parser extends RegexParsers {
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
+  val skip = Atomic(Nil,DiffEqs(Nil,For(Value(0))))
   //   ///////////////
   //   /// Program ///
   //   ///////////////
 
   lazy val progP: Parser[Syntax] =
-    basicProg ~ opt(";" ~> progP) ^^ {
+    seqP ^^ { stx =>
+      Utils.isClosed(stx) match {
+        case Left(msg) => throw new ParserException(msg)
+        case Right(_) =>
+          // println(s"parsed ${stx}")
+          stx
+      }
+    }
+
+  lazy val seqP: Parser[Syntax] =
+    basicProg ~ opt(";" ~> seqP) ^^ {
       case p1 ~ Some(p2) => p1 ~ p2
       case p ~ None => p
     }
 
   lazy val basicProg: Parser[Syntax] =
-    "skip" ~> opt("&"~>realP) ^^ {
-      case None => Skip
-      case Some(real) => DiffEqs(Nil,For(Value(real)))
+    "skip" ~> opt("for"~>realP) ^^ {
+      case None => skip
+      case Some(real) => Atomic(Nil,DiffEqs(Nil,For(Value(real))))
     } |
-    "while" ~> whileGuard ~ "{" ~ progP ~ "}" ^^ {
-      case c ~ _ ~ p ~ _ => While(c, p)
+    "while" ~> whileGuard ~ "{" ~ seqP ~ "}" ^^ {
+      case c ~ _ ~ p ~ _ => While(skip, c, p)
     } |
-    "repeat" ~> intPP ~ "{" ~ progP ~ "}" ^^ {
-      case c ~ _ ~ p ~ _ => While(Counter(c), p)
+    "repeat" ~> intPP ~ "{" ~ seqP ~ "}" ^^ {
+      case c ~ _ ~ p ~ _ => While(skip, Counter(c), p)
     } |
     "if" ~> condP ~ "then" ~ blockP ~ "else" ~ blockP ^^ {
       case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
     } |
     "wait"~>realP ^^ {
-      time:Double => DiffEqs(Nil,For(Value(time)))
+      time:Double => Atomic(Nil,DiffEqs(Nil,For(Value(time))))
     }|
     atomP
 
   lazy val blockP: Parser[Syntax] =
-    "{"~>progP<~"}" |
+    "{"~>seqP<~"}" |
     basicProg
 
   lazy val whileGuard: Parser[LoopGuard] = {
@@ -75,13 +88,22 @@ object Parser extends RegexParsers {
     intPP ^^ Counter
   }
 
-  lazy val atomP: Parser[At] =
+//  lazy val atomP: Parser[At] =
+//    identifier ~ ":=" ~ linP ^^ {
+//      case v ~ _ ~ l => Assign(Var(v), l)
+//    } |
+//      diffEqsP ~ opt("&" ~> durP) ^^ {
+//        case des ~ d => des & d.getOrElse(Forever)
+//      }
+
+  lazy val atomP: Parser[Atomic] =
     identifier ~ ":=" ~ linP ^^ {
-      case v ~ _ ~ l => Assign(Var(v), l)
+      case v ~ _ ~ l => Atomic(List(Assign(Var(v), l)),DiffEqs(Nil,For(Value(0))))
     } |
-      diffEqsP ~ opt("&" ~> durP) ^^ {
-        case des ~ d => des & d.getOrElse(Forever)
-      }
+    diffEqsP ~ opt(durP) ^^ {
+      case des ~ d => Atomic(Nil,des & d.getOrElse(Forever))
+    }
+
 
   lazy val diffEqsP: Parser[DiffEqs] =
     identifier ~ "'" ~ "=" ~ linP ~ opt("," ~> diffEqsP) ^^ {
@@ -90,8 +112,8 @@ object Parser extends RegexParsers {
     }
 
   lazy val durP: Parser[Dur] =
-    condP ^^ Until |
-    realP ^^ Value.andThen(For)
+    "until" ~> condP ^^ Until |
+    "for" ~> realP ^^ Value.andThen(For)
 //////////
 
   lazy val linP: Parser[Lin] =

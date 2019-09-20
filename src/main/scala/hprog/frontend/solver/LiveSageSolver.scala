@@ -1,10 +1,10 @@
 package hprog.frontend.solver
 
-import hprog.ast.SageExpr.{SExpr, SExprFun}
+import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll}
 import hprog.ast._
 import hprog.backend.Show
 import hprog.common.{ParserException, TimeoutException}
-import hprog.frontend.Semantics.{SageSolution, Valuation}
+import hprog.frontend.CommonTypes.{SySolution, Valuation}
 import hprog.frontend.Utils
 
 import scala.sys.process._
@@ -116,7 +116,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
 
   ///
   def askSage(eqs: List[DiffEq]): Option[String] = {
-    val instructions = LiveSageSolver.genSage(eqs) // + "; print(\"§\")"
+    val instructions = genSage(eqs) // + "; print(\"§\")"
 //    debug(()=>s"instructions to solve: '$instructions'")
     debug(()=>s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
@@ -124,7 +124,28 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     rep
   }
 
-  def askSage[E<:SExprFun](expr: E): Option[String] = {
+  /**
+    * Generate code to be sent to Sage
+    * @param eqs
+    * @return
+    */
+  private def genSage(eqs:List[DiffEq]): String = {
+    var res = "_t_ = var('_t_'); "
+    val undefinedVars = Utils.getUsedVars(eqs) -- Utils.getDefVars(eqs)
+    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(Var(v),Value(0))).toList
+
+    for (e <- eqs2)
+      res += s"${e.v.v} = function('${e.v.v}')(_t_); "
+    for ((e,i) <- eqs2.zipWithIndex)
+      res += s"_de${i}_ = diff(${e.v.v},_t_) == ${Show(e.e)}; "
+    res += s"print(expand(desolve_system([${(for(i<-eqs2.indices)yield s"_de${i}_").mkString(",")}]," +
+      s"[${eqs2.map(_.v.v).mkString(",")}])))"
+    res += ";\"ok\""
+    res
+  }
+
+
+  def askSage[E<:SyExprAll](expr: E): Option[String] = {
     val vars = getVars(expr)
     val instructions = //s"print(\"${Show(expr)}\"); \"ok\""
       vars.map(v=>s"$v = var('$v'); ").mkString +
@@ -136,9 +157,8 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   }
 
   def askSage(c:Cond,vl:Valuation): Option[String] = {
-    val vars = getVars(c)
-    val instructions = //s"print(\"${Show(expr)}\"); \"ok\""
-      //vars.map(v=>s"$v = var('$v'); ").mkString +
+    //val vars = getVars(c)
+    val instructions =
       "x = var('x'); "+
         "solve([" + Show(c,vl) + " , x==1],x) != []; \"ok\""
     debug(()=>s"expression to solve: '$instructions'")
@@ -148,35 +168,35 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
 
   }
 
-  private def getVars(expr: SExprFun): List[String] = expr match {
-    case SVal(v)       => Nil
-    case _:SArg        => Nil
-    case SVar(v)       => List(v)
-    case SFun(f, args) => args.flatMap(getVars) //if (args == List(SVal(0)))
+  private def getVars(expr: SyExprAll): List[String] = expr match {
+    case SVal(_)       => Nil
+    case SArg()        => Nil
+    case s:SVar        => List(s.v)
+    case SFun(_, args) => args.flatMap(getVars) //if (args == List(SVal(0)))
     case SDiv(e1, e2)  => getVars(e1) ++ getVars(e2)
     case SMult(e1, e2) => getVars(e1) ++ getVars(e2)
     case SPow(e1, e2)  => getVars(e1) ++ getVars(e2)
     case SAdd(e1, e2)  => getVars(e1) ++ getVars(e2)
     case SSub(e1, e2)  => getVars(e1) ++ getVars(e2)
   }
-  private def getVars(c: Cond): List[String] = c match {
-    case BVal(b) => Nil
-    case And(c1, c2) => getVars(c1) ++ getVars(c2)
-    case Or(c1, c2)  => getVars(c1) ++ getVars(c2)
-    case Not(c2)     => getVars(c2)
-    case EQ(v, l) => v.v :: getVars(l)
-    case GT(v, l) => v.v :: getVars(l)
-    case LT(v, l) => v.v :: getVars(l)
-    case GE(v, l) => v.v :: getVars(l)
-    case LE(v, l) => v.v :: getVars(l)
-  }
-
-  private def getVars(lin: Lin): List[String] = lin match {
-    case Var(v)      => List(v)
-    case Value(v)    => Nil
-    case Add(l1, l2) => getVars(l1) ++ getVars(l2)
-    case Mult(v, l)  => getVars(l)
-  }
+//  private def getVars(c: Cond): List[String] = c match {
+//    case BVal(b) => Nil
+//    case And(c1, c2) => getVars(c1) ++ getVars(c2)
+//    case Or(c1, c2)  => getVars(c1) ++ getVars(c2)
+//    case Not(c2)     => getVars(c2)
+//    case EQ(l1, l2) => getVars(l1) ++ getVars(l2)
+//    case GT(l1, l2) => getVars(l1) ++ getVars(l2)
+//    case LT(l1, l2) => getVars(l1) ++ getVars(l2)
+//    case GE(l1, l2) => getVars(l1) ++ getVars(l2)
+//    case LE(l1, l2) => getVars(l1) ++ getVars(l2)
+//  }
+//
+//  private def getVars(lin: Lin): List[String] = lin match {
+//    case Var(v)      => List(v)
+//    case Value(v)    => Nil
+//    case Add(l1, l2) => getVars(l1) ++ getVars(l2)
+//    case Mult(v, l)  => getVars(l)
+//  }
 
 
 
@@ -196,7 +216,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       }//SageSolver.callSageSolver(eqs, path)
     }
 
-  override def +=(expr: SExpr): Unit =
+  override def +=(expr: SyExpr): Unit =
     if (!cacheVal.contains(expr)) {
       askSage(expr) match {
         case Some(reply) => importExpr(expr,reply)
@@ -218,58 +238,6 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     }
   }
 
-  //      val instr = SageSolver.genSage(eqs)
-  //      cache += (eqs -> (s"$path/sage -c $instr".!!))
-  //      println(s"- adding ${eqs.map(Show(_)).mkString(",")} -> ${cache(eqs)}")
-
-
-
-  //  /**
-//    * Precompute and cache several system of equations with a single system call to Sage
-//    * @param systems systems of equations to be precomupted
-//    */
-//  override def ++=(systems: List[List[DiffEq]]): Unit = {
-//    val filtered = systems.filterNot(cache.contains)
-//    if (filtered.nonEmpty) {
-//      val reply = SageSolver.callSageSolver(filtered,path)
-//      addToCache(filtered,reply)
-
-//      val instructions = filtered.map(SageSolver.genSage).mkString("; print(\"§\"); ")
-//      val results = s"$path/sage -c $instructions".!!
-//      val parsed = results.split('§')
-//      for ((eqs, res) <- filtered.zip(reply)) {
-//        //println(s"- adding  ${eqs} -> $res")
-//        val resParsed = SageParser.parse(res) match {
-//          case SageParser.Success(SolVars(s,sol), _) if s.isEmpty && sol.keySet == Set("") =>
-//            val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
-//            vars match {
-//              case List(variable) => Map(variable -> sol(""))
-//              case _ => throw new ParserException(s"Failed to parse $res - " +
-//                s"only one variable expected, but found ${vars.mkString(",")}.")
-//            }
-//          case SageParser.Success(result, _) => result.sol
-//          case _: SageParser.NoSuccess => throw new ParserException(s"Failed to parse $res")
-//        }
-//        cache += eqs -> resParsed
-//      }
-//    }
-//  }
-
-
-//  /** Gets a solution of a system of equations, using system calls to Sage,
-//    * checking first in its cache.
-//    * @param eqs System of equations to be retrived
-//    * @return Result from Sage
-//    */
-//  def evalFun(eqs:List[DiffEq]): Solution = {
-//    solveSymb(eqs)
-//      .mapValues(expr => t => x => Eval(expr,t,x))
-//  }
-
-
-//  private def cached: Map[List[DiffEq],SageSolution] = cache - Nil
-
-
 }
 
 
@@ -278,82 +246,6 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
 ///////////////////////////////////////
 object LiveSageSolver {
 
-
-  /**
-    * Experimental: generating code to be sent to Sage
-    * @param eqs
-    * @return
-    */
-  def genSage(eqs:List[DiffEq]): String = {
-    var res = "_t_ = var('_t_'); "
-    val undefinedVars = Utils.getUsedVars(eqs) -- Utils.getDefVars(eqs)
-    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(Var(v),Value(0))).toList
-
-    for (e <- eqs2)
-      res += s"${e.v.v} = function('${e.v.v}')(_t_); "
-    for ((e,i) <- eqs2.zipWithIndex)
-      res += s"_de${i}_ = diff(${e.v.v},_t_) == ${Show(e.e)}; "
-    res += s"print(expand(desolve_system([${(for(i<-eqs2.indices)yield s"_de${i}_").mkString(",")}]," +
-      s"[${eqs2.map(_.v.v).mkString(",")}])))"
-    res += ";\"ok\""
-    res
-  }
-
-
-  // DEPRECATED - when calling all in one go. Now calling one eqs at a time
-  def callSageSolver(systems: List[List[DiffEq]], path: String, timeout:Int = 10): List[String] = {
-    if (systems.filter(_.nonEmpty).nonEmpty) {
-      //println(s"solving Sage with ${systems}")
-      val instructions = systems.map(LiveSageSolver.genSage).mkString("; print(\"§\"); ")
-
-      println(s"instructions to solve: ${instructions}")
-
-      val stdout = new StringBuilder
-      val stderr = new StringBuilder
-      val status = s"timeout $timeout $path/sage -c $instructions" !
-                   ProcessLogger(stdout append _, stderr append _)
-      if (status == 0)
-        stdout.split('§').toList
-      else
-        throw new LiveSageSolver.SolvingException(stderr.toString)
-    }
-    else
-      Nil
-  }
-
-  //// running sage the 2nd time
-  private def genSage(c:Cond): String = c match {
-    case BVal(b) => b.toString
-    case And(c1, c2) => s"(${genSage(c1)} & ${genSage(c2)})"
-    case Or(c1, c2) => s"(${genSage(c1)} | ${genSage(c2)})"
-    case Not(c) =>s"not(${genSage(c)})"
-    case EQ(v, l) => s"(__${v.v} == ${genSage(l)})"
-    case GT(v, l) => s"(__${v.v} >  ${genSage(l)})"
-    case LT(v, l) => s"(__${v.v} <  ${genSage(l)})"
-    case GE(v, l) => s"(__${v.v} >= ${genSage(l)})"
-    case LE(v, l) => s"(__${v.v} <= ${genSage(l)})"
-  }
-  private def genSage(lin: Lin): String = lin match {
-    case Var(v) => v
-    case Value(v) => v.toString
-    case Add(l1, l2) => s"(${genSage(l1)} + ${genSage(l2)}"
-    case Mult(v, l) => s"(${v.v} * ${genSage(l)}"
-  }
-  private def genSage(e: SExprFun): String = e match {
-    case SVal(v) => v.toString
-    case _:SArg => "_t_"
-    case SVar(v) => "__"+v
-    case SFun(f,args) => s"$f(${args.map(genSage).mkString(",")})"
-    case SDiv(e1, e2) => s"(${genSage(e1)} / ${genSage(e2)})"
-    case SMult(e1, e2) =>s"(${genSage(e1)} * ${genSage(e2)})"
-    case SPow(e1, e2) => s"(${genSage(e1)} ^ ${genSage(e2)})"
-    case SAdd(e1, e2) => s"(${genSage(e1)} + ${genSage(e2)})"
-    case SSub(e1, e2) => s"(${genSage(e1)} - ${genSage(e2)})"
-  }
-  private def genSage(sol:SageSolution): String =
-    sol.map(kv => s"__${kv._1} = ${genSage(kv._2)};").mkString
-  def genSage(c:Cond,s:SageSolution): String =
-    s"${genSage(s)} print(${genSage(c)})"
 
 
 
@@ -424,8 +316,65 @@ object LiveSageSolver {
   }
 
 
-
   class SolvingException(s:String) extends RuntimeException(s)
+
+
+  // DEPRECATED - when calling all in one go. Now calling one eqs at a time
+  //  def callSageSolver(systems: List[List[DiffEq]], path: String, timeout:Int = 10): List[String] = {
+  //    if (systems.filter(_.nonEmpty).nonEmpty) {
+  //      //println(s"solving Sage with ${systems}")
+  //      val instructions = systems.map(LiveSageSolver.genSage).mkString("; print(\"§\"); ")
+  //
+  //      println(s"instructions to solve: ${instructions}")
+  //
+  //      val stdout = new StringBuilder
+  //      val stderr = new StringBuilder
+  //      val status = s"timeout $timeout $path/sage -c $instructions" !
+  //                   ProcessLogger(stdout append _, stderr append _)
+  //      if (status == 0)
+  //        stdout.split('§').toList
+  //      else
+  //        throw new LiveSageSolver.SolvingException(stderr.toString)
+  //    }
+  //    else
+  //      Nil
+  //  }
+
+  //// running sage the 2nd time
+  //  private def genSage(c:Cond): String = c match {
+  //    case BVal(b) => b.toString
+  //    case And(c1, c2) => s"(${genSage(c1)} & ${genSage(c2)})"
+  //    case Or(c1, c2) => s"(${genSage(c1)} | ${genSage(c2)})"
+  //    case Not(c) =>s"not(${genSage(c)})"
+  //    case EQ(l1, l2) => s"(__${genSage(l1)} == ${genSage(l2)})"
+  //    case GT(l1, l2) => s"(__${genSage(l1)} >  ${genSage(l2)})"
+  //    case LT(l1, l2) => s"(__${genSage(l1)} <  ${genSage(l2)})"
+  //    case GE(l1, l2) => s"(__${genSage(l1)} >= ${genSage(l2)})"
+  //    case LE(l1, l2) => s"(__${genSage(l1)} <= ${genSage(l2)})"
+  //  }
+  //  private def genSage(lin: Lin): String = lin match {
+  //    case Var(v) => v
+  //    case Value(v) => v.toString
+  //    case Add(l1, l2) => s"(${genSage(l1)} + ${genSage(l2)}"
+  //    case Mult(v, l) => s"(${v.v} * ${genSage(l)}"
+  //  }
+  //  private def genSage(e: SyExprAll): String = e match {
+  //    case SVal(v) => v.toString
+  //    case _:SArg => "_t_"
+  //    case s:SVar => "__"+s.v
+  //    case SFun(f,args) => s"$f(${args.map(genSage).mkString(",")})"
+  //    case SDiv(e1, e2) => s"(${genSage(e1)} / ${genSage(e2)})"
+  //    case SMult(e1, e2) =>s"(${genSage(e1)} * ${genSage(e2)})"
+  //    case SPow(e1, e2) => s"(${genSage(e1)} ^ ${genSage(e2)})"
+  //    case SAdd(e1, e2) => s"(${genSage(e1)} + ${genSage(e2)})"
+  //    case SSub(e1, e2) => s"(${genSage(e1)} - ${genSage(e2)})"
+  //  }
+  //  private def genSage(sol:SySolution): String =
+  //    sol.map(kv => s"__${kv._1} = ${genSage(kv._2)};").mkString
+  //  def genSage(c:Cond,s:SySolution): String =
+  //    s"${genSage(s)} print(${genSage(c)})"
+
+
 }
 
 
