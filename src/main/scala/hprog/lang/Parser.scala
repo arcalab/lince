@@ -208,8 +208,9 @@ object Parser extends RegexParsers {
       case "true" ~ None => BVal(true)
       case "false" ~ None => BVal(false)
       case e ~ Some(co) => co(Var(e))
-    }, {
-      case e ~ None => s"Not a condition: $e"
+    }: PartialFunction[String ~ Option[Var=>Cond],Cond],
+    {
+      case e ~ _ => s"Not a condition: $e"
     })
 
   lazy val bcontP: Parser[Var => Cond] =

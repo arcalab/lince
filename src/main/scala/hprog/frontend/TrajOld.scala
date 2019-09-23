@@ -1,15 +1,18 @@
 package hprog.frontend
 
-import hprog.ast.SymbolicExpr.{SyExpr, SyExprTime}
-import hprog.ast.{SArg, SSub, SVal}
-import hprog.backend.Show
-import hprog.frontend.CommonTypes.{Notes, Point, SySolution, SySolutionTime, Warnings}
-import hprog.frontend.solver.Solver
+class TrajOld
+//import hprog.ast.SymbolicExpr.{SyExpr, SyExprTime}
+//import hprog.ast.{SArg, SSub, SVal}
+//import hprog.backend.Show
+//import hprog.frontend.CommonTypes.{Notes, Point, SySolution, SySolutionTime, Warnings}
+//import hprog.frontend.solver.Solver
+
 
 /**
   *
-  * @tparam X type of the value at a given time - e.g., [[hprog.frontend.CommonTypes.Valuation]].
+//  * @tparam X type of the value at a given time - e.g., [[hprog.frontend.CommonTypes.Valuation]].
   */
+
 //trait Traj[X] {
 //
 //  // duration
