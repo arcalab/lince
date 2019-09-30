@@ -94,6 +94,7 @@ object Show {
     case s:SMult[E] => s"${applyP[E](s.e1)}*${applyP[E](s.e2)}"
     case s:SPow[E]  => s"${applyP[E](s.e1)}^${applyP[E](s.e2)}"
     case s:SAdd[E]  => s"${applyP[E](s.e1)}+${applyP[E](s.e2)}"
+    case SSub(SVal(0),v:SymbolicExpr[E]) => s"-${applyP[E](v)}"
     case s:SSub[E]  => s"${applyP[E](s.e1)}-${applyP[E](s.e2)}"
   }
   private def applyP[E<:SymbolicExpr.All](expr: SymbolicExpr[E]): String = expr match {

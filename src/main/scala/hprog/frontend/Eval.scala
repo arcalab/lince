@@ -107,7 +107,7 @@ object Eval {
   def updInputFun(input:Valuation,phi:SySolution): SySolutionTime =
     phi.mapValues(updInputFun(_,input))
   def solveValues(s:Solver,phi:Valuation): Valuation =
-    phi.mapValues(s.solveSymb)
+    phi.mapValues(s.solveSymbExpr)
 
   def updTime(newt: SyExprVar, expr: SyExprAll): SyExprVar = updTimeFun(newt, expr) match {
     case e: SyExprVar @unchecked => e  // guaranteed to succeed (but type eliminated by erasure)

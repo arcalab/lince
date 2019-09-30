@@ -1,11 +1,11 @@
 package hprog.frontend
 
 import hprog.ast
-import hprog.ast.SymbolicExpr.SyExpr
+import hprog.ast.SymbolicExpr.{SyExpr, SyExprTime}
 import hprog.ast._
 import hprog.backend.Show
-import hprog.frontend.CommonTypes.{Point, Valuation, Warnings}
-import hprog.frontend.Traj.{Bound, Logger, REnd, RFound, RInf, Run, Time, Times}
+import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, Valuation, Warnings}
+import hprog.frontend.Traj.{Bound, Logger, REnd, RFound, RInf, Run, Time, TimeClosure, Times}
 import hprog.frontend.solver.Solver
 
 import scala.collection.mutable
@@ -13,12 +13,12 @@ import scala.collection.mutable
 class Traj(syntax:Syntax, solver:Solver, dev: Deviator) {
 
   def eval(t:Double): Option[Point] =
-    eval(SVal(t)).map(Eval(_))
+    eval(SVal(t)).map(e => Eval(e._1))
 
-  def eval(t:SyExpr): Option[Valuation] = {
+  def eval(t:SyExpr): Option[(Valuation,TimeClosure)] = {
     val logger = new Logger()
     Traj.run(Time(t), syntax, Map())(solver, dev, logger) match {
-      case RFound(x) => Some(x)
+      case RFound(x,tc) => Some(x,tc)
       case RInf =>
         throw new RuntimeException(s"got an infinite run when evaluating ${Show(syntax)} @ ${Show(t)}.")
       case _ =>
@@ -31,7 +31,7 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator) {
     if(times.isEmpty) return Nil
 
     val logger = new Logger()
-    val times2 = times.map(solver.solveSymb)
+    val times2 = times.map(solver.solveSymbExpr)
     //        println("batch: "+times2.mkString(","))
     Traj.run(Times(times2), syntax, Map())(solver, dev, logger) match {
       case REnd(_, _, found) =>
@@ -40,7 +40,7 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator) {
       case Traj.RInf =>
         //            println("Inf")
         Nil
-      case RFound(x) =>
+      case RFound(_,_) =>
         //            println("##"+RFound(x))
         Nil
     }
@@ -74,7 +74,7 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator) {
   private def afterFullRun[A](ret:()=>A): Option[A] = fullRun match {
     case RInf => None
     case REnd(_, _,_) => Some(ret())
-    case RFound(x) =>
+    case RFound(x,_) =>
       throw new RuntimeException(s"stopped a full run of ${
         Show(syntax)} @ ${Show(logger.time)} - ${
         Show(x)}.")
@@ -117,7 +117,9 @@ object Traj {
   case object RInf                                  extends Run
   case class REnd(at: RunTarget, x: Valuation,
                   found:List[(SyExpr,Valuation)])   extends Run
-  case class RFound(x: Valuation)                   extends Run
+  case class RFound(x: Valuation,tc:TimeClosure)    extends Run
+
+  case class TimeClosure(e:SySolution, t:SyExpr)
 
   class Logger() {
     private val inits = mutable.Map[SyExpr, Valuation]()
@@ -127,7 +129,7 @@ object Traj {
     var time: SyExpr = SVal(0)
 
     def +=(t: SyExpr)(implicit solver: Solver): Unit =
-      time = solver.solveSymb(SAdd(time, t))
+      time = solver.solveSymbExpr(SAdd(time, t))
     def init(x: Valuation): Unit =
       inits += time -> x
     def end(x: Valuation): Unit =
@@ -292,16 +294,20 @@ object Traj {
                                (implicit solver:Solver, logger: Logger): Run = {
     val phi = solver.solveSymb(at.de.eqs)
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
+    val realTime = Eval(time)
     // Rule Atom-1 (time < dur)
-    if (Eval(time) < dur) {
+    if (realTime < dur) {
       val x3 = x2 ++ Eval.update(phi, time, x2) // update x with phi
+//      val tc = x2.mapValues(e => Eval.updInputFun(e,phi))
+
+      val tc = Eval.updInputFun(x2,phi).mapValues(solver.solveSymb)
       //if (log) logger += time
-      RFound(x3.mapValues(solver.solveSymb))
+      RFound(x3.mapValues(solver.solveSymbExpr),TimeClosure(tc,time))
     }
     // Rule Atom-2 (time >= dur)
     else {
       val x3 = x2 ++ Eval.update(phi, SVal(dur), x2) // update x with phi
-      val r2 = solver.solveSymb(SSub(time, SVal(dur))) // new simplified time
+      val r2 = solver.solveSymbExpr(SSub(time, SVal(dur))) // new simplified time
       if (log) logger += SVal(dur)
       REnd(Time(r2), x3, Nil)
     }
@@ -319,13 +325,13 @@ object Traj {
 
       case Times(time::rest) =>
         runAtomicWithTime(time, at, dur, x, log = true) match {
-          case RFound(x2) =>
+          case RFound(x2,_) =>
             // time2 is the global time with the element was found.
-            val time2 = solver.solveSymb(SAdd(logger.time, time))
+            val time2 = solver.solveSymbExpr(SAdd(logger.time, time))
             // rest2 updates the next time value to include the time spent to find x2
             val rest2 = rest match {
               case Nil => Nil
-              case hd :: tl => solver.solveSymb(SAdd(hd, time)) :: tl
+              case hd :: tl => solver.solveSymbExpr(SAdd(hd, time)) :: tl
             }
             val res = runAtomicUntilEnd(Times(rest2), at, x)
             val res2 = res ++ List(time2 -> x2)

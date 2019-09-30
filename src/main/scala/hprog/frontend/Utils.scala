@@ -2,6 +2,7 @@ package hprog.frontend
 
 import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprVar}
 import hprog.ast._
+import hprog.backend.Show
 import hprog.frontend.CommonTypes.Valuation
 
 object Utils {
@@ -125,6 +126,13 @@ object Utils {
     case SPow(e1, e2) => SPow( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
     case SAdd(e1, e2) => SAdd( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
     case SSub(e1, e2) => SSub( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
+  }
+
+  def asSyExpr(e:SyExprAll): SyExpr = e match {
+    case e2: SyExpr @ unchecked => e2
+    // bottom case never caught, since erasure will make SyExprAll = SyExpr.
+    // (Runtime error will be different.)
+    case _ => throw new RuntimeException(s"Failed to interpret ${Show(e)} as a simple expression.")
   }
 
   //////

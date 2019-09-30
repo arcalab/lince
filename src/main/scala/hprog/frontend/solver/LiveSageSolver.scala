@@ -206,7 +206,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     * @param eqs
     */
   override def +=(eqs:List[DiffEq]): Unit =
-    if (!cache.contains(eqs)) {
+    if (!cacheDE.contains(eqs)) {
       askSage(eqs) match {
         case Some(reply) => importDiffEqs(List(eqs), List(reply))
         case None =>
@@ -216,7 +216,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       }//SageSolver.callSageSolver(eqs, path)
     }
 
-  override def +=(expr: SyExpr): Unit =
+  override def +=(expr: SyExprAll): Unit =
     if (!cacheVal.contains(expr)) {
       askSage(expr) match {
         case Some(reply) => importExpr(expr,reply)

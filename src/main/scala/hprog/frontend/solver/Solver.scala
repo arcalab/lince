@@ -2,10 +2,11 @@ package hprog.frontend.solver
 
 import breeze.linalg._
 import breeze.numerics._
-import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll}
+import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime}
 import hprog.ast._
 import hprog.backend.Show
 import hprog.frontend.Eval
+import hprog.frontend.Utils.asSyExpr
 import hprog.frontend.CommonTypes.{Point, SFunction, Solution, SySolution, Valuation}
 
 trait Solver {
@@ -20,7 +21,7 @@ trait Solver {
   def evalFun(expr: SyExprAll): SFunction =
     (t:Double) => (v:Point) => Eval(Eval.update(expr,SVal(t),v.mapValues(SVal)))
   def evalVal(expr: SyExpr): Double =
-    Eval(solveSymb(expr))
+    Eval(asSyExpr(solveSymb(expr)))
 
   /** Gets a symbolic solution of a system of equations, using system calls to Sage,
     * checking first in its cache.
@@ -28,10 +29,13 @@ trait Solver {
     * @return Result from Sage as a symbolic expression
     */
   def solveSymb(eqs:List[DiffEq]): SySolution
-  def solveSymb(expr: SyExpr): SyExpr
+  def solveSymb(expr: SyExprAll): SyExprAll
   def solveSymb(cond: Cond, valua: Valuation): Boolean
 
-  def solveSymb(valua:Valuation,sol:Solver): Valuation = valua.mapValues(sol.solveSymb)
+  def solveSymb(valua:Valuation,sol:Solver): Valuation =
+    valua.mapValues(e => asSyExpr(sol.solveSymb(e)))
+  def solveSymbExpr(expr:SyExpr): SyExpr =
+    asSyExpr(solveSymb(expr))
 
 }
 

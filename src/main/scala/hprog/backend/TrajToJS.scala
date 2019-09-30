@@ -1,6 +1,7 @@
 package hprog.backend
 
 import hprog.ast.{SDiv, SSub, SVal}
+import hprog.frontend.CommonTypes.Valuation
 import hprog.frontend.{Eval, Traj}
 
 object TrajToJS {
@@ -243,14 +244,21 @@ object TrajToJS {
 
     (traj.getWarnings,traj.getInits,traj.getEnds) match {
       case (Some(warns),Some(inits),Some(ends)) =>
-        val values = ends ++ inits
+        val values = (ends ++ inits).map(kv => Eval(kv._1) -> kv._2)
         val (x,y,msg) = warns
           .toList
+          // list: timeExpr->warning
           .map(es => (Eval(es._1, 0), "'" + fixStr(es._2) + "'"))
+          // list realTime -> fixedWarning
           .filter(es => inScope(es._1))
+          // list with in-scope realTime
           .sorted
-          .map(es=>(es._1,Eval(values.getOrElse(SVal(es._1),Map())).apply(variable), es._2))
-                        // traj.eval(es._1).get.apply(variable),es._2))
+          // sorted list
+          .map(warn=>(warn._1, Eval(
+            values.getOrElse(warn._1,Map():Valuation) // get Valuation at warning warn
+                  .getOrElse(variable, SVal(0)) // get expression of Variable
+            ), warn._2))
+          // for each rt->warn, find the valuation of "rt", find the variable, and get its value
           .unzip3
 
         s"""var w_$variable = {
