@@ -112,8 +112,16 @@ object Parser extends RegexParsers {
     }
 
   lazy val durP: Parser[Dur] =
-    "until" ~> condP ^^ Until |
+    "until" ~ opt(untilArgs) ~ condP ^^ {
+      case _ ~ None ~ cond => Until(cond,0.01,None)
+      case _ ~ Some(args) ~ cond => Until(cond,args._1,args._2)
+    } |
     "for" ~> realP ^^ Value.andThen(For)
+
+  lazy val untilArgs:Parser[(Double,Option[Double])] =
+    "_"~realP~opt(","~>realP) ^^ {
+      case _~eps~jump => (eps,jump)
+    }
 //////////
 
   lazy val linP: Parser[Lin] =

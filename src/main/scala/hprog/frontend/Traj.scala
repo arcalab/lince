@@ -279,9 +279,9 @@ object Traj {
         RInf
 
       // Numerically estimate duration. Experimental - only works for very specific cases.
-      case Until(c) =>
+      case u:Until =>
         val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
-        val durEstimation = Solver.estimateDur(c, at.de.eqs, x2, solver) match {
+        val durEstimation = Solver.estimateDur(u, at.de.eqs, x2, solver) match {
           case Some(d) => For(Value(d))
           case None => Forever
         }

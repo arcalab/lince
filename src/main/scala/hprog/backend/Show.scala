@@ -1,9 +1,9 @@
 package hprog.backend
 
-import hprog.ast.SymbolicExpr.{Pure, SyExpr, SyExprAll}
+import hprog.ast.SymbolicExpr.{Pure, SyExpr}
 import hprog.ast._
-import hprog.frontend.Eval
 import hprog.frontend.CommonTypes.{SySolution, Valuation}
+import hprog.frontend.Eval
 
 object Show {
 
@@ -24,9 +24,11 @@ object Show {
 
   def apply(p:Syntax): String = p match {
     case Atomic(as, de) =>
-      List(as.map(a => s"${a.v.v} := ${apply(a.e)}").mkString(", ")
-        , apply(de.eqs)+apply(de.dur)).filter(_.nonEmpty).mkString(", ")
-    case Seq(p, q) => List(apply(p),apply(q)).filter(_.nonEmpty).mkString("; ")
+      val assg = (as.map(a => s"${a.v.v}:=${apply(a.e)}"))
+      val eqs = de.eqs.map(apply)
+      (assg++eqs).mkString(", ")+apply(de.dur)
+//        (apply(de.eqs)+apply(de.dur)).filter(_.nonEmpty)).mkString(", ")
+    case Seq(p, q) => List(apply(p),apply(q)).filter(_.nonEmpty).mkString("\n")
     case ITE(ifP, thenP, elseP) =>  s"if ${apply(ifP)} then ${apply(thenP)} else ${apply(elseP)} "
     case While(pre, Guard(c), doP) => apply(pre) + s"while (${apply(c)}) { ${apply(doP)} }"
     case While(pre, Counter(i), doP) => apply(pre) + s"while ($i) { ${apply(doP)} }"
@@ -37,13 +39,15 @@ object Show {
     eqs.map(apply).mkString(", ")
 
   def apply(de: DiffEq): String = de match {
-    case DiffEq(v, e) => s"${v.v}' = ${apply(e)}"
+    case DiffEq(v, e) => s"${v.v}'=${apply(e)}"
   }
 
   def apply(dur: Dur): String = dur match {
-    case For(t)  => s" FOR ${apply(t)}"
-    case Until(c) => s" UNTIL ${apply(c)}"
-    case Forever => ""
+    //case For(Value(0.0)) => ""
+    case For(t)  => s" for ${apply(t)}"
+    case Until(c,e,j) => s" until_$e${
+      if(j.isDefined)","+j.get else ""} ${apply(c)}"
+    case Forever => " forever"
   }
 
   def apply(lin: Lin): String = apply(lin,Map():Valuation)
@@ -64,11 +68,11 @@ object Show {
     case And(e1, e2) => s"${showP(e1,vl)} & ${showP(e2,vl)}"
     case Or(e1, e2)  => s"${showP(e1,vl)} | ${showP(e2,vl)}"
     case Not(e1)     => s"!${showP(e1,vl)}"
-    case EQ(l1, l2)    => s"${apply(l1,vl)} == ${apply(l2,vl)}"
-    case GT(l1, l2)    => s"${apply(l1,vl)} >  ${apply(l2,vl)}"
-    case LT(l1, l2)    => s"${apply(l1,vl)} <  ${apply(l2,vl)}"
-    case GE(l1, l2)    => s"${apply(l1,vl)} >= ${apply(l2,vl)}"
-    case LE(l1, l2)    => s"${apply(l1,vl)} <= ${apply(l2,vl)}"
+    case EQ(l1, l2)    => s"${apply(l1,vl)}==${apply(l2,vl)}"
+    case GT(l1, l2)    => s"${apply(l1,vl)}>${apply(l2,vl)}"
+    case LT(l1, l2)    => s"${apply(l1,vl)}<${apply(l2,vl)}"
+    case GE(l1, l2)    => s"${apply(l1,vl)}>=${apply(l2,vl)}"
+    case LE(l1, l2)    => s"${apply(l1,vl)}<=${apply(l2,vl)}"
   }
 
   private def showP(exp:Cond, vl:Valuation):String = exp match {

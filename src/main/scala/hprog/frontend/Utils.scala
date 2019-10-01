@@ -15,10 +15,10 @@ object Utils {
 //  }
 
   def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
-    case Atomic(a, DiffEqs(eqs,_)) => List(eqs)
+    case Atomic(_, DiffEqs(eqs,_)) => List(eqs)
     case Seq(p, q) => getDiffEqs(p) ::: getDiffEqs(q)
-    case ITE(ifP, thenP, elseP) => getDiffEqs(thenP) ::: getDiffEqs(elseP)
-    case While(pre, d, doP) => getDiffEqs(pre) ::: getDiffEqs(doP)
+    case ITE(_, thenP, elseP) => getDiffEqs(thenP) ::: getDiffEqs(elseP)
+    case While(pre, _, doP) => getDiffEqs(pre) ::: getDiffEqs(doP)
   }
 
 //    prog match {
@@ -33,14 +33,14 @@ object Utils {
 
   /**
     * Collect the free variables, following the "free variable rules" (Lince paper)
-    * @param prog
-    * @return
+    * @param prog where to search for the first free variables
+    * @return the free variables of the first atomic expression
     */
   def getFstFreeVars(prog:Syntax): Set[String] = prog match {
     case Atomic(as, _) => as.toSet.flatMap((a:Assign)=>getVars(a.e))
     case Seq(p, _) => getFstFreeVars(p)
     case ITE(ifP, thenP, elseP) => getVars(ifP) ++ getFstFreeVars(thenP) ++ getFstFreeVars(elseP)
-    case While(pre, d, doP) => getFstFreeVars(pre)
+    case While(pre, _, _) => getFstFreeVars(pre)
   }
 
   def isClosed(prog:Syntax): Either[String,Unit] = {
@@ -75,7 +75,7 @@ object Utils {
     getUsedVars(eqs.eqs) ++ getUsedVars(eqs.dur)
 
   def getUsedVars(dur: Dur): Set[String] = dur match {
-    case Until(c) =>getVars(c)
+    case Until(c,_,_) =>getVars(c)
     case _ => Set()
   }
 
@@ -100,7 +100,7 @@ object Utils {
   }
 
   def getVars(cond: Cond): Set[String] = cond match {
-    case BVal(b)    => Set()
+    case BVal(_)    => Set()
     case And(c1,c2) => getVars(c1) ++ getVars(c2)
     case Or(c1,c2)  => getVars(c1) ++ getVars(c2)
     case Not(c)     => getVars(c)

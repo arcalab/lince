@@ -2,12 +2,11 @@ package hprog.frontend.solver
 
 import breeze.linalg._
 import breeze.numerics._
-import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime}
+import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll}
 import hprog.ast._
-import hprog.backend.Show
+import hprog.frontend.CommonTypes._
 import hprog.frontend.Eval
 import hprog.frontend.Utils.asSyExpr
-import hprog.frontend.CommonTypes.{Point, SFunction, Solution, SySolution, Valuation}
 
 trait Solver {
 
@@ -97,25 +96,27 @@ object Solver {
 
 
 
-  def estimateDur(durCond:Cond,eqs:List[DiffEq],x:Valuation,solver:Solver): Option[Double] = {
+  def estimateDur(until:Until, eqs:List[DiffEq], x:Valuation, solver:Solver): Option[Double] = {
     val sol = solver.evalFun(eqs) // maps variables to their solutions (function from t/ctx to value)
 //    println(s"Estimating duration using point ${Show(x)}.")
-    def guard(c: Cond): Double => Boolean =
+    def guard: Double => Boolean =
       t => {
 //        println(s" - guard ${c} @ $t")
-        Eval(sol.mapValues(fun=>fun(t)(Eval(x))),c)
+        Eval(sol.mapValues(fun=>fun(t)(Eval(x))),until.c)
       }
 //    println(" - going")
-    val durValue = searchCond(durCond,guard) // give value or do jumps searching for duration
+    val durValue = searchCond(until,guard) // give value or do jumps searching for duration
     //debug(()=>s"Solving duration for ${Show(eqs)} & ${Show(diffEqs.dur)} - ${durValue}")
     //debug(()=>s"knowing ${Show(input)}")
 //    println(s" - done $durValue")
     durValue
   }
 
-  def searchCond[X](c:Cond, guard:Cond=>Double=>Boolean): Option[Double] = {
-    if (guard(c)(0)) Some(0.0)
-       else logSearch(1, 0, None, guard(c))
+  def searchCond[X](until:Until, guard:Double=>Boolean): Option[Double] = {
+    if (guard(0)) Some(0.0)
+       else
+        //logSearch(1, 0, None)(guard, precision = until.eps)
+        stepwiseSearch(0,until.jump)(guard,until.eps)
   }
 
 
@@ -231,7 +232,8 @@ object Solver {
       //print(s"t=$t -")
       val at = a.map(_.map(_*t))
 
-      def iter(step:Int,bigA:List[List[Double]],cur:List[List[Double]]): List[List[Double]] ={
+      @scala.annotation.tailrec
+      def iter(step:Int, bigA:List[List[Double]], cur:List[List[Double]]): List[List[Double]] ={
         val nextBigA: List[List[Double]] = mXm(bigA,at)
         val den = fact(step).toDouble
         val next = nextBigA.map(_.map(_/den))
@@ -331,36 +333,72 @@ object Solver {
     * Initially it grows exponentially until it finds a "true",
     * once it does, searches for the initial value up to some precision.
     * Assumes that, once the guard it true, it will always be true.
-    * @param prevStepSize
-    * @param curX
-    * @param guard
-    * @param precision
-    * @return
+ *
+    * @param jump The distance backwards when the guard was false.
+    * @param curX Current value being evaluated
+    * @param guard The function that checks if the value holds
+    * @param precision The maximum error
+    * @return The earliest value at which the guard is true, if it exists before "max"
     */
-  def logSearch(prevStepSize:Double, curX: Double, last:Option[Double],
-                guard: Double => Boolean,
+  @scala.annotation.tailrec
+  def logSearch(jump:Double, curX: Double, last:Option[Double])
+               (implicit guard: Double => Boolean,
                 precision: Double = 0.0000001, max: Int = 1000000) : Option[Double] = {
-//    println(s"${if (expanding) "EXPANDING" else "DIVING "} at $curX with step $prevStepSize")
+    //println(s"[SS-log] $curX by $jump (last: $last)")
     if (max<curX)  return None
 
     last match {
-      // no value found yet
+      // no value found yet - growing search
       case None =>
-        if (guard(curX))
-          logSearch(prevStepSize/8,curX - prevStepSize/4,Some(curX),guard,precision,max)
-        else
-          logSearch(prevStepSize*2,curX + prevStepSize  ,None      ,guard,precision,max)
+        if (guard(curX)) // FOUND!
+          logSearch(jump/8,curX - jump/4,Some(curX))
+        else // need to jump
+          logSearch(jump*2,curX + jump  ,None)
 
       // growing steps until guard succeeds
-      case Some(value) =>
-        if (prevStepSize > precision) { // shrinking steps until having the right precision
+      case Some(_) =>
+        if (jump*2 > precision) { // shrinking steps until having the right precision
           if (guard(curX))
-            logSearch(prevStepSize/2,curX - prevStepSize,Some(curX),guard,precision,max)
+            logSearch(jump/2,curX - jump,Some(curX))
           else
-            logSearch(prevStepSize/2,curX + prevStepSize,last      ,guard,precision,max)
+            logSearch(jump/2,curX + jump,last)
         }
-        else last
-        // TODO: control precision and errors
+        else {
+          //println(s"[SS-log] got $last (precision: ${jump*2})")
+          last
+        }
     }
+  }
+
+  @scala.annotation.tailrec
+  def stepwiseSearch(curX: Double, jump:Option[Double])
+                    (implicit guard: Double => Boolean,
+                     step:Double,
+                     max:Int = 10000000): Option[Double] = {
+    //println(s"[SS-jump] $curX by $jump")
+    jump match {
+      case None => stepwiseBasicSearch(curX)(guard,step,max)
+      case Some(delta) =>
+        if (max<curX)
+          None
+        else if (guard(curX)) // overshoot - now go slowly
+          logSearch(delta/4,curX-(delta/2),Some(curX))(guard,step,max)
+        else
+          stepwiseSearch(curX+delta,jump)
+    }
+  }
+
+  @scala.annotation.tailrec
+  def stepwiseBasicSearch(curX: Double)
+                         (implicit guard: Double => Boolean,
+                     step:Double,
+                     max:Int = 10000000): Option[Double] = {
+    //println(s"[SS-basic] $curX by $step")
+    if (max<curX)
+      None
+    else if (guard(curX))
+      Some(curX)
+    else
+      stepwiseBasicSearch(curX+step)
   }
 }

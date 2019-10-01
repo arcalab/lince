@@ -20,10 +20,10 @@ object DSL {
   implicit def int2Lin(n:Int): Value = Value(n)
   implicit def real2Dur(n:Double): Dur = For(Value(n))
   implicit def int2Dur(n:Int): Dur = For(Value(n))
-  implicit def cond2Dur(c:Cond): Dur = Until(c)
+  implicit def cond2Dur(c:Cond): Dur = Until(c,0.01,None)
   implicit def dEq2dEqs(de:DiffEq): DiffEqs= DiffEqs(List(de),Forever)
   implicit def assg2Atom(a:Assign): Atomic = Atomic(List(a),DiffEqs(Nil,For(Value(0))))
-  implicit def dEqs2Atom(des:DiffEqs) = Atomic(Nil,des)
+  implicit def dEqs2Atom(des:DiffEqs): Atomic = Atomic(Nil,des)
 
 
   val x:Var="x"; val y:Var="y"; val p:Var="p"; val v:Var="v"; val g:Var="g"
@@ -33,8 +33,8 @@ object DSL {
   val ex2 = (y^=3) & 34     // statement
   val ex3 = (x^=2) & (y^=3) // statement
   //val ex4 = (x^=2) ~ (y^=3) // program
-  val ex5 = (x:=0) ~ ((x^=2) & (y^=3) & 34) ~ ((x^=2) & (x > 2)) // program
-  val ex6 = (x^=1) & ((x > 3*x) && (x<5))
+  val ex5 = (y:=0) ~ (x:=0) ~ ((x^=2) & (y^=3) & 34) ~ ((x^=2) & (x > 2)) // program
+  val ex6 = (x:=0) ~ ((x^=1) & ((x > 3*x) && (x<5)))
   val ex7 = ((p^=v) & (v^=g) & ((p<=0) && (v<=0))) ~ (v := (-0.5)*v) // bouncing ball
   val ex8 = (x^=1) & (((x > 3*x) && (x<5)) || (y>=3))
   val ex9 = (x^=1) & ((x > 3*x) && ((x<5) || (y>=3)))
