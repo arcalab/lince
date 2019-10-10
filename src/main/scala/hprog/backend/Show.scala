@@ -3,7 +3,8 @@ package hprog.backend
 import hprog.ast.SymbolicExpr.{Pure, SyExpr}
 import hprog.ast._
 import hprog.frontend.CommonTypes.{SySolution, Valuation}
-import hprog.frontend.Eval
+import hprog.frontend.{Eval, Traj}
+import hprog.frontend.Traj.RunTarget
 
 object Show {
 
@@ -160,6 +161,11 @@ object Show {
   }
 
 
+  def apply(r:RunTarget): String = r match {
+    case Traj.Time(t) => apply(t)
+    case Traj.Times(ts) => ts.map(apply[SymbolicExpr.All]).mkString(", ")
+    case Traj.Bound(n) => s"forever ($n loop iterations)"
+  }
 
   //  def apply(p:Progr): String = p match {
 //    case Seq(ps) => ps.map(apply).mkString(" ; ")

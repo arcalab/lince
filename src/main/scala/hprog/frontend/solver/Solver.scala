@@ -31,8 +31,8 @@ trait Solver {
   def solveSymb(expr: SyExprAll): SyExprAll
   def solveSymb(cond: Cond, valua: Valuation): Boolean
 
-  def solveSymb(valua:Valuation,sol:Solver): Valuation =
-    valua.mapValues(e => asSyExpr(sol.solveSymb(e)))
+  def solveSymb(valua:Valuation): Valuation =
+    valua.mapValues(e => asSyExpr(solveSymb(e)))
   def solveSymbExpr(expr:SyExpr): SyExpr =
     asSyExpr(solveSymb(expr))
 

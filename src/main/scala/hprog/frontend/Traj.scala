@@ -21,6 +21,14 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator) {
       case RFound(x,tc) => Some(x,tc)
       case RInf =>
         throw new RuntimeException(s"got an infinite run when evaluating ${Show(syntax)} @ ${Show(t)}.")
+      case REnd(at, x, found) =>
+        at match {
+          case Time(t) if Eval(t)==0 =>
+            val x2 = solver.solveSymb(x)
+            Some(x2,TimeClosure(Map(),SVal(0)))
+          case _ =>
+            throw new RuntimeException(s"Reached the end of trajectory at ${Show(at)} when searching for ${Show(t)}.")
+        }
       case _ =>
         None
     }
@@ -349,7 +357,7 @@ object Traj {
                                  (implicit solver: Solver, logger: Logger): Run = {
     val phi = solver.solveSymb(at.de.eqs)
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
-    val x3 = x2++ solver.solveSymb(Eval.update(phi, SVal(dur), x2),solver) // update x with phi
+    val x3 = x2++ solver.solveSymb(Eval.update(phi, SVal(dur), x2)) // update x with phi
     logger.init(x2)
     logger += SVal(dur)
     logger.end(x3)
