@@ -36,6 +36,8 @@ object Eval {
   def apply(e:SyExprAll, t: Double, x: Valuation): Double = e match {
     case SVal(v) => v
     case _:SArg => t
+    case s:SVar if !x.contains(s.v) =>
+      throw new RuntimeException(s"Evaluating $e but ${s.v} not found in ${Show(x)}.")
     case s:SVar => apply(x(s.v),t,x)
 //    case SVar(v) => apply(x(v),t,x) // not really used - usually v(0) denotes this case
                                            // could create an infinte loop if recursive (not anymore with SExpr)

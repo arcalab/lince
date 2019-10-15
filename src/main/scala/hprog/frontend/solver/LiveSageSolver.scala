@@ -159,8 +159,9 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   def askSage(c:Cond,vl:Valuation): Option[String] = {
     //val vars = getVars(c)
     val instructions =
-      "x = var('x'); "+
-        "solve([" + Show(c,vl) + " , x==1],x) != []; \"ok\""
+      "bool(" + Show(c,vl) + "); \"ok\""
+//      "x = var('x'); "+
+//        "solve([" + Show(c,vl) + " , x==1],x) != []; \"ok\""
     debug(()=>s"expression to solve: '$instructions'")
     val rep = askSage(instructions)
     debug(()=>s"reply: '$rep'")
