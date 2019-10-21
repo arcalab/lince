@@ -12,7 +12,10 @@ It is developed as one of the sub-modules of ReoLive (https://github.com/ReoLang
 
 Local installation of Lince
 ==============
-* Install [SageMath](http://www.sagemath.org/) on your computer.
+* Requirements:
+    - SageMath (http://www.sagemath.org/)
+    - SBT (https://www.scala-sbt.org)
+    - Java runtime
 
 * Clone the [ReoLive repository](https://github.com/ReoLanguage/ReoLive) (Lince is one of its submodules)
 
