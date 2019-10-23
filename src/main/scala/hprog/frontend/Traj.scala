@@ -125,6 +125,7 @@ object Traj {
   sealed abstract class Run {
     def ++(found:List[(SyExpr,Valuation)]): Run = this match {
       case REnd(at, x, found2) =>  REnd(at,x,found2:::found)
+      case RFoundMany(found2) => RFoundMany(found2:::found)
       case run => run
     }
   }

@@ -151,6 +151,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       vars.map(v=>s"$v = var('$v'); ").mkString +
       "print(" + Show(expr) + "); \"ok\""
     debug(()=>s"expression to solve: '$instructions'")
+//    println(s"expression to solve: '$instructions'")
     val rep = askSage(instructions)
     debug(()=>s"reply: '$rep'")
     rep
