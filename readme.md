@@ -19,20 +19,28 @@ Local installation of Lince
 
 * Clone the [ReoLive repository](https://github.com/ReoLanguage/ReoLive) (Lince is one of its submodules)
 
-> git clone git@github.com:ReoLanguage/ReoLive.git
-> cd ReoLive
+```
+git clone git@github.com:ReoLanguage/ReoLive.git
+cd ReoLive
+```
 
 * Pull the git submodules (which will include Lince):
 
-> git submodule update --init
+```
+git submodule update --init
+```
 
 * Use your favourite editor to edit the path to SageMath executables in:
 
-> global.properties
+```
+global.properties
+```
 
 * Run the compilation script:
 
-> ./compile.sh
+```
+./compile.sh
+```
 
 * During development you can recompile faster using `sbt fastOptJS`.
 
@@ -42,11 +50,12 @@ How to run the framework
 
 * Start the server using `sbt`
 
-> sbt server/run
- 
+```
+sbt server/run
+``` 
+
 *  Open `localhost:9000` in a browser
 
-> open http://localhost:9000#lince
-
-
-
+```
+open http://localhost:9000#lince
+```
