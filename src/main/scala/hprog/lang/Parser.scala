@@ -65,8 +65,8 @@ object Parser extends RegexParsers {
       case None => skip
       case Some(real) => Atomic(Nil,DiffEqs(Nil,For(Value(real))))
     } |
-    "while" ~> whileGuard ~ "{" ~ seqP ~ "}" ^^ {
-      case c ~ _ ~ p ~ _ => While(skip, c, p)
+    "while" ~> whileGuard ~ "do" ~ "{" ~ seqP ~ "}" ^^ {
+      case c ~ _ ~ _ ~ p ~ _ => While(skip, c, p)
     } |
     "repeat" ~> intPP ~ "{" ~ seqP ~ "}" ^^ {
       case c ~ _ ~ p ~ _ => While(skip, Counter(c), p)
@@ -74,8 +74,8 @@ object Parser extends RegexParsers {
     "if" ~> condP ~ "then" ~ blockP ~ "else" ~ blockP ^^ {
       case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
     } |
-    "wait"~>realP ^^ {
-      time:Double => Atomic(Nil,DiffEqs(Nil,For(Value(time))))
+    "wait"~>linP ^^ {
+      time => Atomic(Nil,DiffEqs(Nil,For(time)))
     }|
     atomP
 
@@ -116,7 +116,8 @@ object Parser extends RegexParsers {
       case _ ~ None ~ cond => Until(cond,0.01,None)
       case _ ~ Some(args) ~ cond => Until(cond,args._1,args._2)
     } |
-    "for" ~> realP ^^ Value.andThen(For)
+    "for" ~> linP ^^ For
+             //realP ^^ Value.andThen(For)
 
   lazy val untilArgs:Parser[(Double,Option[Double])] =
     "_"~realP~opt(","~>realP) ^^ {

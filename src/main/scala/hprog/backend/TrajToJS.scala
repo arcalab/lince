@@ -56,8 +56,9 @@ object TrajToJS {
     def inScope(t:Double): Boolean = t>=start && t<=end
 
     println(s"> starting run 2 ($nbrSamples samples)")
+//    println(s"> "+samples.mkString(","))
 
-    val sampleValues = traj.evalBatch(samples)
+    val sampleValues = traj.evalBatch(SVal(start),SVal(end), SDiv(SSub(SVal(end),SVal(start)),SVal(nbrSamples))) //(samples)
 
     println("> run 2 completed - got samples")
 

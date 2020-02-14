@@ -58,9 +58,9 @@ case class Assign(v:Var,e:Lin) {
 //  def ~(a:Assign): Syntax = A
 }
 case class DiffEqs(eqs:List[DiffEq],dur:Dur) {
-  def &(dur:Dur) = DiffEqs(eqs,dur) // override dur
-  def &(diffEq: DiffEq)   = DiffEqs(eqs++List(diffEq),dur) // add eq
-  def &(diffEqs: DiffEqs) = DiffEqs(eqs++diffEqs.eqs,diffEqs.dur) // add eqs and override dur
+  def &(dur:Dur): DiffEqs = DiffEqs(eqs,dur) // override dur
+  def &(diffEq: DiffEq): DiffEqs = DiffEqs(eqs++List(diffEq),dur) // add eq
+  def &(diffEqs: DiffEqs): DiffEqs = DiffEqs(eqs++diffEqs.eqs,diffEqs.dur) // add eqs and override dur
 }
 
 // DiffEq
@@ -68,7 +68,7 @@ case class DiffEq(v:Var,e:Lin)
 
 // duration
 sealed abstract class Dur
-case class  For(t:Value)  extends Dur
+case class  For(e:Lin)  extends Dur
 case class  Until(c:Cond, eps:Double, jump:Option[Double]) extends Dur
 case object Forever       extends Dur
 
@@ -79,7 +79,7 @@ case class Guard(c:Cond)  extends LoopGuard
 
 // linear expression
 sealed abstract class Lin {
-  def +(other:Lin) = Add(this,other)
+  def +(other:Lin): Lin = Add(this,other)
 }
 case class Var(v:String)       extends Lin {
   def :=(l: Lin): Assign = Assign(this,l)

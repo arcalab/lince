@@ -15,18 +15,25 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   protected val lockRcv = new Object
   protected val lockSnd = new Object
   protected var last: Option[String] = None
+  debug(()=>s" - Sage process: creating (last=$last)")
   protected val proc = LiveSageSolver.createSageProcess(path,addUpdate)
 
   // wait for process to be created (and first output out)
-  lockRcv.synchronized{
-    //print("(rcv) waiting")
-    if (last==None) // if I'm the first, then wait
-      lockRcv.wait(20000)
-    //debug(()=>" - done(r)")
+  var count = 10
+  while (last!=Some("sage: started") && count>0) { // if not started yet, then wait
+    lockRcv.synchronized{
+      debug(()=>s"Initial run: waiting to start (last=$last, count=$count)")
+      lockRcv.wait(2000)
+      count -= 1
+    }
+    lockSnd.synchronized {
+      lockSnd.notify() // in case it is waiting to send more stuff.
+    }
   }
+  debug(()=>s" - Sage process: should be created (count=$count)")
   // allow sender to continue after startup msg
   lockSnd.synchronized{
-    //print("(rcv) unlocking sender")
+    debug(()=>"unlocking sender")
     last = None
     lockSnd.notify()
     //debug(()=>" - done(r)")
@@ -316,6 +323,7 @@ object LiveSageSolver {
 
     // Artificially add waiting time for Sage to be ready to receive its first input.
     Thread.sleep(2000)
+    put("print('started')")
 
     // return: how to make requests, how to ask to end (with and without waiting for confirmation)
     (s=>put(s),()=>finished(),()=>finished2())

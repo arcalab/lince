@@ -25,7 +25,7 @@ object Show {
 
   def apply(p:Syntax): String = p match {
     case Atomic(as, de) =>
-      val assg = (as.map(a => s"${a.v.v}:=${apply(a.e)}"))
+      val assg = as.map(a => s"${a.v.v}:=${apply(a.e)}")
       val eqs = de.eqs.map(apply)
       (assg++eqs).mkString(", ")+apply(de.dur)
 //        (apply(de.eqs)+apply(de.dur)).filter(_.nonEmpty)).mkString(", ")
@@ -163,8 +163,8 @@ object Show {
 
   def apply(r:RunTarget): String = r match {
     case Traj.Time(t) => apply(t)
-    case Traj.Times(ts) => ts.map(apply[SymbolicExpr.All]).mkString(", ")
-    case Traj.Bound(n) => s"forever ($n loop iterations)"
+    case Traj.Times(from,to,step) => s"${from.toString}:${step.toString}:${to.toString}" //ts.map(apply[SymbolicExpr.All]).mkString(", ")
+    case Traj.Bound(n,timer) => s"forever ($n loop iterations, max $timer time)"
   }
 
   //  def apply(p:Progr): String = p match {
