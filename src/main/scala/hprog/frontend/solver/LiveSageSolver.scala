@@ -23,17 +23,18 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   while (last!=Some("sage: started") && count>0) { // if not started yet, then wait
     lockRcv.synchronized{
       debug(()=>s"Initial run: waiting to start (last=$last, count=$count)")
-      lockRcv.wait(2000)
+      lockRcv.wait(1000)
       count -= 1
     }
     lockSnd.synchronized {
+      //last=None
       lockSnd.notify() // in case it is waiting to send more stuff.
     }
   }
   debug(()=>s" - Sage process: should be created (count=$count)")
   // allow sender to continue after startup msg
   lockSnd.synchronized{
-    debug(()=>"unlocking (sage)")
+    debug(()=>"(lince) unlocking (sage)")
     last = None
     lockSnd.notify()
     //debug(()=>" - done(r)")
