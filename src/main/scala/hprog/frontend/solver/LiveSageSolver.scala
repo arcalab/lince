@@ -49,9 +49,10 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       //    lockRcv.synchronized(lockRcv.notifyAll())
     }
     lockSnd.synchronized{
-      //print(s"(sender) waiting for permission")
+      debug(()=>"(sender) waiting up to 20s for (rcv) to ack my reply")
       if (last!=None) // if I'm the first, then wait
         lockSnd.wait(20000)
+      debug(()=>"(sender) done")
       //debug(()=>s" - done(s)")
     }
     //debug(()=>s"(sender) continuing")
@@ -63,9 +64,10 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     last = None
     var r = proc._2() // will trigger outputs
     lockRcv.synchronized{
-      //print("(rcv) waiting")
+      debug(()=>"(rcv) waiting up to 5s for last msg before closing")
       if (last==None)
         lockRcv.wait(5000)
+      debug(()=>"(rcv) done")
       //debug(()=>" - done(r)")
     }
     // allow sender to continue after startup msg
@@ -78,7 +80,14 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     r
   }
 
-  def closeWithoutWait(): Unit = proc._3()
+  def closeWithoutWait(): Unit = {
+    proc._3()
+    lockSnd.synchronized{
+      last = None
+      lockSnd.notify()
+    }
+
+  }
 
   def askSage(s:String): Option[String] = {
     last = None // clear last answer
@@ -92,8 +101,10 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     while (!ok) {
     // wait for the notification (new value returned)
       lockRcv.synchronized{
+        debug(()=>"(rcv) waiting up to 10s for reply")
         if (last == None) // I'm the first - wait
           lockRcv.wait(10000)
+        debug(()=>"(rcv) done")
         //debug(()=>s"> '${last}'")
       }
       last match {
@@ -102,6 +113,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
           last = Some(prev)
           ok = true
           lockSnd.synchronized{
+            debug(()=>"(rcv) notifying (sender)")
             last = None
             lockSnd.notify()
           }
@@ -109,6 +121,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
           //debug(()=>s"adding $v to prev")
           prev = v.drop(6)
           lockSnd.synchronized{
+            debug(()=>"(rcv) notifying (sender)")
             last = None
             lockSnd.notify()
           }
