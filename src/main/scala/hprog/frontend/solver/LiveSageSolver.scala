@@ -29,6 +29,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     lockSnd.synchronized {
       //last=None
       lockSnd.notify() // in case it is waiting to send more stuff.
+      lockSnd.notify() // in case it is waiting to send more stuff.
     }
   }
   debug(()=>s" - Sage process: should be created (count=$count)")
