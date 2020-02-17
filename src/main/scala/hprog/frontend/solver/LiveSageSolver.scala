@@ -335,7 +335,7 @@ object LiveSageSolver {
     }
 
     // Artificially add waiting time for Sage to be ready to receive its first input.
-    Thread.sleep(2000)
+    //Thread.sleep(2000)
     put("print('started')")
 
     // return: how to make requests, how to ask to end (with and without waiting for confirmation)
