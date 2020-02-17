@@ -33,7 +33,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   debug(()=>s" - Sage process: should be created (count=$count)")
   // allow sender to continue after startup msg
   lockSnd.synchronized{
-    debug(()=>"unlocking sender")
+    debug(()=>"unlocking (sage)")
     last = None
     lockSnd.notify()
     //debug(()=>" - done(r)")
@@ -42,17 +42,17 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   def addUpdate(s:String): Unit = {
     //    last = Some(s)
     lockRcv.synchronized{
-      debug(()=>s"(sender) sage reply: '$s'")
+      debug(()=>s"(sage) sage reply: '$s'")
       last = Some(s)
       lockRcv.notify()
       //debug(()=>" - done(s)")
       //    lockRcv.synchronized(lockRcv.notifyAll())
     }
     lockSnd.synchronized{
-      debug(()=>"(sender) waiting up to 20s for (rcv) to ack my reply")
+      debug(()=>"(sage) waiting up to 20s for (lince) to ack my reply")
       if (last!=None) // if I'm the first, then wait
         lockSnd.wait(20000)
-      debug(()=>"(sender) done")
+      debug(()=>"(sage) done")
       //debug(()=>s" - done(s)")
     }
     //debug(()=>s"(sender) continuing")
@@ -64,10 +64,10 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     last = None
     var r = proc._2() // will trigger outputs
     lockRcv.synchronized{
-      debug(()=>"(rcv) waiting up to 5s for last msg before closing")
+      debug(()=>"(lince) waiting up to 5s for last msg before closing")
       if (last==None)
         lockRcv.wait(5000)
-      debug(()=>"(rcv) done")
+      debug(()=>"(lince) done")
       //debug(()=>" - done(r)")
     }
     // allow sender to continue after startup msg
@@ -101,10 +101,10 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     while (!ok) {
     // wait for the notification (new value returned)
       lockRcv.synchronized{
-        debug(()=>"(rcv) waiting up to 10s for reply")
+        debug(()=>"(lince) waiting up to 10s for reply")
         if (last == None) // I'm the first - wait
           lockRcv.wait(10000)
-        debug(()=>"(rcv) done")
+        debug(()=>"(lince) done")
         //debug(()=>s"> '${last}'")
       }
       last match {
@@ -113,7 +113,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
           last = Some(prev)
           ok = true
           lockSnd.synchronized{
-            debug(()=>"(rcv) notifying (sender)")
+            debug(()=>"(lince) notifying (sender)")
             last = None
             lockSnd.notify()
           }
@@ -121,7 +121,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
           //debug(()=>s"adding $v to prev")
           prev = v.drop(6)
           lockSnd.synchronized{
-            debug(()=>"(rcv) notifying (sender)")
+            debug(()=>"(lince) notifying (sender)")
             last = None
             lockSnd.notify()
           }
@@ -285,6 +285,7 @@ object LiveSageSolver {
       // (which we write via an OutputStream)
       in => {
         writer = new java.io.PrintWriter(in)
+        writer.println("print('started')")
         //debug(()=>"in stream created")
         // later do writer.println(..); writer.flush; writer.close()
       },
@@ -336,7 +337,8 @@ object LiveSageSolver {
 
     // Artificially add waiting time for Sage to be ready to receive its first input.
     //Thread.sleep(2000)
-    put("print('started')")
+    //put("print('started')")
+    writer.flush()
 
     // return: how to make requests, how to ask to end (with and without waiting for confirmation)
     (s=>put(s),()=>finished(),()=>finished2())
