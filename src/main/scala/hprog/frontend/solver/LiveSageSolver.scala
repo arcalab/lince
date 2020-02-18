@@ -9,7 +9,12 @@ import hprog.frontend.Utils
 
 import scala.sys.process._
 
-
+/**
+  * Runs a Sage process in the background and interacts with it
+  * to solve expressions symbolically.
+  *
+  * @param path Folder where the 'sage' binary can be found.
+  */
 class LiveSageSolver(path:String) extends StaticSageSolver {
 
   protected val lockRcv = new Object

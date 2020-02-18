@@ -1,3 +1,6 @@
 target
 project/build.properties
 project/target
+project/metals.sbt
+.bloop
+.metals

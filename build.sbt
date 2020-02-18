@@ -2,7 +2,7 @@ name := "Hybrid Programming"
 
 version := "1.0"
 
-scalaVersion := "2.12.4" // 2.11.8  2.12.4
+scalaVersion := "2.12.10" // 2.11.8  2.12.4
 
 // resolver for scala tests.
 resolvers += "Artima Maven Repository" at "http://repo.artima.com/releases"
