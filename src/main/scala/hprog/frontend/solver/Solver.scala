@@ -2,11 +2,14 @@ package hprog.frontend.solver
 
 import breeze.linalg._
 import breeze.numerics._
-import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll}
+import hprog.ast.SymbolicExpr.{Pure, SyExpr, SyExprAll}
 import hprog.ast._
+import hprog.backend.Show
 import hprog.frontend.CommonTypes._
 import hprog.frontend.Eval
 import hprog.frontend.Utils.asSyExpr
+
+import scala.collection.immutable
 
 trait Solver {
 
@@ -96,27 +99,28 @@ object Solver {
 
 
 
-  def estimateDur(until:Until, eqs:List[DiffEq], x:Valuation, solver:Solver): Option[Double] = {
+  def estimateDur(until:Until, eqs:List[DiffEq], x:Valuation, solver:Solver): Option[(Double,Option[Double=>String])] = {
     val sol = solver.evalFun(eqs) // maps variables to their solutions (function from t/ctx to value)
 //    println(s"Estimating duration using point ${Show(x)}.")
     def guard: Double => Boolean =
       t => {
 //        println(s" - guard ${c} @ $t")
+//        solver.solveSymb(until.c,x)
         Eval(sol.mapValues(fun=>fun(t)(Eval(x))),until.c)
       }
 //    println(" - going")
-    val durValue = searchCond(until,guard) // give value or do jumps searching for duration
+    val durValue = searchCond(until,guard,solver) // give value or do jumps searching for duration
     //debug(()=>s"Solving duration for ${Show(eqs)} & ${Show(diffEqs.dur)} - ${durValue}")
     //debug(()=>s"knowing ${Show(input)}")
 //    println(s" - done $durValue")
     durValue
   }
 
-  def searchCond[X](until:Until, guard:Double=>Boolean): Option[Double] = {
-    if (guard(0)) Some(0.0)
+  def searchCond[X](until:Until, guard:Double=>Boolean,solver:Solver): Option[(Double,Option[Double=>String])] = {
+    if (guard(0.0)) Some((0.0,None))
        else
         //logSearch(1, 0, None)(guard, precision = until.eps)
-        stepwiseSearch(0,until.jump)(guard,until.eps)
+        stepwiseSearch(0,until.jump,until.eps,guard,until.c,solver)
   }
 
 
@@ -216,14 +220,14 @@ object Solver {
     def mPlusm(m1: Matrix, m2: Matrix): Matrix = {
       (m1 zip m2).map(x => x._1.zip(x._2).map(y=>y._1+y._2))
     }
-    def dotProd(v1:Row,v2:Row) =
+    def dotProd(v1:Row,v2:Row): Double =
       v1.zip(v2).
         map { t: (Double, Double) => t._1 * t._2 }.sum
     def transpose(m:Matrix):Matrix =
       if(m.head.isEmpty) Nil
       else m.map(_.head) :: transpose(m.map(_.tail))
 
-    def mXm( m1:Matrix, m2:Matrix ) =
+    def mXm( m1:Matrix, m2:Matrix ): List[List[Double]] =
       for( m1row <- m1 ) yield
         for( m2col <- transpose(m2) ) yield
           dotProd( m1row, m2col )
@@ -333,35 +337,35 @@ object Solver {
     * Initially it grows exponentially until it finds a "true",
     * once it does, searches for the initial value up to some precision.
     * Assumes that, once the guard it true, it will always be true.
- *
+    *
     * @param jump The distance backwards when the guard was false.
     * @param curX Current value being evaluated
     * @param guard The function that checks if the value holds
     * @param precision The maximum error
-    * @return The earliest value at which the guard is true, if it exists before "max"
+    * @return The earliest value at which the guard is true, if it exists before "max", and the largest value traversed
     */
   @scala.annotation.tailrec
-  def logSearch(jump:Double, curX: Double, last:Option[Double])
-               (implicit guard: Double => Boolean,
-                precision: Double = 0.0000001, max: Int = 1000000) : Option[Double] = {
+  def logSearchRec(jump:Double, curX: Double, last:Option[(Double,Double)])
+                  (implicit guard: Double => Boolean,
+                   precision: Double = 0.00000001, max: Int = 1000000) : Option[(Double,Double)] = {
     //println(s"[SS-log] $curX by $jump (last: $last)")
     if (max<curX)  return None
 
     last match {
       // no value found yet - growing search
       case None =>
-        if (guard(curX)) // FOUND!
-          logSearch(jump/8,curX - jump/4,Some(curX))
-        else // need to jump
-          logSearch(jump*2,curX + jump  ,None)
+        if (guard(curX)) // FOUND! define last, start shrinking
+        logSearchRec(jump/8,curX - jump/4, Some((curX,curX)))
+        else // need to jump more
+        logSearchRec(jump*2,curX + jump  ,None)
 
       // growing steps until guard succeeds
-      case Some(_) =>
+      case Some((v1,v2)) =>
         if (jump*2 > precision) { // shrinking steps until having the right precision
           if (guard(curX))
-            logSearch(jump/2,curX - jump,Some(curX))
+            logSearchRec(jump/2,curX - jump, Some(curX,v2))
           else
-            logSearch(jump/2,curX + jump,last)
+            logSearchRec(jump/2,curX + jump,last)
         }
         else {
           //println(s"[SS-log] got $last (precision: ${jump*2})")
@@ -370,35 +374,194 @@ object Solver {
     }
   }
 
-  @scala.annotation.tailrec
-  def stepwiseSearch(curX: Double, jump:Option[Double])
-                    (implicit guard: Double => Boolean,
-                     step:Double,
-                     max:Int = 10000000): Option[Double] = {
+  /**
+    * Searches for the earliest time `t` a predicate `guard(t)` holds by jumping and trying
+    * @param curX next time value to try
+    * @param bigStep   if None: smallStep is the naive step
+    *                  if Some(step): just forward step until guard(t), then logSearch with precision smallStep
+    * @param smallStep if None: ignore bigstep, and do log search up and down with fixed precision
+    *                  if Some(step): use step as jump forward of precision, based on bigStep.
+    * @param guard predicate parameterised by the time
+    * @return
+    */
+  def stepwiseSearch(curX:      Double,
+                     bigStep:   Option[Double],
+                     smallStep: Option[Double],
+                     guard:     Double => Boolean,
+                     guardCond: Cond,
+                     solver:    Solver): Option[(Double,Option[Double=>String])] = {
     //println(s"[SS-jump] $curX by $jump")
-    jump match {
-      case None => stepwiseBasicSearch(curX)(guard,step,max)
-      case Some(delta) =>
-        if (max<curX)
-          None
-        else if (guard(curX)) // overshoot - now go slowly
-          logSearch(delta/4,curX-(delta/2),Some(curX))(guard,step,max)
-        else
-          stepwiseSearch(curX+delta,jump)
+    (bigStep,smallStep) match {
+      case (_,None)                  =>
+        logSearch(1,curX,curX,None,guard,guardCond,100000000)
+      case (None,Some(step))         =>
+        stepwiseSearchSmallSteps(SVal(curX))(guard,SVal(step),100000000,solver).map((_,None))
+      case (Some(bstep),Some(sstep)) =>
+        stepwiseSearchBigSteps(SVal(curX))((SVal(bstep),sstep),guard,guardCond,100000000,solver)
     }
   }
 
   @scala.annotation.tailrec
-  def stepwiseBasicSearch(curX: Double)
-                         (implicit guard: Double => Boolean,
-                     step:Double,
-                     max:Int = 10000000): Option[Double] = {
-    //println(s"[SS-basic] $curX by $step")
-    if (max<curX)
+  private def stepwiseSearchBigSteps(curX: SyExpr)
+                                    (implicit bigSmallStep:(SyExpr,Double),
+                                     guard: Double=>Boolean, guardCond:Cond,
+                                     max:Double,
+                                     solver:Solver): Option[(Double,Option[Double=>String])] = {
+    val now = Eval(curX)
+    if (max<now)
       None
-    else if (guard(curX))
-      Some(curX)
+    else if (guard(now)) // overshoot - now go slowly
+    logSearch(
+      Eval(bigSmallStep._1)/4,
+      now - Eval(bigSmallStep._1)/2,
+      now - Eval(bigSmallStep._1),
+      Some(now),
+      guard,guardCond,max.toInt,bigSmallStep._2)
     else
-      stepwiseBasicSearch(curX+step)
+    stepwiseSearchBigSteps(solver.solveSymbExpr(asSyExpr(curX +bigSmallStep._1)))
   }
-}
+
+  @scala.annotation.tailrec
+  private def stepwiseSearchSmallSteps(curX: SyExpr)
+                                      (implicit guard: Double => Boolean,
+                                       step:SyExpr,
+                                       max:Int,
+                                       solver:Solver): Option[Double] = {
+    //println(s"[SS-basic] $curX by $step")
+    val now = Eval(curX)
+    if      (max<now)     None
+    else if (guard(now))  Some(now)
+    else                  stepwiseSearchSmallSteps(solver.solveSymbExpr(asSyExpr(curX+step)))
+  }
+
+  def logSearch(jump:Double, curX: Double, first:Double, last:Option[Double], guard: Double=>Boolean,
+                guardCond: Cond,
+                max: Int,
+                precision: Double = 0.00000001) : Option[(Double,Option[Double=>String])] = {
+    val res = logSearchRec(jump,curX,last.map(x=>(x,x)))(guard,precision,max)
+    res.map(res => (res._1 , Some( t =>
+      //        s"found logsearch at ${res._1} starting from ${first} until ${res._2}, curX=$curX"
+      s"Assuming ${Show(guardCond)} becomes true only once.</br>" +
+        s"Interval: ${t-(res._1-first)} -> ${t+(res._2-res._1)}</br>" +
+        s"Precision: $precision"
+    )))
+  }
+
+
+  /////////////////////////////////////////////////
+//
+//  /**
+//    * Searches for the earliest value at which a given guard becomes true.
+//    * Initially it grows exponentially until it finds a "true",
+//    * once it does, searches for the initial value up to some precision.
+//    * Assumes that, once the guard it true, it will always be true.
+//    *
+//    * @param jump The distance backwards when the guard was false.
+//    * @param curX Current value being evaluated
+//    * @param guard The function that checks if the value holds
+//    * @param precision The maximum error
+//    * @return The earliest value at which the guard is true, if it exists before "max", and the largest value traversed
+//    */
+//  @scala.annotation.tailrec
+//  def logSearchRec(jump:Double, curX: Double, last:Option[(SyExpr,SyExpr)])
+//                  (implicit guard: SyExpr => Boolean,
+//                   precision: Double = 0.00000001, max: Int = 1000000) : Option[(SyExpr,SyExpr)] = {
+//    //println(s"[SS-log] $curX by $jump (last: $last)")
+//    if (max<curX)  return None
+//
+//    last match {
+//      // no value found yet - growing search
+//      case None =>
+//        if (guard(SVal(curX))) // FOUND! define last, start shrinking
+//        logSearchRec(jump/8,curX - jump/4, Some((SVal(curX),SVal(curX))))
+//        else // need to jump more
+//        logSearchRec(jump*2,curX + jump  ,None)
+//
+//      // growing steps until guard succeeds
+//      case Some((v1,v2)) =>
+//        if (jump*2 > precision) { // shrinking steps until having the right precision
+//          if (guard(SVal(curX)))
+//            logSearchRec(jump/2,curX - jump, Some(SVal(curX),v2))
+//          else
+//            logSearchRec(jump/2,curX + jump,last)
+//        }
+//        else {
+//          //println(s"[SS-log] got $last (precision: ${jump*2})")
+//          last
+//        }
+//    }
+//  }
+//
+//  /**
+//    * Searches for the earliest time `t` a predicate `guard(t)` holds by jumping and trying
+//    * @param curX next time value to try
+//    * @param bigStep   if None: smallStep is the naive step
+//    *                  if Some(step): just forward step until guard(t), then logSearch with precision smallStep
+//    * @param smallStep if None: ignore bigstep, and do log search up and down with fixed precision
+//    *                  if Some(step): use step as jump forward of precision, based on bigStep.
+//    * @param guard predicate parameterised by the time
+//    * @return
+//    */
+//  def stepwiseSearch(curX:      SyExpr,
+//                     bigStep:   Option[Double],
+//                     smallStep: Option[Double],
+//                     guard:     SyExpr => Boolean,
+//                     guardCond: Cond,
+//                     solver:    Solver): Option[(SyExpr,Option[Double=>String])] = {
+//    //println(s"[SS-jump] $curX by $jump")
+//    (bigStep,smallStep) match {
+//      case (_,None)                  =>
+//        logSearch(1,Eval(curX),curX,None,guard,guardCond,100000000)
+//      case (None,Some(step))         =>
+//        stepwiseSearchSmallSteps(curX)(guard,step,(Eval(curX)+1000000*step).toInt,solver).map((_,None))
+//      case (Some(bstep),Some(sstep)) =>
+//        stepwiseSearchBigSteps(curX)((bstep,sstep),guard,guardCond,Eval(curX)+1000000*bstep,solver)
+//    }
+//  }
+//
+//  @scala.annotation.tailrec
+//  private def stepwiseSearchBigSteps(curX: SyExpr)
+//                                    (implicit bigSmallStep:(Double,Double),
+//                                     guard: SyExpr=>Boolean, guardCond:Cond,
+//                                     max:Double,
+//                                     solver:Solver): Option[(SyExpr,Option[Double=>String])] = {
+//    if (max<Eval(curX))
+//      None
+//    else if (guard(curX)) // overshoot - now go slowly
+//    logSearch(
+//      bigSmallStep._1/4,
+//      Eval(curX) - bigSmallStep._1/2,
+//      solver.solveSymbExpr(SSub[Pure](curX,SVal(bigSmallStep._1))),
+//      Some(curX),
+//      guard,guardCond,max.toInt,bigSmallStep._2)
+//    else
+//    stepwiseSearchBigSteps(solver.solveSymbExpr(SAdd[Pure](curX , SVal(bigSmallStep._1))))
+//  }
+//
+//  @scala.annotation.tailrec
+//  private def stepwiseSearchSmallSteps(curX: SyExpr)
+//                                      (implicit guard: SyExpr => Boolean,
+//                                       step:Double,
+//                                       max:Int,
+//                                       solver:Solver): Option[SyExpr] = {
+//    //println(s"[SS-basic] $curX by $step")
+//    if      (max<Eval(curX))     None
+//    else if (guard(curX))  Some(curX)
+//    else                   stepwiseSearchSmallSteps(solver.solveSymbExpr(SAdd[Pure](curX,SVal(step))))
+//  }
+//
+//  def logSearch(jump:Double, curX: Double, first:SyExpr, last:Option[SyExpr], guard: SyExpr=>Boolean,
+//                guardCond: Cond,
+//                max: Int,
+//                precision: Double = 0.00000001) : Option[(SyExpr,Option[Double=>String])] = {
+//    val res = logSearchRec(jump,curX,last.map(x=>(x,x)))(guard,precision,max)
+//    res.map(res => (res._1 , Some( t =>
+//      //        s"found logsearch at ${res._1} starting from ${first} until ${res._2}, curX=$curX"
+//      s"Assuming ${Show(guardCond)} becomes true only once</br>" +
+//        s"Interval: ${t-(Eval(res._1)-Eval(first))} -> ${t+(Eval(res._2)-Eval(res._1))}" +
+//        s"Precision: $precision</br>"
+//      //      s"on $curX-${res._2}"
+//    )))
+//  }
+
+  }

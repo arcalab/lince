@@ -69,7 +69,7 @@ case class DiffEq(v:Var,e:Lin)
 // duration
 sealed abstract class Dur
 case class  For(e:Lin)  extends Dur
-case class  Until(c:Cond, eps:Double, jump:Option[Double]) extends Dur
+case class  Until(c:Cond, eps:Option[Double], jump:Option[Double]) extends Dur
 case object Forever       extends Dur
 
 // loopguard

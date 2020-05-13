@@ -16,8 +16,8 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
   def eval(t:Double): Option[Point] =
     eval(SVal(t)).map(e => Eval(e._1))
 
-  def eval(t:SyExpr): Option[(Valuation,TimeClosure)] = {
-    val logger = new Logger()
+  def eval(t:SyExpr,logger: Logger = new Logger()): Option[(Valuation,TimeClosure)] = {
+//    val logger = new Logger()
     Traj.run(Time(t), syntax, Map())(solver, dev, logger) match {
       case RFound(x,tc) => Some(x,tc)
       case RInf =>
@@ -159,9 +159,9 @@ object Traj {
   case class TimeClosure(e:SySolution, t:SyExpr)
 
   class Logger() {
-    private val inits = mutable.Map[SyExpr, Valuation]()
-    private val ends = mutable.Map[SyExpr, Valuation]()
-    private val notes = mutable.Set[(SyExpr, String)]()
+    private val inits    = mutable.Map[SyExpr, Valuation]()
+    private val ends     = mutable.Map[SyExpr, Valuation]()
+    private val notes    = mutable.Set[(SyExpr, String)]()
     private val warnings = mutable.Set[(SyExpr, String)]()
     var time: SyExpr = SVal(0)
 
@@ -173,6 +173,11 @@ object Traj {
       ends += time -> x
     def note(s: String): Unit = notes += time -> s
     def warn(s: String): Unit = warnings += time -> s
+    def warn(ts: Double=>String,delta:SyExpr): Unit = {
+      val t = Utils.asSyExpr(time+delta)
+      warnings += t -> ts(Eval(time)+Eval(delta))
+    }
+
     def addWarnings(ws:Warnings): Unit = warnings ++= ws
     def getInits: Map[SyExpr, Valuation] = inits.toMap
     def getEnds: Map[SyExpr, Valuation] = ends.toMap
@@ -317,7 +322,9 @@ object Traj {
       case u:Until =>
         val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
         val durEstimation = Solver.estimateDur(u, at.de.eqs, x2, solver) match {
-          case Some(d) => For(Value(d))
+          case Some((d,ws)) =>
+            for (w<-ws) logger.warn(w,SVal(d))
+            For(Value(d))
           case None => Forever
         }
         runAtomicUntilEnd(rb, Atomic(at.as, DiffEqs(at.de.eqs, durEstimation)), x)

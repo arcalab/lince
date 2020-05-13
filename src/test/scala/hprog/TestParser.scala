@@ -17,7 +17,7 @@ class TestParser extends FlatSpec {
   testOk("y'=3 for 34",ex2)
   testOk("x'=2, y'=3",ex3)
   //testOk("x'=2 ; y'=3",ex4)
-  testOk("y:=0; x:=0; x'=2, y ' =3 for 34 ; x' = 2 until_0.01 x > 2",ex5)
+  testOk("y:=0; x:=0; x'=2, y ' =3 for 34 ; x' = 2 until x > 2",ex5)
   //testOk("x=2, y=3 & 34 ; x=2 & x > 2",ex5)
   testOk("x:=0; x'=1 until x > (3 * x) /\\ x < 5",ex6)
   testKO("p' = v; v' = g until_0.01 p <= 0 /\\ v <= 0;\nv := -0.5 * v")

@@ -20,7 +20,7 @@ object DSL {
   implicit def int2Lin(n:Int): Value = Value(n)
   implicit def real2Dur(n:Double): Dur = For(Value(n))
   implicit def int2Dur(n:Int): Dur = For(Value(n))
-  implicit def cond2Dur(c:Cond): Dur = Until(c,0.01,None)
+  implicit def cond2Dur(c:Cond): Dur = Until(c,None,None)
   implicit def dEq2dEqs(de:DiffEq): DiffEqs= DiffEqs(List(de),Forever)
   implicit def assg2Atom(a:Assign): Atomic = Atomic(List(a),DiffEqs(Nil,For(Value(0))))
   implicit def dEqs2Atom(des:DiffEqs): Atomic = Atomic(Nil,des)
