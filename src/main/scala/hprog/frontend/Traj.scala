@@ -303,7 +303,7 @@ object Traj {
         rb match {
           // Rule 1+2
           case Time(time) =>
-            runAtomicWithTime(time,at,d,x)
+            runAtomicWithTime(time,at,d,x,true) // set log=false if warnings are not important
 
           // variation of atomic-time rules
           case times:Times =>
