@@ -127,6 +127,7 @@ object Show {
 //    case SMult(e1@SAdd(_,_),e2)=> s"${ppP[E](e1)}*${ppP[E](e2)}"
     case SAdd(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}+${ppP[E](e2)}"
 //    case SSub(e1@SAdd(_,_),e2)=> s"${ppP[E](e1)}-${ppP[E](e2)}"
+    case SSub(SVal(0),e)=> s"-${ppP[E](e)}"
     case s:SFun[E]  => s"${s.f}(${s.args.map(pp[E]).mkString(",")})"
     case s:SDiv[E]  => s"${ppP[E](s.e1)}/${ppP[E](s.e2)}"
     case s:SMult[E] => s"${ppP[E](s.e1)}*${ppP[E](s.e2)}"
@@ -145,6 +146,9 @@ object Show {
 
   def apply(sol:SySolution): String =
     sol.map(kv => s"${kv._1}:${apply(kv._2)}").mkString(", ")
+
+  def pp(sol:SySolution): String =
+    sol.map(kv => s"${kv._1}:${pp(kv._2)}").mkString(", ")
 
 
   def floatToFraction(v: Double): String = {
