@@ -94,7 +94,7 @@ class StaticSageSolver extends Solver {
     */
   def +=(cond: Cond, valua: Valuation): Unit = {
     if (!cacheBool.contains(cond, valua) && !cacheStrBool.contains(Show(cond, valua))) {
-      val est = Eval(valua.mapValues(Eval(_, 0)), cond)
+      val est = Eval(valua.view.mapValues(Eval(_, 0)).toMap, cond)
 //      println(s"static solver failed for '${Show(cond,valua)}'. " +
 //      s"Know only ${cacheStrBool.keys.map("'"+_+"'").mkString(", ")}. " +
 //      s"Using estimation $est instead.")
@@ -232,7 +232,7 @@ class StaticSageSolver extends Solver {
           }
         // if more than one variable exists, all is good
         case SageParser.Success(result, _) =>
-          result.mapValues(Utils.fixVars)
+          result.view.mapValues(Utils.fixVars).toMap
         case _: SageParser.NoSuccess => throw new ParserException(s"Failed to parse '$sageReply'.")
       }
       (resParsed,sageReply)

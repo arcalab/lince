@@ -72,7 +72,7 @@ object Eval {
   def apply(e:SyExprVar, x:Valuation): Double = apply(e,0,x)
   def apply(e:SyExpr): Double = apply(e,0,Map())
 
-  def apply(v: Valuation): Point = v.mapValues(apply)
+  def apply(v: Valuation): Point = v.view.mapValues(apply).toMap
 
   def update(e:SyExprAll, t:SyExpr, v:Valuation): SyExpr =
     updInput(Eval.updTime(t,e),v)
@@ -106,13 +106,13 @@ object Eval {
   }
 
   def updTime(t:SyExpr, phi:SySolution): SySolutionVar =
-    phi.mapValues(updTime(t,_))
+    phi.view.mapValues(updTime(t,_)).toMap
   def updInput(input:Valuation,phi:SySolutionVar): Valuation =
-    phi.mapValues(updInput(_,input))
+    phi.view.mapValues(updInput(_,input)).toMap
   def updInputFun(input:Valuation,phi:SySolution): SySolutionTime =
-    phi.mapValues(updInputFun(_,input))
+    phi.view.mapValues(updInputFun(_,input)).toMap
   def solveValues(s:Solver,phi:Valuation): Valuation =
-    phi.mapValues(s.solveSymbExpr)
+    phi.view.mapValues(s.solveSymbExpr).toMap
 
   def updTime(newt: SyExprVar, expr: SyExprAll): SyExprVar = updTimeFun(newt, expr) match {
     case e: SyExprVar @unchecked => e  // guaranteed to succeed (but type eliminated by erasure)

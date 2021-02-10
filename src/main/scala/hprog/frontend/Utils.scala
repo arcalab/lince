@@ -115,7 +115,7 @@ object Utils {
   def toValuation(as:List[Assign],prev:Valuation): Valuation =
     as.map(kv => kv.v.v -> Eval.lin2sage(kv.e))
       .toMap
-      .mapValues(e => exprVarToExpr(e,prev))
+      .view.mapValues(e => exprVarToExpr(e,prev)).toMap
 
   def exprVarToExpr(e:SyExprVar,prev:Valuation): SyExpr = e match {
     case SVal(v) => SVal(v)
