@@ -349,9 +349,9 @@ object Traj {
       val x3 = x2 ++ Eval.update(phi, time, x2) // update x with phi
 //      val tc = x2.mapValues(e => Eval.updInputFun(e,phi))
 
-      val tc = Eval.updInputFun(x2,phi).mapValues(solver.solveSymb)
+      val tc = Eval.updInputFun(x2,phi).view.mapValues(solver.solveSymb).toMap
       //if (log) logger += time
-      RFound(x3.mapValues(solver.solveSymbExpr),TimeClosure(tc,time))
+      RFound(x3.view.mapValues(solver.solveSymbExpr).toMap,TimeClosure(tc,time))
     }
     // Rule Atom-2 (time >= dur)
     else {

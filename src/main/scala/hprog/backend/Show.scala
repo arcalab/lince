@@ -154,7 +154,7 @@ object Show {
   def floatToFraction(v: Double): String = {
     var den: BigInt = 1
     var num: BigDecimal = v
-    while (num.toBigIntExact().isEmpty) { // && num < BigDecimal.apply("100000000000000000000000")) {
+    while (num.toBigIntExact.isEmpty) { // && num < BigDecimal.apply("100000000000000000000000")) {
       num *= 10
       den *= 10
       //println(s"   - $num/$den")

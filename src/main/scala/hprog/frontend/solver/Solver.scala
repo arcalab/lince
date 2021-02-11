@@ -19,9 +19,9 @@ trait Solver {
     * @return Result from Sage as a function
     */
   def evalFun(eqs:List[DiffEq]): Solution =
-    solveSymb(eqs).mapValues(evalFun)
+    solveSymb(eqs).view.mapValues(evalFun).toMap
   def evalFun(expr: SyExprAll): SFunction =
-    (t:Double) => (v:Point) => Eval(Eval.update(expr,SVal(t),v.mapValues(SVal)))
+    (t:Double) => (v:Point) => Eval(Eval.update(expr,SVal(t),v.view.mapValues(SVal).toMap))
   def evalVal(expr: SyExpr): Double =
     Eval(asSyExpr(solveSymb(expr)))
 
@@ -35,7 +35,7 @@ trait Solver {
   def solveSymb(cond: Cond, valua: Valuation): Boolean
 
   def solveSymb(valua:Valuation): Valuation =
-    valua.mapValues(e => asSyExpr(solveSymb(e)))
+    valua.view.mapValues(e => asSyExpr(solveSymb(e))).toMap
   def solveSymbExpr(expr:SyExpr): SyExpr =
     asSyExpr(solveSymb(expr))
 
@@ -78,7 +78,7 @@ object Solver {
     case Var(v) => Map(v->1)
     case Value(v) => Map(("_"+base)->v)
     case Add(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
-    case Mult(v, l) => getRowValues(l,base).mapValues(_*v.v)
+    case Mult(v, l) => getRowValues(l,base).view.mapValues(_*v.v).toMap
   }
   //  private def multt(d:Double,d2:Double): Double = d*d2
   private def join(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
@@ -106,7 +106,7 @@ object Solver {
       t => {
 //        println(s" - guard ${c} @ $t")
 //        solver.solveSymb(until.c,x)
-        Eval(sol.mapValues(fun=>fun(t)(Eval(x))),until.c)
+        Eval(sol.view.mapValues(fun=>fun(t)(Eval(x))).toMap,until.c)
       }
 //    println(" - going")
     val durValue = searchCond(until,guard,solver) // give value or do jumps searching for duration

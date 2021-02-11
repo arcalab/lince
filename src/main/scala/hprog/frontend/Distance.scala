@@ -162,18 +162,18 @@ object Distance {
     case Var(v) => Map(v->1.0)
     case Value(v) => Map("" -> v)
     case Add(l1, l2) => add(lin2point(l1),lin2point(l2))
-    case Mult(v, l) => lin2point(l).mapValues(_ * v.v)
+    case Mult(v, l) => lin2point(l).view.mapValues(_ * v.v).toMap
   }
   def add(p1:Point,p2:Point): Point =
     p1 ++ (for ((x,v) <- p2) yield x -> (p1.getOrElse(x,0.0)+v))
 
   def neg(p1:Point): Point =
-    p1.mapValues(_*(-1))
+    p1.view.mapValues(_*(-1)).toMap
 
   // v*d / |v|^2
   def closestToOrigin(plane:Point,d:Double): Point = {
     val norm = plane.values.map(math.pow(_,2)).sum
-    plane.mapValues(x => x*d/norm)
+    plane.view.mapValues(x => x*d/norm).toMap
   }
 
   def left(ineq: Ineq): Lin = ineq match {
@@ -194,7 +194,7 @@ object Distance {
 
   // need to shift based on `max` because variables will only get positive values
   def quadraticProgrm(p: Point, ineqs: Set[Ineq], max:Double): Option[Point] = {
-    val delta = p.mapValues(x => if (x<max) max-x else 0)
+    val delta = p.view.mapValues(x => if (x<max) max-x else 0).toMap
     //println(s"before: ${ineqs.mkString(", ")}")
     //println(s"delta: ${delta.map(kv=>kv._1+"->"+kv._2).mkString(", ")}")
     val shiftedP = add(p,delta)

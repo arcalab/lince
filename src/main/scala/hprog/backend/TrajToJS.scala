@@ -101,7 +101,7 @@ object TrajToJS {
     for (n <- traj.getNotes ; (expr,note) <- n) {
       val t = Eval(expr)
       if (inScope(t))
-        boundaries = boundaries.mapValues(vals => addNote(t,note,vals))
+        boundaries = boundaries.view.mapValues(vals => addNote(t,note,vals)).toMap
     }
     def addNote(t: Double, n: String, vals: BoundaryVar): BoundaryVar = {
       vals.get(Right(t)) match {
@@ -115,7 +115,7 @@ object TrajToJS {
 
     // clean boundaries in continuous points
     if (hideCont) {
-      boundaries = boundaries.mapValues(filterCont)
+      boundaries = boundaries.view.mapValues(filterCont).toMap
     }
 
     /////
