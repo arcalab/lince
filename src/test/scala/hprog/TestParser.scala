@@ -1,6 +1,6 @@
 package hprog
 
-import org.scalatest.FlatSpec
+import org.scalatest.flatspec.AnyFlatSpec
 import hprog.DSL._
 import hprog.ast._
 import hprog.backend.Show
@@ -11,7 +11,7 @@ import hprog.common.ParserException
 /**
   * Created by jose on 02/08/2018.
   */
-class TestParser extends FlatSpec {
+class TestParser extends AnyFlatSpec {
 
   testOk("x:=2",ex1)
   testOk("y'=3 for 34",ex2)
@@ -23,7 +23,7 @@ class TestParser extends FlatSpec {
   testKO("p' = v; v' = g until_0.01 p <= 0 /\\ v <= 0;\nv := -0.5 * v")
 
 
-  private def testOk(in:String,res:Syntax) =
+  private def testOk(in:String,res:Syntax): Unit =
     s"""Parsing "$in"""" should s"""produce the program "${Show(res)}"""" in {
       Parser.parse(in) match {
         case Parser.Success(result, _) =>
@@ -34,18 +34,18 @@ class TestParser extends FlatSpec {
       }
   }
 
-  private def testKO(in:String)=
+  private def testKO(in:String): Unit =
     s"""Parsing "$in"""" should s"""NOT parse"""" in {
       try {
         Parser.parse(in) match {
           case Parser.Success(result, _) =>
             fail(s"succeed to parse: ${Show(result)}")
           //          assert(s"Wrong parsed value. Got\n  $result\nexpected\n  $res",result,res)
-          case err: Parser.NoSuccess =>
+          case _: Parser.NoSuccess =>
             //fail("Parse error: " + err)
         }
       } catch {
-        case e:ParserException => {}
+        case _:ParserException =>
       }
     }
 }

@@ -1,17 +1,15 @@
 package hprog
 
-import org.scalatest.FlatSpec
-import hprog.DSL._
 import hprog.ast._
-import hprog.backend.Show
 import hprog.frontend.Eval
 import hprog.lang.SageParser
+import org.scalatest.flatspec.AnyFlatSpec
 
 
 /**
   * Created by jose on 05/04/2019.
   */
-class TestSageParser extends FlatSpec {
+class TestSageParser extends AnyFlatSpec {
 
   testOk("[v(_t_) == -49/5*_t_ + v(0), p(_t_) == -49/10*_t_^2 + _t_*v(0) + p(0)]",
     Map("v"->100, "p"->500),
@@ -38,13 +36,13 @@ class TestSageParser extends FlatSpec {
 //    Map("p"->100, "v"->500),List(0.0->0.0,1.0->0.0,2.0->0.0))
 
 
-  private def testOk(in:String, ctx:frontend.CommonTypes.Point, res:List[(Double,Map[String,Double])]) =
+  private def testOk(in:String, ctx:frontend.CommonTypes.Point, res:List[(Double,Map[String,Double])]): Unit =
     for ((t,mp) <- res; (vv,va) <- mp) {
-      s"Parsing '${in}'\n for $vv, t=$t with ${ctx.mkString(";")}" should s"""be $va"""" in {
+      s"Parsing '$in'\n for $vv, t=$t with ${ctx.mkString(";")}" should s"""be $va"""" in {
 //      s"Parsing something" should s"""be $va"""" in {
         SageParser.parse(in) match {
           case SageParser.Success(result, _) =>
-            assertResult(va)(Eval.apply(result(vv),t,ctx.mapValues(SVal(_))))
+            assertResult(va)(Eval.apply(result(vv),t,ctx.view.mapValues(SVal).toMap))
           //          assert(s"Wrong parsed value. Got\n  $result\nexpected\n  $res",result,res)
           case err: SageParser.NoSuccess =>
             fail("Parse error: " + err)

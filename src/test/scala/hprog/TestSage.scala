@@ -1,19 +1,16 @@
 package hprog
 
-import org.scalatest.FlatSpec
 import hprog.DSL._
-import hprog.ast._
 import hprog.backend.Show
-import hprog.lang.Parser
-import hprog.lang.SageParser
-import hprog.common.ParserException
 import hprog.frontend.solver.LiveSageSolver
+import hprog.lang.SageParser
+import org.scalatest.flatspec.AnyFlatSpec
 
 
 /**
   * Created by jose on 02/08/2018.
   */
-class TestSage extends FlatSpec {
+class TestSage extends AnyFlatSpec {
 
   val solver = new LiveSageSolver("/Applications/SageMath-9.0.app/Contents/Resources/sage")
 
@@ -26,7 +23,7 @@ class TestSage extends FlatSpec {
 
   testExpr("-49/5*2 + 34","72/5")
 
-  private def testExpr(in:String,res:String) =
+  private def testExpr(in:String,res:String): Unit =
     s"""Using Sage to simplify "$in"""" should s"""produce the value "${Show(res)}"""" in {
       
       SageParser.parseExpr(in) match {

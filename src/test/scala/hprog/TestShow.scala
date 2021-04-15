@@ -1,11 +1,11 @@
 package hprog
 
-import org.scalatest.FlatSpec
+import org.scalatest.flatspec.AnyFlatSpec
 import DSL._
 import hprog.ast._
 import hprog.backend.Show
 
-class TestShow extends FlatSpec {
+class TestShow extends AnyFlatSpec {
 
   def testPrint(c:Syntax, res:String) {
 //    println(show(c))
