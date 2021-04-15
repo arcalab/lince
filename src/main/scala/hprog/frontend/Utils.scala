@@ -304,7 +304,7 @@ object Utils {
   }
 
   def filterOneSides(d:Domain): Option[Domain] = {
-    val allOneSide = d.mapValues(isOneSide).forall(_._2)
+    val allOneSide = d.view.mapValues(isOneSide).forall(_._2)
     if (allOneSide) Some(d) else None
   }
 }

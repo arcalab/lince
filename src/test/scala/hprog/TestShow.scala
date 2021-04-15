@@ -7,7 +7,7 @@ import hprog.backend.Show
 
 class TestShow extends AnyFlatSpec {
 
-  def testPrint(c:Syntax, res:String) {
+  def testPrint(c:Syntax, res:String): Unit = {
 //    println(show(c))
     s"Program ${Show(c)}" should s"be printed as expected" in
       assertResult(res)(Show(c))

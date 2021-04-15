@@ -6,6 +6,8 @@ import hprog.backend.Show
 import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, Valuation}
 import hprog.frontend.solver.Solver
 
+import scala.sys.error
+
 object Eval {
 
 //  private type ST = SyExprTime
@@ -201,6 +203,8 @@ object Eval {
     case _:SVar => e
 //    case sf:SFun[_] => SVar(sf.f): SymbolicExpr[SymbolicExpr.Var]
     case SFun(f, List(SVal(0))) => SVar(f)
+    case SFun(f,a) =>
+      error(s"Trying to calculate the value of an expression with a function $f(${a.map(Show(_)).mkString(",")}")
     case SDiv(e1, e2) => SDiv(sFunToSVar(e1),sFunToSVar(e2))
     case SMult(e1, e2) => SMult(sFunToSVar(e1),sFunToSVar(e2))
     case SPow(e1, e2) => SPow(sFunToSVar(e1),sFunToSVar(e2))
