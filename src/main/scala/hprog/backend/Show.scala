@@ -115,19 +115,26 @@ object Show {
     case SVal(v) => if (v.round == v) v.toInt.toString else v.toString // f"$v%1.8f"
     case _:SArg  => "t"
     case s:SVar  => s.v
+    //// Optimizations (prettifiers)
     case SMult(SVal(-1),e)=> s"-${ppP[E](e)}"
     case SMult(e,SVal(-1))=> s"-${ppP[E](e)}"
+    case SMult(SVal(1),e)=> s"${pp[E](e)}"
+    case SMult(e,SVal(1))=> s"${pp[E](e)}"
     case SMult(SVar(x),d@SVal(_))=> s"${pp[E](d)}$x"
     case SMult(SArg(),d@SVal(_))=> s"${pp[E](d)}t"
     case SMult(d@SVal(_),SVar(x))=> s"${pp[E](d)}$x"
     case SMult(d@SVal(_),SArg())=> s"${pp[E](d)}t"
 //    case SMult(e1,e2@SAdd(_,_))=> s"${ppP[E](e1)}*${ppP[E](e2)}"
+    case SAdd(SVal(0),e)=> s"${pp[E](e)}"
+    case SAdd(e,SVal(0))=> s"${pp[E](e)}"
     case SAdd(e1,e2@SAdd(_,_)) => s"${ppP[E](e1)}+${pp[E](e2)}"
 //    case SSub(e1,e2@SAdd(_,_)) => s"${ppP[E](e1)}-${ppP[E](e2)}"
 //    case SMult(e1@SAdd(_,_),e2)=> s"${ppP[E](e1)}*${ppP[E](e2)}"
     case SAdd(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}+${ppP[E](e2)}"
 //    case SSub(e1@SAdd(_,_),e2)=> s"${ppP[E](e1)}-${ppP[E](e2)}"
     case SSub(SVal(0),e)=> s"-${ppP[E](e)}"
+    case SSub(e,SVal(0))=> s"${pp[E](e)}"
+    //// General cases
     case s:SFun[E]  => s"${s.f}(${s.args.map(pp[E]).mkString(",")})"
     case s:SDiv[E]  => s"${ppP[E](s.e1)}/${ppP[E](s.e2)}"
     case s:SMult[E] => s"${ppP[E](s.e1)}*${ppP[E](s.e2)}"
@@ -145,10 +152,14 @@ object Show {
 
 
   def apply(sol:SySolution): String =
-    sol.map(kv => s"${kv._1}:${apply(kv._2)}").mkString(", ")
+    sol.map(kv => s"${kv._1}(t) = ${apply(kv._2)}").mkString("</br>")
 
   def pp(sol:SySolution): String =
-    sol.map(kv => s"${kv._1}:${pp(kv._2)}").mkString(", ")
+    sol.map(kv => s"${kv._1}(t) = ${pp(kv._2)}").mkString("</br>")
+
+  def pp(sol:SySolution, v:Valuation): String = {
+    pp(sol.view.mapValues(Eval.updInputFun(_,v)).toMap)
+  }
 
 
   def floatToFraction(v: Double): String = {

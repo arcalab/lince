@@ -167,12 +167,10 @@ object Traj {
 
     def +=(t: SyExpr)(implicit solver: Solver): Unit =
       time = solver.solveSymbExpr(SAdd(time, t))
-    def init(x: Valuation): Unit =
-      inits += time -> x
-    def end(x: Valuation): Unit =
-      ends += time -> x
-    def note(s: String): Unit = notes += time -> s
-    def warn(s: String): Unit = warnings += time -> s
+    def init(x: Valuation): Unit = if (x.nonEmpty)    inits += time -> x
+    def end(x: Valuation): Unit =  if (x.nonEmpty)     ends += time -> x
+    def note(s: String): Unit =    if (s.nonEmpty)    notes += time -> s
+    def warn(s: String): Unit =    if (s.nonEmpty) warnings += time -> s
     def warn(ts: Double=>String,delta:SyExpr): Unit = {
       val t = Utils.asSyExpr(time+delta)
       warnings += t -> ts(Eval(time)+Eval(delta))
@@ -424,7 +422,7 @@ object Traj {
     val phi = solver.solveSymb(at.de.eqs)
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
-    logger.note("sol: "+Show.pp(phi))
+    logger.note(Show.pp(phi,x))
 
     debug(()=>s"running $at bounded $b for $durLin on $x2.")
     val durSy = Eval.lin2sage(durLin)
