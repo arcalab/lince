@@ -422,7 +422,7 @@ object Traj {
     val phi = solver.solveSymb(at.de.eqs)
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
-    logger.note(Show.pp(phi,x))
+    logger.note(Show.pp(phi,x2))
 
     debug(()=>s"running $at bounded $b for $durLin on $x2.")
     val durSy = Eval.lin2sage(durLin)
