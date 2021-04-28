@@ -59,3 +59,9 @@ sbt server/run
 ```
 open http://localhost:9000#lince
 ```
+
+* Alternatively, open the local html file `site/lince.html` (or `site/index.html`)
+
+```
+open file/lince.html
+```
