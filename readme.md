@@ -1,4 +1,4 @@
-Lince
+Lince [![Build Status](https://travis-ci.org/arcalab/lince.svg?branch=master)](https://travis-ci.org/arcalab/lince)
 ========================
 
 This prototype analyses hybrid programs using simulation based on symbolic evaluation (via [SageMath](http://www.sagemath.org/)) and estimation of approximation errors caused by small perturbations.
