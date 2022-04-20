@@ -68,7 +68,7 @@ object Show {
     case And(e1,e2:And)     => s"${showP(e1,vl)} & ${showP(e2,vl)}"
     case And(e1, e2) => s"${showP(e1,vl)} & ${showP(e2,vl)}"
     case Or(e1, e2)  => s"${showP(e1,vl)} | ${showP(e2,vl)}"
-    case Not(e1)     => s"!${showP(e1,vl)}"
+    case Not(e1)     => s"not${showP(e1,vl)}"
     case EQ(l1, l2)    => s"${apply(l1,vl)}==${apply(l2,vl)}"
     case GT(l1, l2)    => s"${apply(l1,vl)}>${apply(l2,vl)}"
     case LT(l1, l2)    => s"${apply(l1,vl)}<${apply(l2,vl)}"
