@@ -135,6 +135,13 @@ object Utils {
     case _ => throw new RuntimeException(s"Failed to interpret ${Show(e)} as a simple expression.")
   }
 
+  def asSyExprVar(e:SyExprAll): SyExprVar = e match {
+    case e2: SyExprVar @ unchecked => e2
+    // bottom case never caught, since erasure will make SyExprAll = SyExpr.
+    // (Runtime error will be different.)
+    case _ => throw new RuntimeException(s"Failed to interpret ${Show(e)} as a simple expression with variables.")
+  }
+
   //////
   // inferring open domains...
   //////

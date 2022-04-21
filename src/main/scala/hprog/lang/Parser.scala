@@ -1,6 +1,7 @@
 package hprog.lang
 
 import hprog.ast._
+import hprog.ast.SymbolicExpr.SyExprVar
 import hprog.common.ParserException
 import hprog.frontend.Utils
 
@@ -227,7 +228,8 @@ object Parser extends RegexParsers {
     ">=" ~> linP ^^ (e2 => (e1: Var) => e1 >= e2) |
     "<" ~> linP ^^ (e2 => (e1: Var) => e1 < e2) |
     ">" ~> linP ^^ (e2 => (e1: Var) => e1 > e2) |
-    "==" ~> linP ^^ (e2 => (e1: Var) => e1 === e2)
+    "==" ~> linP ^^ (e2 => (e1: Var) => e1 === e2) |
+    "!=" ~> linP ^^ (e2 => (e1: Var) => Not(e1 === e2))
 
 
   lazy val realP: Parser[Double] =
@@ -238,6 +240,10 @@ object Parser extends RegexParsers {
     intP
   lazy val intP: Parser[Int] =
     """[0-9]+""".r ^^ { s: String => s.toInt }
+
+//  def intExpr: Parser[SyExprVar] =
+//    SageParser.eqExpr ^^ { Utils.asSyExprVar } // assuming it has no variable "_t_"
+
 
   // AUX
   private def invert(lin: Lin): Lin = lin match {

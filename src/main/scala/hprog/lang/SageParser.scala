@@ -21,7 +21,7 @@ object SageParser extends RegexParsers {
     * @param c string representing a reply from Sage
     * @return Parse result (parsed(functions) or failure(error))
     */
-  def parse(c: String): ParseResult[SySolution] = {
+  def parseSol(c: String): ParseResult[SySolution] = {
     val res = parseAll(sols, c)
 //    res match {
 //      case Success(result, _) =>

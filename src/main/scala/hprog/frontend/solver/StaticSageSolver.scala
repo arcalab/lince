@@ -221,7 +221,7 @@ class StaticSageSolver extends Solver {
 
   def replyToDiffCache(vars:List[String], sageReply:String): DiffCache = {
     if (sageReply.nonEmpty) {
-      val resParsed = SageParser.parse(sageReply) match {
+      val resParsed = SageParser.parseSol(sageReply) match {
         // single solution - name is not known from the answer of Sage
         case SageParser.Success(sol, _) if sol.keySet == Set("") =>
 //          val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
