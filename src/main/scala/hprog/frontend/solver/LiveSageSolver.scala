@@ -98,6 +98,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
 
   def askSage(s:String): Option[String] = {
     last = None // clear last answer
+    println(s"[LiveSolver] Asking sage: $s")
     proc._1(s) // put string in input queue of Sage process
     waitForReply()
   }
@@ -178,9 +179,10 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       vars.map(v=>s"$v = var('$v'); ").mkString +
       "print(" + Show(expr) + "); \"ok\""
     debug(()=>s"expression to solve: '$instructions'")
-//    println(s"expression to solve: '$instructions'")
+    println(s"expression to solve: '$instructions'")
     val rep = askSage(instructions)
     debug(()=>s"reply: '$rep'")
+    println(s"reply: '$rep'")
     rep
   }
 
