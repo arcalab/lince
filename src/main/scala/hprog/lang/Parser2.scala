@@ -44,7 +44,7 @@ object Parser2 {
       case Some((x, y)) =>
         s"""at ($x,$y):
            |"${loc.getLine(x).getOrElse("-")}"
-           |${"-".repeat(y + 1) + "^\n"}""".stripMargin
+           |${("-"*(y + 1)) + "^\n"}""".stripMargin
       case _ => ""
     }
     s"${pos}expected: ${err.expected.toList.mkString(", ")}\noffsets: ${
