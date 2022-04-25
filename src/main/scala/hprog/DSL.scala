@@ -5,8 +5,8 @@ import hprog.ast._
 import hprog.common.ParserException
 import hprog.frontend.CommonTypes.Valuation
 import hprog.frontend.solver.LiveSageSolver
-import hprog.frontend.{Deviator, Distance, CommonTypes, Traj}
-import hprog.lang.{Parser, SageParser}
+import hprog.frontend.{CommonTypes, Deviator, Distance, Traj}
+import hprog.lang.{Parser, Parser2, SageParser}
 
 import scala.language.implicitConversions
 
@@ -46,11 +46,11 @@ object DSL {
     */
   def parse(s:String): Syntax =  {
     //println("parsing...")
-    Parser.parse(s) match {
-      case Parser.Success(result, _) =>
+    Parser2.parse(s) match {
+      case Right(result) => // Parser.Success(result, _) =>
         //println("parsed")
         result
-      case f: Parser.NoSuccess =>
+      case Left(f) => //f: Parser.NoSuccess =>
         //println("failed")
         throw new ParserException(f.toString)
     }
@@ -80,19 +80,20 @@ object DSL {
     */
   def parseCond(s:String): Cond =  {
     //println("parsing...")
-    Parser.parseCond(s) match {
-      case Parser.Success(result, _) =>
+    Parser2.parseCond(s) match {
+      case Right(result) => //Parser.Success(result, _) =>
         //println("parsed")
         result
-      case f: Parser.NoSuccess =>
+      case Left(f) => //: Parser.NoSuccess =>
         //println("failed")
         throw new ParserException(f.toString)
     }
   }
 
-  val parseWithError: String => Parser.ParseResult[Syntax] = Parser.parse
+//  val parseWithError: String => Parser.ParseResult[Syntax] = Parser.parse
+  val parseWithError: String => Either[String,Syntax] = Parser2.parse
 
-//  def parseTraj(s:String,sagePath:String): Traj[Valuation] = // e.g., sagePath = "/home/jose/Applications/SageMath"
+  //  def parseTraj(s:String,sagePath:String): Traj[Valuation] = // e.g., sagePath = "/home/jose/Applications/SageMath"
 //    Semantics.syntaxToValuation(parse(s),new LiveSageSolver(sagePath), new Distance(10)).traj(Map())
 
 }
