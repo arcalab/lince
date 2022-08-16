@@ -54,14 +54,14 @@ object Parser2 {
 
 
   def prog: P[Syntax] =
-    command.surroundedBy(sps).map(stx =>
+    command.surroundedBy(sps).map(stx => {
       Utils.isClosed(stx) match {
         case Left(msg) => throw new ParserException(msg)
         case Right(_) =>
           // println(s"parsed ${stx}")
           stx
       }
-    )
+    })
 
 
 
@@ -92,11 +92,12 @@ object Parser2 {
 
   /** (Recursive) Parser for an linear expression */
   def linP: P[Lin] = P.recursive((linRec:P[Lin]) => {
-    def lit: P[Lin] =
+    def lit: P[Lin] = P.recursive((litRec:P[Lin]) => {
       char('(') *> linRec.surroundedBy(sps) <* char(')') |
-      (char('-') ~ linRec).map(x => Mult(Value(-1),x._2)) |
+      (char('-') ~ litRec).map(x => Mult(Value(-1), x._2)) |
       realP.map(Value.apply) |
       varName.map(Var.apply)
+    })
 
     def mult: P[(Lin, Lin) => Lin] =
       string("*").as((x:Lin,y:Lin) => (x,y) match {
@@ -113,6 +114,37 @@ object Parser2 {
     listSep(listSep(lit, mult), plusminus)
   })
 
+//  def linPNew: P[Lin] = P.recursive((linRec: P[Lin]) => {
+//    def lit: P[Lin] =
+//      char('(') *> linRec.surroundedBy(sps) <* char(')') |
+//        (char('-') ~ linRec).map(x => Mult(Value(-1), x._2)) |
+//        realP.map(Value.apply) |
+//        varName.map(Var.apply)
+//
+//    def plusmin:P[Lin] = P.recursive((plusminRec: P[Lin]) => {
+//      (mult ~ ((charIn('+')|charIn('-')).surroundedBy(sps) ~ plusminRec).?)
+//        .map(x => x._2 match {
+//          case None => x._1
+//          case Some(('+',v)) => Add(x._1,v)
+//          case Some((_,v)) => Add(x._1, Mult(Value(-1), v))
+//        })
+//    })
+//
+//    def mult: P[Lin] = P.recursive((multRec: P[Lin]) => {
+//      (lit.soft ~ (charIn('*').surroundedBy(sps) ~ multRec).?)
+//        .map(x => (x._1,x._2) match {
+//          case (v1,None) => v1
+//          case (Value(v1),Some((_,v2))) => Mult(Value(v1), v2)
+//          case (v1,Some((_, Value(v2)))) => Mult(Value(v2), v1)
+//          case (v1,Some((_, v2))) => sys.error(s"Multiplication [$v1 * $v2] must have at least a fixed number.")
+//        })
+//    })
+//
+//    plusmin
+//      .map(x => {println(s"got lin $x"); x})
+//    lit
+//  })
+
 
   def durP: P[Dur] =
     (string("for")~sps) *> linP.map(For.apply) |
@@ -124,7 +156,7 @@ object Parser2 {
       })
 
 
-  /** (Recursive) Parser for a boolean expression */
+//  /** (Recursive) Parser for a boolean expression */
   def condP: P[Cond] = P.recursive( (bexprRec:P[Cond]) => {
     def lit: P[Cond] = P.recursive( (litR:P[Cond]) =>
       string("true").as(BVal(true)) |
@@ -154,6 +186,8 @@ object Parser2 {
       (string("&&")|string("/\\")).map(_ => And.apply)
 
     listSep(listSep(lit, and), or)
+//    string("true").as(BVal(true)) |
+//    string("false").as(BVal(false))
   })
 
 
@@ -181,12 +215,18 @@ object Parser2 {
           basicRec
 
       skip | waitc | ite | whilec | repeat | assign.backtrack | diffEqsP
+//      skip | waitc | ite | whilec | repeat | assign
     })
 
     def seqOp =
       char(';').as((x:Syntax,y:Syntax)=>x ~ y)
 
     listSep(basicCommand, seqOp)
+//    (basicCommand ~ ((sps~char(';')~sps) *> basicCommand).?)
+//      .map(x => x._2 match {
+//        case None => x._1
+//        case Some(s2) => x._1 ~ s2
+//      })
   })
 
   val skipComm: Syntax = Atomic(Nil, DiffEqs(Nil, For(Value(0))))
@@ -203,16 +243,17 @@ object Parser2 {
       .map(x => Atomic(Nil, x._1._1 & x._2.getOrElse(Forever)))
 
   def diffEqsCoreP: P[DiffEqs] =
+//    diffEqP.map(x=>DiffEqs(List(x),Forever))
     listSep(diffEqP.map(x=>DiffEqs(List(x),Forever)),
             char(',').as((x:DiffEqs,y:DiffEqs) => DiffEqs(x.eqs:::y.eqs,Forever)))
 
   def diffEqP: P[DiffEq] =
     (varName ~ char('\'') ~ char('=').surroundedBy(sps) ~ linP)
       .map(x => Var(x._1._1._1) ^= x._2)
-
-
-  ////// auxiliary ////
-
+//
+//
+//  ////// auxiliary ////
+//
   /** Non-empty list of elements with a binary operator */
   def listSep[A](elem:P[A],op:P[(A,A)=>A]): P[A] =
     (elem ~ (op.surroundedBy(sps).backtrack~elem).rep0)

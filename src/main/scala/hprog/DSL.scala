@@ -46,11 +46,19 @@ object DSL {
     */
   def parse(s:String): Syntax =  {
     //println("parsing...")
-    Parser2.parse(s) match {
-      case Right(result) => // Parser.Success(result, _) =>
+//    Parser2.parse(s) match {
+//      case Right(result) =>
+//        //println("parsed")
+//        result
+//      case Left(f) =>
+//        //println("failed")
+//        throw new ParserException(f.toString)
+//    }
+    Parser.parse(s) match {
+      case Parser.Success(result, _) =>
         //println("parsed")
         result
-      case Left(f) => //f: Parser.NoSuccess =>
+      case f: Parser.NoSuccess =>
         //println("failed")
         throw new ParserException(f.toString)
     }
