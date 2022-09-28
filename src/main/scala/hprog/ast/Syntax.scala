@@ -1,7 +1,10 @@
 package hprog.ast
 
-/*
-New version - correct one:
+/**
+A element `p` of the class `Syntax` is our internal representation of a Lince program `p`.
+
+Overview of the grammar:
+```
  p := at | p;p | Skip | if b then p else p | While b p | ... Wait r
  at := assgn | diffEq
  assgn := X := lin
@@ -9,20 +12,21 @@ New version - correct one:
  lin := X | R | lin+lin | R lin
 
  b?  := true | false | &|! | X {><=} lin
+```
 
- ---
- examples
+Examples of programs include:
+```
  x:=0 ;
  x'=y+2x, y'=3 & 1 ;
  x'=2 & 2
 
-
  p'=v, v'=g & p<=0 /\ v<=0 ;
  v:= -0.5*v
-
- */
+```
+  */
 
 sealed abstract class Syntax {
+  /** Sequential composition of programs with some pre-processing */
   def ~(other:Syntax): Syntax = other match {
     case While(pre,d,doP) => While(this~pre,d,doP)
     case _ => Seq(this,other)
@@ -35,8 +39,9 @@ sealed abstract class Syntax {
 //    case (p1, p2) => Seq(List(p1, p2))
 //  }
 }
-// programs
+/** An atomic program is a list of assignments and a system of differential equations with a bound */
 case class Atomic(as:List[Assign],de:DiffEqs)        extends Syntax {
+  /** Sequential composition of programs with some pre-processing */
   override def ~(p:Syntax): Syntax = (de.dur,p) match {
     case (_,Seq(p,q)) => Seq(this~p,q)
     case (_,While(pre, d, doP)) => While(this~pre,d,doP)
@@ -46,13 +51,17 @@ case class Atomic(as:List[Assign],de:DiffEqs)        extends Syntax {
 //  def ~(a:Assign): Syntax = this ~ Atomic(List(a),DiffEqs(Nil,For(Value(0))))
 //  def ~(de:DiffEq): Syntax = this ~ Atomic(Nil,DiffEqs(List(de),Forever))
 }
+/** Sequence of programs is a program*/
 case class Seq(p:Syntax,q:Syntax)                    extends Syntax
+/**  "If-then-else" is a program*/
 case class ITE(ifP:Cond, thenP:Syntax, elseP:Syntax) extends Syntax
+/** "While" is a program */
 case class While(pre:Syntax,d:LoopGuard,doP:Syntax)  extends Syntax
+
 //case object           Skip                                      extends Syntax
 //case class            SPosition(s1:Syntax,s2:Syntax)            extends Syntax
 
-// atoms
+/** An assignment is a member of the Atomic programs, between a variable and a linear expression */
 case class Assign(v:Var,e:Lin) {
 //  def ~(p:Syntax): Syntax = Atomic(List(this),DiffEqs(Nil,For(Value(0)))) ~ p
 //  def ~(a:Assign): Syntax = A
