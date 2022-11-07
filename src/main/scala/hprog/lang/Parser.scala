@@ -44,7 +44,6 @@ object Parser extends RegexParsers {
   //   ///////////////
   //   /// Program ///
   //   ///////////////
-
   /** Parser for a program that checks if the program is closed before returning. */
   lazy val progP: Parser[Syntax] =
     seqP ^^ { stx =>
@@ -56,14 +55,14 @@ object Parser extends RegexParsers {
 
   /** Parser for a sequence of programs */
   lazy val seqP: Parser[Syntax] =
-    basicProg ~ opt(";" ~> seqP) ^^ {
+    basicProg ~ opt(seqP) ^^ {
       case p1 ~ Some(p2) => p1 ~ p2
       case p ~ None => p
     }
 
   /** Parser for a basic program: "skip", "while", "repeat", "if", "wait", or an atomic program (see below) */
   lazy val basicProg: Parser[Syntax] =
-    "skip" ~> opt("for"~>realP) ^^ {
+    "skip" ~> opt("for"~>realP) <~ ";" ^^ {
       case None => skip
       case Some(real) => Atomic(Nil,DiffEqs(Nil,For(Value(real))))
     } |
@@ -76,7 +75,7 @@ object Parser extends RegexParsers {
     "if" ~> condP ~ "then" ~ blockP ~ "else" ~ blockP ^^ {
       case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
     } |
-    "wait"~>linP ^^ {
+    ("wait"~>linP) <~ ";" ^^ {
       time => Atomic(Nil,DiffEqs(Nil,For(time)))
     }|
     atomP
@@ -94,10 +93,10 @@ object Parser extends RegexParsers {
 
   /** Parser for an atomic program: an assignment or a set of diff equations. */
   lazy val atomP: Parser[Atomic] =
-    identifier ~ ":=" ~ linP ^^ {
+    (identifier ~ ":=" ~ linP) <~ ";" ^^ {
       case v ~ _ ~ l => Atomic(List(Assign(Var(v), l)),DiffEqs(Nil,For(Value(0))))
     } |
-    diffEqsP ~ opt(durP) ^^ {
+    (diffEqsP ~ opt(durP)) <~ ";" ^^ {
       case des ~ d => Atomic(Nil,des & d.getOrElse(Forever))
     }
 
