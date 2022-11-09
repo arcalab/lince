@@ -3,7 +3,7 @@ package hprog.frontend
 import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime, SyExprVar}
 import hprog.ast._
 import hprog.backend.Show
-import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, Valuation}
+import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, Valuation, Solution}
 import hprog.frontend.solver.Solver
 
 import scala.sys.error
@@ -50,6 +50,7 @@ object Eval {
     case SSub(e1, e2) => apply(e1,t,x) - apply(e2,t,x)
     case s:SFun[SymbolicExpr.All] => (s.f,s.args) match {
       case (v,List(SVal(0.0))) if x contains v => apply(x(v),t,x) // could create infinite loop
+      case ("max",v1::v2::Nil) => math.max(apply(v1,t,x), apply(v2,t,x))
       case ("exp",v::Nil) => math.exp(apply(v,t,x))
       case ("sin",v::Nil) => math.sin(apply(v,t,x))
       case ("cos",v::Nil) => math.cos(apply(v,t,x))
@@ -81,6 +82,11 @@ object Eval {
 
   def update(phi:SySolution, t:SyExpr, v:Valuation): Valuation =
     updInput(v,Eval.updTime(t,phi))
+
+  // variation for numerically computed solutions
+  def updateNum(phi: Solution, t: SyExpr, v: Valuation): Valuation =
+    phi.view.mapValues(updater => SVal(updater(apply(t))(apply(v)))).toMap
+    //updInput(v, Eval.updTime(t, phi))
 
   /** Update an expression by replacing initial values v(0)
     * @param e expression to be updated

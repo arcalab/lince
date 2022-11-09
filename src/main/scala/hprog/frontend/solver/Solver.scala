@@ -199,7 +199,7 @@ object Solver {
     * @param precision
     * @return
     */
-  def solveTaylorManual(a:List[List[Double]],precision:Double = 0.0000001):  (List[Double],Double) => List[Double] = {
+  def solveTaylorManual(a:List[List[Double]],precision:Double = 0.0000001, maxSteps:Int=100):  (List[Double],Double) => List[Double] = {
     //println("building ODE "+a.mkString("/"))
     val size = a.size // square matrix
 
@@ -248,7 +248,7 @@ object Solver {
 //        if (res.nonEmpty && res.head.nonEmpty && res.head.head.isNaN)
 //          cur
         //else
-        if (av.isNaN || avg(next) < precision)
+        if (av.isNaN || avg(next) < precision || step>maxSteps)
           res
         else
           iter(step+1,nextBigA,res)

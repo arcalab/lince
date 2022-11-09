@@ -5,7 +5,7 @@ import hprog.ast.SymbolicExpr.{Pure, SyExpr}
 import hprog.ast._
 import hprog.backend.Show
 import hprog.common.TimeOutOfBoundsException
-import hprog.frontend.CommonTypes.{Point, SySolution, Valuation, Warnings}
+import hprog.frontend.CommonTypes.{Point, SySolution, Valuation, Warnings, Solution}
 import hprog.frontend.Traj._
 import hprog.frontend.solver.Solver
 
@@ -332,34 +332,45 @@ object Traj {
 
   private def runAtomicWithTime(time: SyExpr, at:Atomic, dur:Lin, x:Valuation,log:Boolean = false)
                                (implicit solver:Solver, logger: Logger): Run = {
-    val phi = solver.solveSymb(at.de.eqs)
+    val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
+    val phiBkp:Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
     debug(()=>s"running $at @ ${Eval(time)} (${Show(time)}) for $dur on $x2.")
     val realTime = Eval(time)
     val durSy = Eval.lin2sage(dur)
     val durSy2 = Eval.updInput(durSy,x2)
-    val durVal = Eval(durSy2) max 0
-    debug(()=>s"$dur ~~> $durSy ~~> $durSy2 ~~> $durVal.")
+    val durVal = solver.solveSymbExpr(SFun("max",List(SVal(0),durSy2))) //Eval(durSy2) max 0
+    debug(()=>s"duration: $dur ~~> $durSy ~~> $durSy2 ~~> $durVal.")
 
     // Rule Atom-1 (time < dur)
-    if (realTime < durVal) {
-      val x3 = x2 ++ Eval.update(phi, time, x2) // update x with phi
-//      val tc = x2.mapValues(e => Eval.updInputFun(e,phi))
-
-      val tc = Eval.updInputFun(x2,phi).view.mapValues(solver.solveSymb).toMap
-      //if (log) logger += time
-      RFound(x3.view.mapValues(solver.solveSymbExpr).toMap,TimeClosure(tc,time))
+    if (realTime < Eval(durVal)) {
+      if (phi.nonEmpty) {
+        val x3 = x2 ++ Eval.update(phi, time, x2) // update x with phi @ given time
+        val tc = Eval.updInputFun(x2, phi) // replace in phi the variables in x2 (before diff eqs)
+          .view.mapValues(solver.solveSymb).toMap // simplify/solve result
+        //if (log) logger += time
+        RFound(x3.view.mapValues(solver.solveSymbExpr).toMap, TimeClosure(tc, time))
+      } else {
+        val x3 = x2 ++ Eval.updateNum(phiBkp, time, x2) // update x with phi @ given time NUMERICALLY
+        val tc = Eval.updInputFun(x2, phi) // replace in phi the variables in x2 (before diff eqs)
+        RFound(x3, TimeClosure(tc, time))
+      }
     }
     // Rule Atom-2 (time >= dur)
     else {
-      val x3 = solver.solveSymb(x2 ++ Eval.update(phi, SVal(durVal), x2)) // update x with phi
-      val r2 = solver.solveSymbExpr(SSub(time, SVal(durVal))) // new simplified time
-      if (log) logger += SVal(durVal)
-      REnd(Time(r2), x3, Nil)
+      if (phi.nonEmpty) {
+        val x3 = solver.solveSymb(x2 ++ Eval.update(phi, durVal, x2)) // update x with phi @ end of "for"
+        val r2 = solver.solveSymbExpr(SSub(time, durVal)) // new simplified time
+        if (log) logger += durVal
+        REnd(Time(r2), x3, Nil)
+      } else {
+        val x3 = x2 ++ Eval.updateNum(phiBkp, durVal, x2) // update x with phi @ end of "for"
+        val r2 = SVal(Eval(SSub(time, durVal))) // new simplified time
+        if (log) logger += durVal
+        REnd(Time(r2), x3, Nil)
+      }
     }
-
-
   }
 
 
@@ -419,7 +430,8 @@ object Traj {
 
   private def runAtomicWithBounds(b:Bound,at:Atomic,durLin:Lin,x:Valuation)
                                  (implicit solver: Solver, logger: Logger): Run = {
-    val phi = solver.solveSymb(at.de.eqs)
+    val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
+    val phiBkp: Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
     logger.note(Show.pp(phi,x2))
@@ -429,21 +441,29 @@ object Traj {
     debug(()=>s" - $durSy")
     val durSy2 = Eval.updInput(durSy,x2)
     debug(()=>s" - $durSy2")
-    val durValue = solver.solveSymbExpr(durSy2)
+    val durValue = solver.solveSymbExpr( SFun("max",List(SVal(0),durSy2)))
+    //     val durVal = solver.solveSymbExpr(SFun("max",List(SVal(0),durSy2)))
 
     // manually comparing values that should be simplified already
     val stop = Eval(durValue) >= Eval(b.timer)
 
     if (stop) {
-      val x3 = x2++ solver.solveSymb(Eval.update(phi, b.timer, x2)) // update x with phi after b.timer durtion
+      val x3 = if (phi.nonEmpty)
+        x2 ++ solver.solveSymb(Eval.update(phi, b.timer, x2)) // update x with phi after b.timer durtion
+      else
+        x2 ++ (Eval.updateNum(phiBkp, b.timer, x2)) // update x with phi after b.timer durtion Numerically
       logger.init(x2)
       logger += b.timer
       logger.end(x3)
-      REnd(Bound(0,SVal(0)), x3, Nil)
+      REnd(Bound(0, SVal(0)), x3, Nil)
     }
     else {
-      val newTimer = solver.solveSymbExpr(SSub(b.timer,durSy2))
-      val x3 = x2++ solver.solveSymb(Eval.update(phi, durSy2, x2)) // update x with phi after b.timer durtion
+      val (newTimer,x3) = if (phi.nonEmpty)
+        solver.solveSymbExpr(SSub(b.timer, durSy2)) ->
+          (x2 ++ solver.solveSymb(Eval.update(phi, durSy2, x2))) // update x with phi after b.timer durtion
+      else
+        SVal(Eval(SSub(b.timer, durSy2))) ->
+          (x2 ++ Eval.updateNum(phiBkp, durSy2, x2)) // update x with phi after b.timer durtion
       logger.init(x2)
       logger += durSy2
       logger.end(x3)
@@ -490,7 +510,7 @@ object Traj {
   private val skip = Atomic(Nil, DiffEqs(Nil, For(Value(0))))
 
   private def debug(str: () => String): Unit = {
-    //println("[Traj] "+str())
+    // println("[Traj] "+str())
   }
 
 
