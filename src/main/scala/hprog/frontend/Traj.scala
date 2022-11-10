@@ -350,7 +350,9 @@ object Traj {
         val tc = Eval.updInputFun(x2, phi) // replace in phi the variables in x2 (before diff eqs)
           .view.mapValues(solver.solveSymb).toMap // simplify/solve result
         //if (log) logger += time
-        RFound(x3.view.mapValues(solver.solveSymbExpr).toMap, TimeClosure(tc, time))
+        val x4 = x3.view.mapValues(solver.solveSymbExpr).toMap
+        debug(()=> s"simplified updated state: $x4" )
+        RFound(x4, TimeClosure(tc, time))
       } else {
         val x3 = x2 ++ Eval.updateNum(phiBkp, time, x2) // update x with phi @ given time NUMERICALLY
         val tc = Eval.updInputFun(x2, phi) // replace in phi the variables in x2 (before diff eqs)
@@ -438,9 +440,9 @@ object Traj {
 
     debug(()=>s"running $at bounded $b for $durLin on $x2.")
     val durSy = Eval.lin2sage(durLin)
-    debug(()=>s" - $durSy")
+    //debug(()=>s" - $durSy")
     val durSy2 = Eval.updInput(durSy,x2)
-    debug(()=>s" - $durSy2")
+    //debug(()=>s" - $durSy2")
     val durValue = solver.solveSymbExpr( SFun("max",List(SVal(0),durSy2)))
     //     val durVal = solver.solveSymbExpr(SFun("max",List(SVal(0),durSy2)))
 
@@ -460,7 +462,7 @@ object Traj {
     else {
       val (newTimer,x3) = if (phi.nonEmpty)
         solver.solveSymbExpr(SSub(b.timer, durSy2)) ->
-          (x2 ++ solver.solveSymb(Eval.update(phi, durSy2, x2))) // update x with phi after b.timer durtion
+          (solver.solveSymb(x2 ++ Eval.update(phi, durSy2, x2))) // update x with phi after b.timer durtion
       else
         SVal(Eval(SSub(b.timer, durSy2))) ->
           (x2 ++ Eval.updateNum(phiBkp, durSy2, x2)) // update x with phi after b.timer durtion
