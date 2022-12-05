@@ -286,8 +286,7 @@ object LiveSageSolver {
 
     // limit scope of any temporary variables
     // locally {
-    //val sage = s"$path/sage"
-    val sage = "\"C:\\Users\\Ricardo Correia\\AppData\\Local\\SageMath 9.3\\runtime\\bin\\mintty.exe\" -t 'SageMath 9.3 Console' -i sagemath.ico /bin/bash --login -c '/opt/sagemath-9.3/sage'"
+    val sage = s"$path/sage"
     // strings are implicitly converted to ProcessBuilder
     // via scala.sys.process.ProcessImplicits.stringToProcess(_)
     val io = new ProcessIO(
