@@ -80,13 +80,15 @@ object Solver {
 
 
 
-/////////////////////////////////////////////////////////////////
-// ALTEREI!!!!!!!!!!!!!!!
+
   private def getRowValues(e:Lin,base:String): Map[String,Double] = e match {
     case Var(v) => Map(v->1)
     case Value(v) => Map(("_"+base)->v)
     case Add(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
-    case Mult(l1, l2) => mult(getRowValues(l1,base),getRowValues(l2,base))
+    case Mult(v, l) => getRowValues(l,base).view.mapValues(_*v.v).toMap
+      // reverted to the original definition, dropping Ricardo Correia's one below.
+    //case Mult(l1, l2) => mult(getRowValues(l1,base),getRowValues(l2,base))
+
     //case Div(l1, l2) => div(getRowValues(l1,base),getRowValues(l2,base))
     //case Pow(l1, l2) => mypow(getRowValues(l1,base),getRowValues(l2,base))
     //case Sqrt(l1, l2) => mysqrt(getRowValues(l1,base),getRowValues(l2,base))
@@ -107,6 +109,7 @@ object Solver {
     res
   }
 
+  @deprecated
   private def mult(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
     var res = m2
     for ((k, v1) <- m1) m2.get(k) match {
