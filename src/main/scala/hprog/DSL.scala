@@ -2,6 +2,7 @@ package hprog
 
 import hprog.ast.SymbolicExpr.SyExprAll
 import hprog.ast._
+import Syntax._
 import hprog.common.ParserException
 import hprog.frontend.CommonTypes.Valuation
 import hprog.frontend.solver.LiveSageSolver
@@ -14,22 +15,24 @@ import scala.language.implicitConversions
  * Created by jose on 17/07/18.
  */
 object DSL {
-  implicit def str2Var(s:String): Var = ast.Var(s)
+  implicit def str2Var(s:String): Var = Var(s)
   implicit def bool2Cond(b:Boolean): BVal = BVal(b)
   implicit def real2Lin(n:Double): Value = Value(n)
   implicit def int2Lin(n:Int): Value = Value(n)
-  implicit def real2Dur(n:Double): Dur = For(Value(n))
-  implicit def int2Dur(n:Int): Dur = For(Value(n))
+  implicit def real2Dur(n:Double): Dur = For(ValueNotLin(n))
+  implicit def int2Dur(n:Int): Dur = For(ValueNotLin(n))
   implicit def cond2Dur(c:Cond): Dur = Until(c,None,None)
   implicit def dEq2dEqs(de:DiffEq): DiffEqs= DiffEqs(List(de),Forever)
-  implicit def assg2Atom(a:Assign): Atomic = Atomic(List(a),DiffEqs(Nil,For(Value(0))))
+  implicit def assg2Atom(a:Assign): Atomic = Atomic(List(a),DiffEqs(Nil,For(ValueNotLin(0))))
   implicit def dEqs2Atom(des:DiffEqs): Atomic = Atomic(Nil,des)
+ 
 
+ /*
 
-  val x:Var="x"; val y:Var="y"; val p:Var="p"; val v:Var="v"; val g:Var="g"
+  val x:VarNotLin=VarNotLin("x"); val y:VarNotLin=VarNotLin("y"); val p:VarNotLin=VarNotLin("p"); val v:VarNotLin=VarNotLin("v");val g:VarNotLin=VarNotLin("g")
 
   // examples
-  val ex1 = Assign(x,Value(2))            // assignment
+  val ex1 = Assign(x,ValueNotLin(2))            // assignment
   val ex2 = (y^=3) & 34     // statement
   val ex3 = (x^=2) & (y^=3) // statement
   //val ex4 = (x^=2) ~ (y^=3) // program
@@ -39,6 +42,7 @@ object DSL {
   val ex8 = (x^=1) & (((x > 3*x) && (x<5)) || (y>=3))
   val ex9 = (x^=1) & ((x > 3*x) && ((x<5) || (y>=3)))
 
+ */
   /**
     * Parses a string into a program.
     * @param s string representing a program

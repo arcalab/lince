@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.parse.Rfc5234.sp
 
 import hprog.ast._
+import Syntax._
 import hprog.ast.SymbolicExpr.SyExprVar
 import hprog.common.ParserException
 import hprog.frontend.Utils
@@ -91,6 +92,16 @@ object Parser2 {
   def intP: P[Int] = digits.map(_.toInt)
 
   /** (Recursive) Parser for an linear expression */
+  
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// ALTEREI !!!!!!!!!!!!!!!!!!!!!
   def linP: P[Lin] = P.recursive((linRec:P[Lin]) => {
     def lit: P[Lin] = P.recursive((litRec:P[Lin]) => {
       char('(') *> linRec.surroundedBy(sps) <* char(')') |
@@ -104,15 +115,57 @@ object Parser2 {
         case (Value(x), l) => Mult(Value(x), l)
         case (l, Value(x)) => Mult(Value(x), l)
         case _ => sys.error(s"Multiplication [$x * $y] must have at least a fixed number.")
+        //case _ => sys.error(s"Multiplication [$x * $y] must have at least a fixed number.")
 //        case _ => P.failWith(s"Multiplication [$x * $y] must have at least a fixed number.")
       })
+    /*
+    def div: P[(Lin, Lin) => Lin] =
+      string("/").as((x:Lin,y:Lin) => (x,y) match {
+        case (l1,l2) => Div(l1,l2)
+      })
 
+    def res: P[(Lin, Lin) => Lin] =
+      string("%").as((x:Lin,y:Lin) => (x,y) match {
+        case (l1,l2) => Res(l1,l2)
+      })
+    */
     def plusminus: P[(Lin, Lin) => Lin] =
       string("+").as((x:Lin,y:Lin) => Add(x,y)) |
       string("-").as((x:Lin,y:Lin) => Add(x, Mult(Value(-1), y)))
 
     listSep(listSep(lit, mult), plusminus)
   })
+
+
+
+  def notlinP: P[NotLin] = P.recursive((linRec:P[NotLin]) => {
+    def litnotlin: P[NotLin] = P.recursive((litRec:P[NotLin]) => {
+      char('(') *> linRec.surroundedBy(sps) <* char(')') |
+      (char('-') ~ litRec).map(x => MultNotLin(ValueNotLin(-1), x._2)) |
+      realP.map(ValueNotLin.apply) |
+      varName.map(VarNotLin.apply)
+    })
+
+    def multnotlin: P[(NotLin, NotLin) => NotLin] =
+      string("*").as((x:NotLin,y:NotLin) => (x,y) match {
+        case (l1,l2) => MultNotLin(l1,l2)
+      })
+
+    def plusminusnotlin: P[(NotLin, NotLin) => NotLin] =
+      string("+").as((x:NotLin,y:NotLin) => AddNotLin(x,y)) |
+      string("-").as((x:NotLin,y:NotLin) => AddNotLin(x, MultNotLin(ValueNotLin(-1), y)))
+
+    listSep(listSep(litnotlin, multnotlin), plusminusnotlin)
+  })
+
+
+
+
+
+
+
+
+
 
 //  def linPNew: P[Lin] = P.recursive((linRec: P[Lin]) => {
 //    def lit: P[Lin] =
@@ -147,7 +200,7 @@ object Parser2 {
 
 
   def durP: P[Dur] =
-    (string("for")~sps) *> linP.map(For.apply) |
+    (string("for")~sps) *> notlinP.map(For.apply) |
     (string("until")~(char('_')*>realP~(char(',')*>realP).?).? ~ sps ~ condP)
       .map(x => {
         val eps = x._1._1._2.map(_._1)
@@ -166,18 +219,18 @@ object Parser2 {
       char('(') *> bexprRec <* char(')')
     )
 
-    def op: P[(Lin, Lin) => Cond] =
+    def op: P[(NotLin, NotLin) => Cond] =
     //      string("<=").as((x: Lin, y: Lin) => Or(LT(x, y), EQ(x, y))) |
     //        string(">=").as((x: Lin, y: Lin) => Or(GT(x, y), EQ(x, y))) |
-      string("<=").as((x: Lin, y: Lin) => LE(x, y)) |
-      string(">=").as((x: Lin, y: Lin) => GE(x, y)) |
-      char('<').as((x:Lin,y:Lin) => LT(x,y)) |
-      char('>').as((x:Lin,y:Lin) => GT(x,y)) |
-      string("==").as((x:Lin,y:Lin) => EQ(x,y)) |
-      string("!=").as((x:Lin,y:Lin) => Not(EQ(x,y)))
+      string("<=").as((x: NotLin, y: NotLin) => LE(x, y)) |
+      string(">=").as((x: NotLin, y: NotLin) => GE(x, y)) |
+      char('<').as((x:NotLin,y:NotLin) => LT(x,y)) |
+      char('>').as((x:NotLin,y:NotLin) => GT(x,y)) |
+      string("==").as((x:NotLin,y:NotLin) => EQ(x,y)) |
+      string("!=").as((x:NotLin,y:NotLin) => Not(EQ(x,y)))
 
     def ineq =
-      (linP ~ op.surroundedBy(sps) ~ linP).map(x => x._1._2(x._1._1, x._2))
+      (notlinP ~ op.surroundedBy(sps) ~ notlinP).map(x => x._1._2(x._1._1, x._2))
 
     def or: P[(Cond, Cond) => Cond] =
       (string("||")|string("\\/")).map(_ => Or.apply)
@@ -229,14 +282,14 @@ object Parser2 {
 //      })
   })
 
-  val skipComm: Syntax = Atomic(Nil, DiffEqs(Nil, For(Value(0))))
+  val skipComm: Syntax = Atomic(Nil, DiffEqs(Nil, For(ValueNotLin(0))))
   def skip: P[Syntax] =
     string("skip").as(skipComm)
   def waitc: P[Syntax] =
-    (string("wait")~sps *> linP).map(l => Atomic(Nil,DiffEqs(Nil,For(l))))
+    (string("wait")~sps *> notlinP).map(l => Atomic(Nil,DiffEqs(Nil,For(l))))
   def assign: P[Syntax] = //: P[Assign] =
-    (varName ~ string(":=").surroundedBy(sps) ~ linP)
-      .map(x => Atomic(List(Assign(Var(x._1._1), x._2)),DiffEqs(Nil,For(Value(0)))))
+    (varName ~ string(":=").surroundedBy(sps) ~ notlinP)
+      .map(x => Atomic(List(Assign(VarNotLin(x._1._1), x._2)),DiffEqs(Nil,For(ValueNotLin(0)))))
 
   def diffEqsP: P[Syntax] =
     (diffEqsCoreP ~ sps ~ durP.?)

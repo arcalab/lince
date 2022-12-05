@@ -2,10 +2,11 @@ package hprog.frontend
 
 import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime, SyExprVar}
 import hprog.ast._
+import Syntax._
 import hprog.backend.Show
 import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, Valuation, Solution}
 import hprog.frontend.solver.Solver
-
+import scala.math._
 import scala.sys.error
 
 object Eval {
@@ -15,13 +16,44 @@ object Eval {
 //  private type SA = SyExprAll
 //  private type SV = SyExprVar
 
+
+//////////////////////////////////////////////////////////////////////////////
+
+// ALTEREI!!!!!!!!!!!!!!!!!
   def apply(state:Point, lin: Lin): Double = lin match {
     case Var(v) => state(v)
     case Value(v) => v
     case Add(l1, l2) => apply(state,l1) + apply(state,l2)
-    case Mult(v, l)  => apply(state,v)  * apply(state,l)
+    case Mult(v,l2)  => apply(state,v)  * apply(state,l2)
+    /*
+    case Div(l1,l2)  => apply(state,l1) / apply(state,l2)
+    case Res(l1,l2)  => apply(state,l1) % apply(state,l2)
+    case Sin(l1)  => sin(apply(state,l1))
+    case Cos(l1)  => cos(apply(state,l1))
+    case Tan(l1)  => tan(apply(state,l1))
+    case Pow(l1,l2)  => pow(apply(state,l1),apply(state,l2))
+    case Sqrt(l1,l2)  => pow(apply(state,l1),(1/apply(state,l2)))
+    */
   }
 
+
+// ACRESCENTEI !!!!!!!!!!!!!
+  def apply(state:Point, notlin: NotLin): Double = notlin match {
+    case VarNotLin(v) => state(v)
+    case ValueNotLin(v) => v
+    case AddNotLin(l1, l2) => apply(state,l1) + apply(state,l2)
+    case MultNotLin(l1,l2)  => apply(state,l1)  * apply(state,l2)
+    case DivNotLin(l1,l2)  => apply(state,l1) / apply(state,l2)
+    case ResNotLin(l1,l2)  => apply(state,l1) % apply(state,l2)
+    case SinNotLin(l1)  => math.sin(apply(state,l1))
+    case CosNotLin(l1)  => math.cos(apply(state,l1))
+    case TanNotLin(l1)  => math.tan(apply(state,l1))
+    case PowNotLin(l1,l2)  => pow(apply(state,l1),apply(state,l2))
+    //case SqrtNotLin(l1,l2)  => pow(apply(state,l1),(1/apply(state,l2)))
+  }
+  
+
+  // ALTEREI !!!!!!!!!!!!!!! (nos números, apenas o zero é falso)
   def apply(state:Point, cond: Cond): Boolean =
     cond match {
       case BVal(b) =>  b
@@ -33,7 +65,11 @@ object Eval {
       case LT(v, l) => apply(state,v) <  apply(state,l)
       case GE(v, l) => apply(state,v) >= apply(state,l)
       case LE(v, l) => apply(state,v) <= apply(state,l)
+      //case IsoletedCond(l) => if (apply(state,l) != 0) true else false
     }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////
 
   def apply(e:SyExprAll, t: Double, x: Valuation): Double = e match {
     case SVal(v) => v
@@ -44,6 +80,7 @@ object Eval {
 //    case SVar(v) => apply(x(v),t,x) // not really used - usually v(0) denotes this case
                                            // could create an infinte loop if recursive (not anymore with SExpr)
     case SDiv(e1, e2) => apply(e1,t,x) / apply(e2,t,x)
+    case SRes(e1, e2) => apply(e1,t,x) % apply(e2,t,x)
     case SMult(e1, e2) =>apply(e1,t,x) * apply(e2,t,x)
     case SPow(e1, e2) => math.pow(apply(e1,t,x),apply(e2,t,x))
     case SAdd(e1, e2) => apply(e1,t,x) + apply(e2,t,x)
@@ -54,7 +91,7 @@ object Eval {
       case ("exp",v::Nil) => math.exp(apply(v,t,x))
       case ("sin",v::Nil) => math.sin(apply(v,t,x))
       case ("cos",v::Nil) => math.cos(apply(v,t,x))
-      case ("tan",v::Nil) => math.atan(apply(v,t,x))
+      case ("tan",v::Nil) => math.tan(apply(v,t,x))
       case ("arcsin",v::Nil) => math.asin(apply(v,t,x))
       case ("arccos",v::Nil) => math.acos(apply(v,t,x))
       case ("arctan",v::Nil) => math.atan(apply(v,t,x))
@@ -83,11 +120,14 @@ object Eval {
   def update(phi:SySolution, t:SyExpr, v:Valuation): Valuation =
     updInput(v,Eval.updTime(t,phi))
 
+
   // variation for numerically computed solutions
   def updateNum(phi: Solution, t: SyExpr, v: Valuation): Valuation =
     phi.view.mapValues(updater => SVal(updater(apply(t))(apply(v)))).toMap
     //updInput(v, Eval.updTime(t, phi))
 
+
+    
   /** Update an expression by replacing initial values v(0)
     * @param e expression to be updated
     * @param sol solution with the new values
@@ -100,6 +140,7 @@ object Eval {
     case s:SFun[SymbolicExpr.All] =>
       SFun[SymbolicExpr.Time](s.f,s.args.map(e2 =>  updInputFun(e2,sol)))
     case SDiv(e1, e2)  => SDiv( updInputFun(e1,sol),updInputFun(e2,sol))
+    case SRes(e1, e2)  => SRes( updInputFun(e1,sol),updInputFun(e2,sol))
     case SMult(e1, e2) => SMult(updInputFun(e1,sol),updInputFun(e2,sol))
     case SPow(e1, e2)  => SPow( updInputFun(e1,sol),updInputFun(e2,sol))
     case SAdd(e1, e2)  => SAdd( updInputFun(e1,sol),updInputFun(e2,sol))
@@ -150,6 +191,7 @@ object Eval {
     case sf:SFun[SymbolicExpr.All]  =>
       SFun(sf.f,sf.args.map((e2:SyExprAll) => updTimeFun(newt,e2)))
     case SDiv(e1, e2)  => SDiv( updTimeFun(newt,e1), updTimeFun(newt,e2))
+    case SRes(e1, e2)  => SRes( updTimeFun(newt,e1), updTimeFun(newt,e2))
     case SMult(e1, e2) => SMult(updTimeFun(newt,e1), updTimeFun(newt,e2))
     case SPow(e1, e2)  => SPow( updTimeFun(newt,e1), updTimeFun(newt,e2))
     case SAdd(e1, e2)  => SAdd( updTimeFun(newt,e1), updTimeFun(newt,e2))
@@ -193,11 +235,40 @@ object Eval {
 //    case SVal(v) => Var(v)
 //  }
 
+
+
+// Não soube fazer para os que têm ???
   def lin2sage(l:Lin): SyExprVar = l match {
     case Var(v) => SVar(v) //SFun(v,List(SVal(0))) //SVar(v)
     case Value(v) => SVal(v)
     case Add(l1, l2) => SAdd(lin2sage(l1),lin2sage(l2))
     case Mult(v, l2) => SMult(SVal(v.v),lin2sage(l2))
+    /*
+    case Div(l1, l2) => SDiv(lin2sage(l1),lin2sage(l2))
+    case Pow(l1,l2) => SPow(lin2sage(l1),lin2sage(l2))
+    //case Sin(l1) =>???
+    //case Cos(l1) =>???
+    //case Tan(l1) =>???
+    //case Sqrt(l1,l2) =>???
+    */
+
+  }
+
+
+ // Estou na dúvida para os que têm ???, mas penso que seja o que está comentando
+  def notlin2sage(l:NotLin): SyExprVar = l match {
+    case VarNotLin(v) => SVar(v) //SFun(v,List(SVal(0))) //SVar(v)
+    case ValueNotLin(v) => SVal(v)
+    case AddNotLin(l1, l2) => SAdd(notlin2sage(l1),notlin2sage(l2))
+    case MultNotLin(l1, l2) => SMult(notlin2sage(l1),notlin2sage(l2))
+    case DivNotLin(l1, l2) => SDiv(notlin2sage(l1),notlin2sage(l2))
+    case PowNotLin(l1,l2) => SPow(notlin2sage(l1),notlin2sage(l2))
+    case SinNotLin(l1) =>  SFun("sin",List(notlin2sage(l1)))
+    case CosNotLin(l1) =>  SFun("cos",List(notlin2sage(l1)))
+    case TanNotLin(l1) => SFun("tan",List(notlin2sage(l1)))
+    //case SqrtNotLin(l1,l2) => SFun("sqrt",List(notlin2sage(l1)))
+    case ResNotLin(l1,l2) => SRes(notlin2sage(l1),notlin2sage(l2)) // SFun("Res",List(notlin2sage(l1),notlin2sage(l2)))
+
   }
 
   //def syExprToLin(e:SyExpr): Lin =
@@ -212,6 +283,7 @@ object Eval {
     case SFun(f,a) =>
       error(s"Trying to calculate the value of an expression with a function $f(${a.map(Show(_)).mkString(",")}")
     case SDiv(e1, e2) => SDiv(sFunToSVar(e1),sFunToSVar(e2))
+    case SRes(e1, e2) => SRes(sFunToSVar(e1),sFunToSVar(e2))
     case SMult(e1, e2) => SMult(sFunToSVar(e1),sFunToSVar(e2))
     case SPow(e1, e2) => SPow(sFunToSVar(e1),sFunToSVar(e2))
     case SAdd(e1, e2) => SAdd(sFunToSVar(e1),sFunToSVar(e2))
@@ -232,6 +304,13 @@ object Eval {
       case (SVal(0),_) => SVal(0)
       case (SVal(x),SVal(y)) => SVal(x/y)
       case (x,y) => SDiv(x,y)
+    }
+    case SRes(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
+      case (x,SVal(1)) => SVal(0)
+      case (SVal(1),_) => SVal(1)
+      case (SVal(0),_) => SVal(0)
+      case (SVal(x),SVal(y)) => SVal(x%y)
+      case (x,y) => SRes(x,y)
     }
     case SMult(e1, e2) => (simplifyMan(e1),simplifyMan(e2)) match {
       case (x,SVal(1)) => x

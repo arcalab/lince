@@ -1,8 +1,9 @@
 package hprog.frontend.solver
 
 import hprog.ast.SymbolicExpr.SyExprAll
-import hprog.ast.{Cond, DiffEq}
+import hprog.ast._
 import hprog.frontend.Eval
+import Syntax._
 import hprog.frontend.CommonTypes.{Point, Solution, SySolution, Valuation}
 
 // Numerical solver, using a naive solution for differencital equations
@@ -52,7 +53,7 @@ class SimpleSolver extends Solver {
       val input2  = vars.map(input ++ dummies)
       //      println("input with dummies: "+input2.mkString(","))
       val list = sol1(input2, t)
-//      println(s"solving: got list ${list.size}")
+      //      println(s"solving: got list ${list.size}")
 //      println(s"solving: returning ${(vars zip list).toMap -- vars.map("_"+_)}")
       (vars zip list).toMap -- vars.map("_"+_)
     }

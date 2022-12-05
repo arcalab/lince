@@ -13,7 +13,7 @@ object TrajToJS {
   private type BoundaryVar = Map[Either[Double,Double],(Double,String)] // left/right of a time t -> value and comment
 
 
-  def apply(traj:Traj, divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true): String = {
+  def apply(traj:Traj,divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true): String = {
 
     ////println("> starting script generation")
     val dur = traj.getDur
@@ -21,7 +21,7 @@ object TrajToJS {
     // trick to avoid many sampling when already lots of boundaries exist
     val nbrSamples = 0.max(100 - traj.getInits.getOrElse(Map()).size)
 
-    ////println(s"> run 1 completed - got duration $dur & boundary points")
+    ///println(s"> run 1 completed - got duration $dur & boundary points")
 
     val max: Double = Eval(dur.getOrElse(SVal(10)),0)
 
@@ -55,12 +55,12 @@ object TrajToJS {
     // checks if a time value is within the scope
     def inScope(t:Double): Boolean = t>=start && t<=end
 
-    ////println(s"> starting run 2 ($nbrSamples samples)")
+    ///println(s"> starting run 2 ($nbrSamples samples)")
 //    println(s"> "+samples.mkString(","))
 
     val sampleValues = traj.evalBatch(SVal(start),SVal(end), SDiv(SSub(SVal(end),SVal(start)),SVal(nbrSamples))) //(samples)
 
-    ////println("> run 2 completed - got samples")
+    ///println("> run 2 completed - got samples")
 
     for ((t,x) <- sampleValues; (variable,value) <- x)
       traces += variable -> (traces(variable) + (Eval(t)->Left(Eval(value))))
@@ -69,7 +69,7 @@ object TrajToJS {
 //        traces += variable -> (traces(variable) + (t->Left(value)))
     //      println("d")
 
-    ////println("> building boundaries, warnings, and notes")
+  //  println("> building boundaries, warnings, and notes")
     // Add ending points to "boundaries" and to "traces"
     for (e <- traj.getEnds;
          (t,endValues) <- e if inScope(Eval(t,0));
@@ -128,7 +128,7 @@ object TrajToJS {
     js += buildTraces(traces,colorIDs)
     js += buildBoundaries(boundaries,colorIDs)
     js += buildWarnings(traj,inScope,colorIDs)
-    ////println("> done")
+    ///println("> done")
 
 
     val traceNames = traces.keys.map("t_"+_).toList ++

@@ -2,6 +2,7 @@ package hprog.frontend.solver
 
 import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll}
 import hprog.ast._
+import Syntax._
 import hprog.backend.Show
 import hprog.common.{ParserException, TimeoutException}
 import hprog.frontend.CommonTypes.{SySolution, Valuation}
@@ -28,7 +29,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   while (last!=Some("sage: started") && count>0) { // if not started yet, then wait
     lockRcv.synchronized{
       debug(()=>s"Initial run: waiting to start (last=$last, count=$count)")
-      lockRcv.wait(1000)
+      lockRcv.wait(3000) // tempo de espera para o sage coemeçar
       count -= 1
     }
     lockSnd.synchronized {
@@ -108,9 +109,9 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     while (!ok) {
     // wait for the notification (new value returned)
       lockRcv.synchronized{
-        debug(()=>"(lince) waiting up to 10s for reply")
+        debug(()=>"(lince) waiting up to 40s for reply")
         if (last == None) // I'm the first - wait
-          lockRcv.wait(10000)
+          lockRcv.wait(40000)
         debug(()=>"(lince) done")
         //debug(()=>s"> '${last}'")
       }
@@ -203,6 +204,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     case s:SVar        => List(s.v)
     case SFun(_, args) => args.flatMap(getVars) //if (args == List(SVal(0)))
     case SDiv(e1, e2)  => getVars(e1) ++ getVars(e2)
+    case SRes(e1, e2)  => getVars(e1) ++ getVars(e2)
     case SMult(e1, e2) => getVars(e1) ++ getVars(e2)
     case SPow(e1, e2)  => getVars(e1) ++ getVars(e2)
     case SAdd(e1, e2)  => getVars(e1) ++ getVars(e2)
@@ -284,7 +286,8 @@ object LiveSageSolver {
 
     // limit scope of any temporary variables
     // locally {
-    val sage = s"$path/sage"
+    //val sage = s"$path/sage"
+    val sage = "\"C:\\Users\\Ricardo Correia\\AppData\\Local\\SageMath 9.3\\runtime\\bin\\mintty.exe\" -t 'SageMath 9.3 Console' -i sagemath.ico /bin/bash --login -c '/opt/sagemath-9.3/sage'"
     // strings are implicitly converted to ProcessBuilder
     // via scala.sys.process.ProcessImplicits.stringToProcess(_)
     val io = new ProcessIO(

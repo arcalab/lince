@@ -24,6 +24,7 @@ sealed trait SymbolicExpr[+X<:SymbolicExpr.All] {
     case s:SVar => s.v
     case SFun(f, args) => s"$f(${args.mkString(",")})"
     case SDiv(e1, e2) => s"$e1/$e2"
+    case SRes(e1,e2) => s"$e1%$e2"
     case SMult(e1, e2) => s"$e1*$e2"
     case SPow(e1, e2) => s"$e1^$e2"
     case SAdd(e1, e2) => s"$e1+$e2"
@@ -49,6 +50,7 @@ case class SVar(v:String)                     extends SymbolicExpr[Vars]
 case class SFun[X<:All](f:String, args:List[SymbolicExpr[X]])
                                               extends SymbolicExpr[X]
 case class SDiv[X<:All](e1:SymbolicExpr[X], e2:SymbolicExpr[X])  extends SymbolicExpr[X]
+case class SRes[X<:All](e1:SymbolicExpr[X], e2:SymbolicExpr[X])  extends SymbolicExpr[X]
 case class SMult[X<:All](e1:SymbolicExpr[X], e2:SymbolicExpr[X]) extends SymbolicExpr[X]
 case class SPow[X<:All](e1:SymbolicExpr[X], e2:SymbolicExpr[X])  extends SymbolicExpr[X]
 case class SAdd[X<:All](e1:SymbolicExpr[X], e2:SymbolicExpr[X])  extends SymbolicExpr[X]

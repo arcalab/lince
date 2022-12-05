@@ -2,6 +2,7 @@ package hprog.frontend.solver
 
 import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime}
 import hprog.ast._
+import Syntax._
 import hprog.backend.Show
 import hprog.common.ParserException
 import hprog.frontend.CommonTypes.{SySolution, Valuation, Warnings}
@@ -318,7 +319,7 @@ class StaticSageSolver extends Solver {
   }
 
   protected def debug(s:()=>String): Unit = {
-    // println("[Solver] "+s())
+    println("[Solver] "+s())
   }
 
 }

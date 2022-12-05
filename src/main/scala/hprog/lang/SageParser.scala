@@ -161,6 +161,7 @@ object SageParser extends RegexParsers {
       case SFun(_, _) => SMult(SVal(-1),e)
       case SPow(_, _) => SMult(SVal(-1),e)
       case SDiv(e1, e2)  => SDiv(invert(e1),e2)
+      case SRes(e1, e2)  => SRes(invert(e1),e2)
       case SMult(e1, e2) => SMult(invert(e1),e2)
       case SAdd(e1, e2)  => SAdd(invert(e1),invert(e2))
       case SSub(e1, e2)  => SSub(e2,e1)

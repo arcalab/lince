@@ -4,6 +4,7 @@ import breeze.linalg._
 import breeze.numerics._
 import hprog.ast.SymbolicExpr.{Pure, SyExpr, SyExprAll}
 import hprog.ast._
+import Syntax._
 import hprog.backend.Show
 import hprog.frontend.CommonTypes._
 import hprog.frontend.Eval
@@ -74,12 +75,28 @@ object Solver {
     vars.map(x => m.getOrElse[Double](x,0))
   }
 
+
+
+
+
+
+/////////////////////////////////////////////////////////////////
+// ALTEREI!!!!!!!!!!!!!!!
   private def getRowValues(e:Lin,base:String): Map[String,Double] = e match {
     case Var(v) => Map(v->1)
     case Value(v) => Map(("_"+base)->v)
     case Add(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
-    case Mult(v, l) => getRowValues(l,base).view.mapValues(_*v.v).toMap
+    case Mult(l1, l2) => mult(getRowValues(l1,base),getRowValues(l2,base))
+    //case Div(l1, l2) => div(getRowValues(l1,base),getRowValues(l2,base))
+    //case Pow(l1, l2) => mypow(getRowValues(l1,base),getRowValues(l2,base))
+    //case Sqrt(l1, l2) => mysqrt(getRowValues(l1,base),getRowValues(l2,base))
+    //case Sin(l1) => mysin(getRowValues(l1,base))
+    //case Cos(l1) => mycos(getRowValues(l1,base))
+    //case Tan(l1) => mytan(getRowValues(l1,base))
   }
+
+
+
   //  private def multt(d:Double,d2:Double): Double = d*d2
   private def join(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
     var res = m2
@@ -89,6 +106,28 @@ object Solver {
     }
     res
   }
+
+  private def mult(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
+    var res = m2
+    for ((k, v1) <- m1) m2.get(k) match {
+      case Some(v2) => val v = v1*v2; res += k -> v
+      case None => res += k->v1
+    }
+    res
+  }
+
+////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
 
   private def list2Matrix(m:List[List[Double]]): DenseMatrix[Double] = {
     val rows = m.size
@@ -199,7 +238,7 @@ object Solver {
     * @param precision
     * @return
     */
-  def solveTaylorManual(a:List[List[Double]],precision:Double = 0.0000001, maxSteps:Int=100):  (List[Double],Double) => List[Double] = {
+  def solveTaylorManual(a:List[List[Double]],precision:Double = 0.0000001, maxSteps:Int=100): (List[Double],Double) => List[Double] = {
     //println("building ODE "+a.mkString("/"))
     val size = a.size // square matrix
 

@@ -3,11 +3,14 @@ package hprog.frontend
 //import breeze.numerics.{pow, sqrt}
 import hprog.ast
 import hprog.ast._
+import Syntax._
 import hprog.frontend.CommonTypes.Point
 import optimus.algebra.{Constraint, Expression}
 import optimus.optimization._
 import optimus.optimization.enums.SolverLib
 import optimus.optimization.model.{MPFloatVar, MPVar}
+
+import scala.math._
 
 class Distance(eps:Double) extends Deviator {
   override def closest(p: Point, cond: Cond): Option[Point] =
@@ -23,6 +26,11 @@ object Distance {
     * @param max maximum distance to search
     * @return some closest point within c and not further than `max`
     */
+
+
+
+
+  // PEDIR AO PROF AJUDA PARA PERCEBER MELHOR
   def closest(p:Point,c:Cond,max:Double): Option[Point] = {
     val res = if (max<=0) {
       if (normaliseCond(c) contains p) Some(p) else None
@@ -30,11 +38,14 @@ object Distance {
     else closest(p, normaliseCond(c), max).flatMap(p2 =>
         if (dist(p,p2)<=max) Some(p2) else None
     )
-    //println(s"got closest to ${p} when ${Show(c)} - ${res}")
+   
     res
   }
 
 
+
+
+// PEDIR AO PROF AJUDA PARA PERCEBER MELHOR
   type DNF = Or
   case class Or(ands:Set[And]) {
     def contains(p:Point): Boolean = ands.exists(_ contains p)
@@ -45,48 +56,59 @@ object Distance {
   sealed abstract class Ineq {
     def contains(p:Point): Boolean = this match {
       //case EQ(l1, l2) => Eval(p,l1) == Eval(p,l2)
-      case GT(l1, l2) => Eval(p,l1) >  Eval(p,l2)
+      case GT(l1, l2) => Eval(p,l1) >  Eval(p,l2) // COMO FOI POSSÍVEL ACEDER AO EVAL??
       case LT(l1, l2) => Eval(p,l1) <  Eval(p,l2)
       case GE(l1, l2) => Eval(p,l1) >= Eval(p,l2)
       case LE(l1, l2) => Eval(p,l1) <= Eval(p,l2)
     }
   }
-  //  case class EQ(l1:Lin,l2:Lin)      extends Ineq
-  case class GT(l1:Lin,l2:Lin)      extends Ineq
-  case class LT(l1:Lin,l2:Lin)      extends Ineq
-  case class GE(l1:Lin,l2:Lin)      extends Ineq
-  case class LE(l1:Lin,l2:Lin)      extends Ineq
 
 
 
+  // ALTEREI!!!!!!!!!!!!
+  case class GT(l1:NotLin,l2:NotLin)      extends Ineq
+  case class LT(l1:NotLin,l2:NotLin)      extends Ineq
+  case class GE(l1:NotLin,l2:NotLin)      extends Ineq
+  case class LE(l1:NotLin,l2:NotLin)      extends Ineq
+
+//////////////////////////////////////////////////////////////////
+
+// ALTEREI!
+
+// TENHO DUVIDAS NOS BVALS, AND E OR
   def normaliseCond(c:Cond): DNF = c match {
     case BVal(true) => Or(Set(And(Set())))
-    case BVal(false) => Or(Set())
-    case ast.And(c1, c2) => (normaliseCond(c1),normaliseCond(c2)) match {
+    case BVal(false) => Or(Set()) // PORQUE ESTE É ASSIM E O DO BVAL(TRUE) NÃO?
+    case ast.Syntax.And(c1, c2) => (normaliseCond(c1),normaliseCond(c2)) match {
       case (Or(ands1),Or(ands2)) => Or( for(a1<-ands1;a2<-ands2) yield And(a1.ineqs++a2.ineqs))
     }
-    case ast.Or(c1, c2) =>  (normaliseCond(c1),normaliseCond(c2)) match {
+    case ast.Syntax.Or(c1, c2) =>  (normaliseCond(c1),normaliseCond(c2)) match {
       case (Or(ands1), Or(ands2)) => Or(ands1++ands2)
     }
     case Not(c2) => normaliseCond(swapOps(c2))
-    case ast.EQ(v, l) => Or(Set(And(Set(GE(v,l),LE(v,l)))))
-    case ast.GT(v, l) => Or(Set(And(Set(GT(v,l)))))
-    case ast.LT(v, l) => Or(Set(And(Set(LT(v,l)))))
-    case ast.GE(v, l) => Or(Set(And(Set(GE(v,l)))))
-    case ast.LE(v, l) => Or(Set(And(Set(LE(v,l)))))
+    case ast.Syntax.EQ(l1, l2) => Or(Set(And(Set(GE(l1, l2),LE(l1, l2)))))
+    case ast.Syntax.GT(l1, l2) => Or(Set(And(Set(GT(l1, l2)))))
+    case ast.Syntax.LT(l1, l2) => Or(Set(And(Set(LT(l1, l2)))))
+    case ast.Syntax.GE(l1, l2) => Or(Set(And(Set(GE(l1, l2)))))
+    case ast.Syntax.LE(l1, l2) => Or(Set(And(Set(LE(l1, l2)))))
   }
+  
 
+  // no fundo faz o swap da condição
   def swapOps(c: Cond): Cond = c match {
     case BVal(b)        => BVal(!b)
-    case ast.And(c1, c2)=> ast.Or(swapOps(c1),swapOps(c2))
-    case ast.Or(c1, c2) => ast.And(swapOps(c1),swapOps(c2))
+    case ast.Syntax.And(c1, c2)=> ast.Syntax.Or(swapOps(c1),swapOps(c2))
+    case ast.Syntax.Or(c1, c2) => ast.Syntax.And(swapOps(c1),swapOps(c2))
     case Not(c2)        => c2
-    case ast.EQ(v, l)   => ast.Or(ast.LT(v,l),ast.GT(v,l))
-    case ast.GT(v, l)   => ast.LE(v,l)
-    case ast.LT(v, l)   => ast.GE(v,l)
-    case ast.GE(v, l)   => ast.LT(v,l)
-    case ast.LE(v, l)   => ast.GT(v,l)
+    case ast.Syntax.EQ(l1, l2)   => ast.Syntax.Or(ast.Syntax.LT(l1, l2),ast.Syntax.GT(l1, l2))
+    case ast.Syntax.GT(l1, l2)   => ast.Syntax.LE(l1, l2)
+    case ast.Syntax.LT(l1, l2)   => ast.Syntax.GE(l1, l2)
+    case ast.Syntax.GE(l1, l2)   => ast.Syntax.LT(l1, l2)
+    case ast.Syntax.LE(l1, l2)   => ast.Syntax.GT(l1, l2)
   }
+
+///////////////////////////////////////////////////////////////////////////
+
 
   private def closest(p:Point, dnf:DNF, max:Double): Option[Point] = dnf.ands.headOption match {
     case Some(and) =>
@@ -145,10 +167,10 @@ object Distance {
     else closest(p,left(ineq),right(ineq))
   }
 
-  def closest(p:Point, l1:Lin, l2:Lin): Point = {
+  def closest(p:Point, l1:NotLin, l2:NotLin): Point = {
     val delta = neg(p)
-    val p1 = lin2point(shiftLin(l1,delta))
-    val p2 = lin2point(shiftLin(l2,delta))
+    val p1 = notlin2point(shiftNotLin(l1,delta))
+    val p2 = notlin2point(shiftNotLin(l2,delta))
     //    val plane = add(add(p1,neg(p2)),neg(p)) // p1-p2 - p
     val plane = add(p1,neg(p2))
     val d = 0.0 - plane.getOrElse("",0.0) // extra value without variable from p1-p2
@@ -157,15 +179,74 @@ object Distance {
     //println(s"closest to origin solving ${plane2} = $d\n returned $p3")
     add(p3 , p) // add point p in the end
   }
+// ALTEREI!!!!
+  def notlin2point(notlin: NotLin): Point = notlin match {
+    case VarNotLin(v) => Map(v->1.0)
+    case ValueNotLin(v) => Map("" -> v)
+    case AddNotLin(l1, l2) => add(notlin2point(l1),notlin2point(l2))
+    case MultNotLin(l1, l2) => mul(notlin2point(l1),notlin2point(l2))
+    case DivNotLin(l1, l2) => div(notlin2point(l1),notlin2point(l2))
+    case ResNotLin(l1, l2) => res(notlin2point(l1),notlin2point(l2))
+    case SinNotLin(l1) => seno(notlin2point(l1)) 
+    case CosNotLin(l1) => cosseno(notlin2point(l1)) 
+    case TanNotLin(l1) => tangente(notlin2point(l1))
+    case PowNotLin(l1, l2) => powdef(notlin2point(l1),notlin2point(l2))
+    //case SqrtNotLin(l1, l2) => ???
 
-  def lin2point(lin: Lin): Point = lin match {
-    case Var(v) => Map(v->1.0)
-    case Value(v) => Map("" -> v)
-    case Add(l1, l2) => add(lin2point(l1),lin2point(l2))
-    case Mult(v, l) => lin2point(l).view.mapValues(_ * v.v).toMap
-  }
+    }
+
+  // Porque só tem 'x' depois do yield?
   def add(p1:Point,p2:Point): Point =
     p1 ++ (for ((x,v) <- p2) yield x -> (p1.getOrElse(x,0.0)+v))
+
+
+//////////////////////////////////////////////////////////////////
+
+// ADICIONEI ESTAs (PROVAVELMENTE ESTÁ MAL)
+  def mul(p1:Point,p2:Point): Point=
+    p1 ++ (for ((x,v) <- p2) yield x -> (p1.getOrElse(x,1.0)*v))
+
+  def div(p1:Point,p2:Point): Point=
+    p1 ++ (for ((x,v) <- p2) yield x -> (if (p1.contains(x))  p1(x)/v else v)) 
+
+
+  def res(p1:Point,p2:Point): Point=
+    p1 ++ (for ((x,v) <- p2) yield x -> (if (p1.contains(x))  p1(x)%v else v))
+
+ 
+  def seno(p1:Map[String,Double]): Map[String,Double]=
+    p1.map(v => v._1 -> sin(v._2))
+  
+
+
+  def cosseno(p1:Map[String,Double]): Map[String,Double]=
+    p1.map(v => v._1 -> cos(v._2))
+
+
+  def tangente(p1:Map[String,Double]): Map[String,Double]=
+    p1.map(v => v._1 -> tan(v._2))
+
+
+  def powdef(p1:Map[String,Double],p2:Map[String,Double]): Map[String,Double]=
+   p1 ++ (for ((x,v) <- p2) yield x -> (if (p1.contains(x))  pow(p1(x),v) else v))
+
+
+/*
+  def cosseno(p1:Point): Point=
+    p1.mapValues((x,v)=>(x,cos(v)))
+
+  def tangente(p1:Point): Point=
+    p1.mapValues((x,v)=>(x,tan(v)))
+
+
+  def powdef(p1:Point,p2:Point): Point=
+  
+
+  def sqrtdef(p1:Point,p2:Point): Point=
+*/
+  
+/////////////////////////////////////////////////////////////////
+
 
   def neg(p1:Point): Point =
     p1.view.mapValues(_*(-1)).toMap
@@ -176,14 +257,14 @@ object Distance {
     plane.view.mapValues(x => x*d/norm).toMap
   }
 
-  def left(ineq: Ineq): Lin = ineq match {
+  def left(ineq: Ineq): NotLin = ineq match {
     //case EQ(l1,_) => l1
     case GT(l1,_) => l1
     case LT(l1,_) => l1
     case GE(l1,_) => l1
     case LE(l1,_) => l1
   }
-  def right(ineq: Ineq): Lin = ineq match {
+  def right(ineq: Ineq): NotLin = ineq match {
     //case EQ(_,l2) => l2
     case GT(_,l2) => l2
     case LT(_,l2) => l2
@@ -205,16 +286,29 @@ object Distance {
   }
 
   def shiftIneq(ineq: Ineq, delta:Point): Ineq = ineq match {
-    case GT(l1, l2) => GT(shiftLin(l1,delta),shiftLin(l2,delta))
-    case LT(l1, l2) => LT(shiftLin(l1,delta),shiftLin(l2,delta))
-    case GE(l1, l2) => GE(shiftLin(l1,delta),shiftLin(l2,delta))
-    case LE(l1, l2) => LE(shiftLin(l1,delta),shiftLin(l2,delta))
+    case GT(l1, l2) => GT(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case LT(l1, l2) => LT(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case GE(l1, l2) => GE(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case LE(l1, l2) => LE(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
   }
-  def shiftLin(lin: Lin, delta:Point): Lin = lin match {
-    case Var(v) => if (delta(v)!=0) Add(lin,Value(-delta(v))) else lin
-    case Value(_) => lin
-    case Add(l1, l2) => Add(shiftLin(l1,delta),shiftLin(l2,delta))
-    case Mult(v, l) => Mult(v,shiftLin(l,delta))
+
+
+
+
+  //ALTEREI!!!
+  def shiftNotLin(notlin: NotLin, delta:Point): NotLin = notlin match {
+    case VarNotLin(v) => if (delta(v)!=0) AddNotLin(notlin,ValueNotLin(-delta(v))) else notlin // Porquê o menos ??
+    case ValueNotLin(_) => notlin
+    case AddNotLin(l1, l2) => AddNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case MultNotLin(l1, l2) => MultNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case DivNotLin(l1,l2) => DivNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case ResNotLin(l1,l2) => ResNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case SinNotLin(l1) => SinNotLin(shiftNotLin(l1,delta))
+    case CosNotLin(l1) => CosNotLin(shiftNotLin(l1,delta))
+    case TanNotLin(l1) => TanNotLin(shiftNotLin(l1,delta))
+    case PowNotLin(l1,l2) => PowNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    //case SqrtNotLin(l1,l2) => SqrtNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+     
   }
 
 
@@ -276,7 +370,7 @@ subjectTo(
           x + y <:= 5,
           x <:= 3
          )
-  At last, we can solve the problem by starting the solver and displaying the results:
+  At last.Syntax, we can solve the problem by starting the solver and displaying the results:
 
 start()
 println(s"objective: $objectiveValue")
@@ -289,19 +383,19 @@ release()
   }
 
   def ineqToConstr(ineq: Ineq, vars: Map[String, MPVar]): Constraint = {
-    val small:Point = lin2point(smallPart(ineq))
-    val big:Point   = lin2point(bigPart(ineq))
+    val small:Point = notlin2point(smallPart(ineq))
+    val big:Point   = notlin2point(bigPart(ineq))
 
     point2Expr(small,vars) <:= point2Expr(big,vars)
   }
 
-  def smallPart(ineq: Ineq): Lin = ineq match {
+  def smallPart(ineq: Ineq): NotLin = ineq match {
     case GT(_, l2) => l2
     case LT(l1, _) => l1
     case GE(_, l2) => l2
     case LE(l1, _) => l1
   }
-  def bigPart(ineq: Ineq): Lin = ineq match {
+  def bigPart(ineq: Ineq): NotLin = ineq match {
     case GT(l1, _) => l1
     case LT(_, l2) => l2
     case GE(l1, _) => l1
