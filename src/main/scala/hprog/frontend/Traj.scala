@@ -523,6 +523,7 @@ object Traj {
       else
         SVal(Eval(SSub(b.timer, durSy2))) ->
           (x2 ++ Eval.updateNum(phiBkp, durSy2, x2)) // update x with phi after b.timer durtion
+      // debug(()=>s" - updated newTimer and x3: $x3")
       logger.init(x2)
       logger += durSy2
       logger.end(x3)
