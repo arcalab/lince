@@ -29,7 +29,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   while (last!=Some("sage: started") && count>0) { // if not started yet, then wait
     lockRcv.synchronized{
       debug(()=>s"Initial run: waiting to start (last=$last, count=$count)")
-      lockRcv.wait(3000) // tempo de espera para o sage coemeçar
+      lockRcv.wait(1000) // tempo de espera para o sage coemeçar
       count -= 1
     }
     lockSnd.synchronized {
@@ -111,7 +111,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       lockRcv.synchronized{
         debug(()=>"(lince) waiting up to 40s for reply")
         if (last == None) // I'm the first - wait
-          lockRcv.wait(40000)
+          lockRcv.wait(10000)
         debug(()=>"(lince) done")
         //debug(()=>s"> '${last}'")
       }
@@ -159,7 +159,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     */
   private def genSage(eqs:List[DiffEq]): String = {
     var res = "_t_ = var('_t_'); "
-    val undefinedVars = Utils.getUsedVars(eqs) -- Utils.getDefVars(eqs)
+    val undefinedVars = (Utils.getUsedVarsTHEN(eqs)++Utils.getUsedVarsELSE(eqs)) -- Utils.getDefVars(eqs) //AAAAAAAAAAAAAAAAAAAALLLTEREIIIII
     val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(Var(v),Value(0))).toList
 
     for (e <- eqs2)
@@ -286,8 +286,8 @@ object LiveSageSolver {
 
     // limit scope of any temporary variables
     // locally {
-    //val sage = s"$path/sage"
-    val sage = "\"C:\\Users\\Ricardo Correia\\AppData\\Local\\SageMath 9.3\\runtime\\bin\\mintty.exe\" -t 'SageMath 9.3 Console' -i sagemath.ico /bin/bash --login -c '/opt/sagemath-9.3/sage'"
+    val sage = s"$path/sage"
+    //val sage = "\"C:\\Users\\Ricardo Correia\\AppData\\Local\\SageMath 9.3\\runtime\\bin\\mintty.exe\" -t 'SageMath 9.3 Console' -i sagemath.ico /bin/bash --login -c '/opt/sagemath-9.3/sage'"
     // strings are implicitly converted to ProcessBuilder
     // via scala.sys.process.ProcessImplicits.stringToProcess(_)
     val io = new ProcessIO(

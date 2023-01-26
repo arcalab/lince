@@ -287,7 +287,7 @@ object Show {
 
 
   // NÃO PERCEBI O QUE ESTA FAZ
-  def floatToFraction(v: Double): String = {
+  def floatToFraction(v: Double): String = try {
     var den: BigInt = 1
     var num: BigDecimal = v
     while (num.toBigIntExact.isEmpty) { // && num < BigDecimal.apply("100000000000000000000000")) {
@@ -298,6 +298,8 @@ object Show {
     //println(s"-- $v -> ${num.toBigInt.toString}/${den.toString}")
     if (den == 1) num.toBigInt.toString
     else s"${num.toBigInt.toString}/${den.toString}"
+    } catch {
+    case e: java.lang.NumberFormatException => "NaN"
   }
 
   // NÃO PERCEBI PARA O QUE SERVE

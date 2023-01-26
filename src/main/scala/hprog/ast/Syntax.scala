@@ -48,7 +48,7 @@ object Syntax {
     override def ~(p:Syntax): Syntax = (de.dur,p) match {
       case (_,Seq(p,q)) => Seq(this~p,q)
       case (_,While(pre, d, doP)) => While(this~pre,d,doP)
-      case (For(ValueNotLin(0)),Atomic(as2,de)) => Atomic(as++as2,de)
+      //case (For(ValueNotLin(0)),Atomic(as2,de)) => Atomic(as++as2,de)
       case (_,_) => Seq(this,p)
     }
   //  def ~(a:Assign): Syntax = this ~ Atomic(List(a),DiffEqs(Nil,For(Value(0))))

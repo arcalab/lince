@@ -195,9 +195,9 @@ object Distance {
 
     }
 
-  // Porque só tem 'x' depois do yield?
+  // Porque só tem 'x' depois do yield?   
   def add(p1:Point,p2:Point): Point =
-    p1 ++ (for ((x,v) <- p2) yield x -> (p1.getOrElse(x,0.0)+v))
+    p1 ++ (for ((x,v) <- p2) yield x -> (p1.getOrElse(x,0.0)+v)) // getOrElse retira o valor de p1 e se não existir retorna (x,0)
 
 
 //////////////////////////////////////////////////////////////////
