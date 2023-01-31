@@ -53,7 +53,7 @@ object Eval {
   }
   
 
-  // ALTEREI !!!!!!!!!!!!!!! (nos números, apenas o zero é falso)
+  // ALTEREI !!!!!!!!!!!!!!! 
   def apply(state:Point, cond: Cond): Boolean =
     cond match {
       case BVal(b) =>  b
@@ -107,12 +107,12 @@ object Eval {
     }
   }
 
-  // Ignore variables or time arguments
+  // Ignore variables or time arguments (caso se queira colocar apenas alguns argumentos)
   def apply(e:SyExprTime, t:Double): Double = apply(e,t,Map())
   def apply(e:SyExprVar, x:Valuation): Double = apply(e,0,x)
   def apply(e:SyExpr): Double = apply(e,0,Map())
 
-  def apply(v: Valuation): Point = v.view.mapValues(apply).toMap
+  def apply(v: Valuation): Point = v.view.mapValues(apply).toMap // o mapValues só atua nos valores das keys do Map
 
   def update(e:SyExprAll, t:SyExpr, v:Valuation): SyExpr =
     updInput(Eval.updTime(t,e),v)

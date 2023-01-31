@@ -18,11 +18,11 @@ object Utils {
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // pego em conteúdo do tipo syntaxNL e retorno conteúdo do tipo List[List[DiffEq]]
-  // No fundo o que  faz é retirar todas as equações diferenciais de um código
+  // pego em conteúdo do tipo syntax e retorno conteúdo do tipo List[List[DiffEq]]
+  // No fundo o que esta função faz é retirar todas as equações diferenciais de um programa
   def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
     case Atomic(_, DiffEqs(eqs,_)) => List(eqs)
-    case Seq(p, q) => getDiffEqs(p) ::: getDiffEqs(q) // adiciona o resultado da direita ao inicio da lista da esquerda
+    case Seq(p, q) => getDiffEqs(p) ::: getDiffEqs(q) // junta as duas listas
     case ITE(_, thenP, elseP) => getDiffEqs(thenP) ::: getDiffEqs(elseP)
     case While(pre, _, doP) => getDiffEqs(pre) ::: getDiffEqs(doP)
   }
@@ -31,45 +31,88 @@ object Utils {
 
 
 
+// NOVO
+def extractAssigments(prog:Syntax):List[Assign] = prog match {
+  
+  case Atomic(as,_) => {
+       // println("asATomic:",as)
+  	return as
+  }
+  case Seq(Atomic(as,_),q) => {
+  	var ac=as++extractAssigments(q)
+  	//println("acSeq:",ac)
+  	return ac
+  }
+  case Seq(p,q) =>{
+  
+   return extractAssigments(p) ++ extractAssigments(q)
+  }
+  case While(pre,c,p) => {
+  	//println("ww:",extractAssigments(pre))
+  	return extractAssigments(pre)
+  
+  }
+  case _ =>  List()
 
-////// NOVO ///////
 
-// verifica se as variáveis livres já tinham sido declaradas antes de serem usadas
-  def assigmentsVerify(prog:Syntax): Boolean = prog match {
-    case Atomic(as,_)=>{
-      var declVar= as.map(_.v.v).toList // lista  das variáveis declaradas
+}
+
+
+
+
+////// NOVO /////// 
+//verify if the free varibles had already been declarated before being used.
+  def assigmentsVerify(prog:Syntax): Set[String] = prog match {
+    
+    case Seq(p,q) => {
+      var as=extractAssigments(p) ++ extractAssigments(q)
+      //println("assgmverify:",as)
+      var declVar= as.map(_.v.v).toList //list of declarated variables in atomic
       var aux=0
       var aux2=1
+      var zz:Set[String]=Set()
       for (i <- as){
-        var z=getVars(i.e)   // variáveis utilizadas na atribuição de outra variável
-
-        //  removo as variaveis que existem em z que foram declaradas antes
+ 
+        var z=getVars(i.e)   // Set of used variables in the atribution of other veriable in atomic
+        // remotion of existing variables in Z that have been declareted 
+        for (j <- 0 until (aux) by 1){
+          z -= declVar(j)
+        }
+        
+        zz=zz++z
+        aux=aux+1
+        
+        }
+       
+       return zz	
+    
+    }
+    case Atomic(as,_)=>{
+      var declVar= as.map(_.v.v).toList //list of declarated variables in atomic
+      var aux=0
+      var aux2=1
+      var zz:Set[String]=Set()
+      
+      for (i <- as){
+ 
+        var z=getVars(i.e)   // Set of used variables in the atribution of other veriable in atomic
+        // remotion of existing variables in Z that have been declareted 
         for (j <- 0 until (aux) by 1){
           z -= declVar(j)
         }
 
-        // se o z ficou vazio, então é porque as variáveis tinham sido declaradas antes, senão não
-        if(z.size==0){
-          aux2=aux2
-        } else {
-          aux2=0
-        }
-
+        // if Z stayed empty, it is because the variables had already been declareted, if not no        
+        
+        zz=zz++z
         aux=aux+1
-
-      }
-
-      if (aux2==0) {
-        return false
-      } else {
-        return true
-      }
-
-    }
-  case Seq(p,_) => assigmentsVerify(p)
-  case ITE(ifP,thenP,elseP) => (getVars(ifP).size==0) && assigmentsVerify(thenP) && assigmentsVerify(elseP)
-  case While(pre,_,_) => assigmentsVerify(pre)
-
+        
+        }
+       
+       return zz
+    }   
+    //case Seq(p,_) => assigmentsVerify(p)
+    case ITE(ifP,thenP,elseP) =>getVars(ifP)++assigmentsVerify(thenP)++assigmentsVerify(elseP) //probably this case does not have any effect because it is obligatory the declaration of variables above the instructions 
+    case While(pre,c,p) => assigmentsVerify(pre)  
   }
 
 
@@ -83,7 +126,7 @@ object Utils {
     * @return the free variables of the first atomic expression
     */
 
-  // O que faz é tipo chegar a p:=3+v e ficar com Set(v), mas apenas lhe interessa as do primiero atomico
+  // O que faz é tipo chegar a p:=3+v e ficar com Set(v), mas apenas lhe interessa as do primeiro atomico
   def getFstFreeVars(prog:Syntax): Set[String] = prog match {
     case Atomic(as, _) => as.toSet.flatMap((a:Assign)=>getVars(a.e))
     case Seq(p, _) => getFstFreeVars(p)
@@ -97,31 +140,38 @@ object Utils {
 
 
 
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// verifica se há variáveis livres e também se são utilizadas variáveis que não são declaradas
+// Verify if exists free variables  already been declarated before being used, and also if they are used variables that are not declareted
   def isClosed(prog:Syntax): Either[String,Unit] = {
-    val declVar = getFstDeclVars(prog) //cria um conjunto com a primeiras variaveis declaradas
-    println("Variáveis declaradas:",declVar)
-    val initFreeVars = getFstFreeVars(prog) // cria outro conjunto com as primeiras variáveis livres
-    println("Variáveis livres:",initFreeVars)
-    val usedVars = getUsedVars(prog) // cria um conjunto com todas as variáveis utilizadas
-    println("Variáveis utilizadas:",usedVars)
-    if (initFreeVars.nonEmpty) // verifico se existem variáveis livres, se existirem imprimo
-      Left(s"Initial declaration has free variables: ${initFreeVars.mkString(", ")}")
-    else if (!usedVars.forall(declVar)) // verifico se são utilizadas variáveis que não são declaradas 
-      Left(s"Variable(s) not declared: ${(usedVars -- declVar).mkString(", ")}")
+    val declVarTHEN = getFstDeclVarsTHEN(prog) //make a set with the firsts declareted variables (THEN)
+    println("Variáveis declaradas (THEN):",declVarTHEN)
+    
+    val declVarELSE = getFstDeclVarsELSE(prog) //make a set with the firsts declareted variables (ELSE)
+    println("Variáveis declaradas (ELSE):",declVarELSE)
+    
+    val usedVarsTHEN = getUsedVarsTHEN(prog)   //make a set with the firsts used variables
+    println("Variáveis utilizadas (THEN):",usedVarsTHEN)
+    
+    val usedVarsELSE = getUsedVarsELSE(prog)  //make a set with the firsts used variables
+    println("Variáveis utilizadas (ELSE):",usedVarsELSE)
+    
+    val asVerify=assigmentsVerify(prog) //make a set of free variables that not had been declareted before of ther invocation.
+    println("Variáveis livres não declaradas:",asVerify)
+    
+    if (asVerify.nonEmpty) //Verify if exist free variables that not had been declareted before, if exist i print it.
+      Left(s"Initial declaration has free variables non declared: ${asVerify.mkString(", ")}")
+    else if (!usedVarsTHEN.forall(declVarTHEN)) 
+      Left(s"Variable(s) not declared: ${((usedVarsTHEN -- declVarTHEN)++(usedVarsELSE-- declVarELSE)).mkString(", ")}")
+    else if (!usedVarsELSE.forall(declVarELSE))
+       Left(s"Variable(s) not declared: ${((usedVarsTHEN -- declVarTHEN)++(usedVarsELSE-- declVarELSE)).mkString(", ")}")
     else
       Right(())
   }
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
 
 
 
@@ -150,21 +200,22 @@ object Utils {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+//NOVOOO
   // a função getUsedVars é defenida para List[DiffEq],Syntax,DiffEqs e Dur, retornado as variáveis utilizadas lá
-  def getUsedVars(eqs: List[DiffEq]): Set[String] =
-    eqs.flatMap(eq => getVars(eq.e)).toSet
+  def getUsedVarsTHEN(eqs: List[DiffEq]): Set[String] =
+    eqs.flatMap(eq => getVars(eq.e)+eq.v.v).toSet  // ALTEREIIIIIIII
 
-  def getUsedVars(prog:Syntax): Set[String] = prog match {
-    case Atomic(as, de) => as.toSet.flatMap((a:Assign)=>getVars(a.e)+a.v.v) ++ getUsedVars(de)
-    case Seq(p, q) => getUsedVars(p) ++ getUsedVars(q)
-    case ITE(ifP, thenP, elseP) => getVars(ifP) ++ getUsedVars(thenP) ++ getUsedVars(elseP)
-    case While(pre, d, doP) => getUsedVars(pre) ++ getVars(d) ++ getUsedVars(doP)
+  def getUsedVarsTHEN(prog:Syntax): Set[String] = prog match {
+    case Atomic(as, de) => as.toSet.flatMap((a:Assign)=>getVars(a.e)+a.v.v) ++ getUsedVarsTHEN(de)
+    case Seq(p, q) => getUsedVarsTHEN(p) ++ getUsedVarsTHEN(q)
+    case ITE(ifP, thenP, _) => getVars(ifP) ++ getUsedVarsTHEN(thenP) 
+    case While(pre, d, doP) => getUsedVarsTHEN(pre) ++ getVars(d) ++ getUsedVarsTHEN(doP)
   }
 
-  def getUsedVars(eqs: DiffEqs): Set[String] =
-    getUsedVars(eqs.eqs) ++ getUsedVars(eqs.dur)
+  def getUsedVarsTHEN(eqs: DiffEqs): Set[String] =
+    getUsedVarsTHEN(eqs.eqs) ++ getUsedVarsTHEN(eqs.dur)
 
-  def getUsedVars(dur: Dur): Set[String] = dur match {
+  def getUsedVarsTHEN(dur: Dur): Set[String] = dur match {
     case Until(c,_,_) =>getVars(c)
     case For(nl) => getVars(nl) // NOVO!!!!!!!!!!!  
     case _ => Set()
@@ -174,6 +225,27 @@ object Utils {
 
 
 
+//NOVOOOO
+ def getUsedVarsELSE(eqs: List[DiffEq]): Set[String] =
+    eqs.flatMap(eq => getVars(eq.e)+eq.v.v).toSet  // ALTEREIIIIIIII
+
+  def getUsedVarsELSE(prog:Syntax): Set[String] = prog match {
+    case Atomic(as, de) => as.toSet.flatMap((a:Assign)=>getVars(a.e)+a.v.v) ++ getUsedVarsELSE(de)
+    case Seq(p, q) => getUsedVarsELSE(p) ++ getUsedVarsELSE(q)
+    case ITE(ifP, _, elseP) => getVars(ifP) ++ getUsedVarsELSE(elseP)
+    case While(pre, d, doP) => getUsedVarsELSE(pre) ++ getVars(d) ++ getUsedVarsELSE(doP)
+  }
+
+  def getUsedVarsELSE(eqs: DiffEqs): Set[String] =
+    getUsedVarsELSE(eqs.eqs) ++ getUsedVarsELSE(eqs.dur)
+
+  def getUsedVarsELSE(dur: Dur): Set[String] = dur match {
+    case Until(c,_,_) =>getVars(c)
+    case For(nl) => getVars(nl) // NOVO!!!!!!!!!!!  
+    case _ => Set()
+  }
+
+
 
 
 
@@ -182,21 +254,44 @@ object Utils {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+// NOVOOO
   // Pega num programa e retira as primeiras variáveis declaradas (do primiero atómico)
-  @scala.annotation.tailrec
-  def getFstDeclVars(prog:Syntax): Set[String] = prog match {
+  //@scala.annotation.tailrec
+  def getFstDeclVarsTHEN(prog:Syntax): Set[String] = prog match {
+    
+    case Seq(p,q) => {
+      var as=extractAssigments(Seq(p,q))
+      //println("then:",as)
+      var asSet=as.map(_.v.v).toSet
+      
+      return asSet
+      }
     case Atomic(a, _)     => a.map(_.v.v).toSet // cria um conjunto com as primeiras variáveis declaradas
-    case Seq(p, _)        => getFstDeclVars(p)
-    case ITE(_, thenP, _) => getFstDeclVars(thenP) // PORQUE APENAS SE USOU O THEN E NÃO O ELSE?
-    case While(pre, _, _) => getFstDeclVars(pre)
+   
+    
+      
+    case ITE(_, thenP, _) => getFstDeclVarsTHEN(thenP) 
+    
+    case While(pre, _, _) => getFstDeclVarsTHEN(pre)
   }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
-
-
+//NOVOOO
+  def getFstDeclVarsELSE(prog:Syntax): Set[String] = prog match {
+    case Atomic(a, _)     => a.map(_.v.v).toSet // cria um conjunto com as primeiras variáveis declaradas
+   
+    case Seq(p,q) => {
+      var as=extractAssigments(p) ++ extractAssigments(q)
+      var asSet=as.map(_.v.v).toSet
+      return asSet
+      }
+    case ITE(_, _, elseP) =>getFstDeclVarsELSE(elseP) 
+    case While(pre, _, _) => getFstDeclVarsELSE(pre)
+  }
 
 
 

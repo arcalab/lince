@@ -298,7 +298,7 @@ object Show {
     //println(s"-- $v -> ${num.toBigInt.toString}/${den.toString}")
     if (den == 1) num.toBigInt.toString
     else s"${num.toBigInt.toString}/${den.toString}"
-  } catch {
+    } catch {
     case e: java.lang.NumberFormatException => "NaN"
   }
 

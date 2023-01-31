@@ -53,6 +53,7 @@ object Parser extends RegexParsers {
   /** Parser for a program that checks if the program is closed before returning. */
   
 
+
   lazy val progP: Parser[Syntax] =
     seqP ^^ { stx =>
       Utils.isClosed(stx) match {
@@ -60,32 +61,38 @@ object Parser extends RegexParsers {
         case Right(_) => stx
       }
     }
-    
+ 
+ 
 
-  //lazy val progP: Parser[Syntax] = seqP 
-     
-  /** Parser for a sequence of programs */
-  // Gramática para uma sequeência de programas
-  // Podemos ter um basicprog seguido por ponto e virgula e por por outro basicprog, ou nada 
+
+//lazy val progP: Parser[Syntax] = seqP
+
+// Parser to obligate program to have a atomic/s (declarations of variables) followed by instructions
+
   lazy val seqP: Parser[Syntax] =
-    basicProg ~ opt(seqP) ^^ {
+    atomP ~ opt(nextInstructions) ^^{
+     case a ~ Some(n) => a ~ n
+     case a ~ None => a
+    }
+ 
+
+// instructions or sequence of instructions
+  lazy val nextInstructions: Parser[Syntax]=
+     basicProg ~ opt(nextInstructions) ^^ {
       case p1 ~ Some(p2) => p1 ~ p2
       case p ~ None => p
-    }
-
+    } 
+    
   /** Parser for a basic program: "skip", "while", "repeat", "if", "wait", or an atomic program (see below) */
-
-   
-  // COLOCAR O SKIP COM NOTLIN
-  lazy val basicProg: Parser[Syntax] =
+   lazy val basicProg: Parser[Syntax] =
     "skip" ~> opt("for"~>realP)<~";" ^^ { //penso que o skip sirva para o programa estar sem fazer nada durante o tempo que o skip indica
       case None => skip
       case Some(real) => Atomic(Nil,DiffEqs(Nil,For(ValueNotLin(real)))) // Nil é uma lista vazia
     } |
-    "while" ~> whileGuard ~ "do" ~ "{" ~ seqP ~ "}" ^^ {
+    "while" ~> whileGuard ~ "do" ~ "{" ~ nextInstructions ~ "}" ^^ {
       case c ~ _ ~ _ ~ p ~ _ => While(skip, c, p) // while sem quaqulquer "pre"
     } |
-    "repeat" ~> intPP ~ "{" ~ seqP ~ "}" ^^ { // "Repeat" int { seqp }
+    "repeat" ~> intPP ~ "{" ~ nextInstructions ~ "}" ^^ { 
       case c ~ _ ~ p ~ _ => While(skip, Counter(c), p)
     
     } |
@@ -96,10 +103,11 @@ object Parser extends RegexParsers {
       time => Atomic(Nil,DiffEqs(Nil,For(time)))
     }|
     atomP
+    
 
   /** parser of a program wrapped with curly brackets or a basic program */
   lazy val blockP: Parser[Syntax] =
-    "{"~>seqP<~"}" |
+    "{"~>nextInstructions<~"}" |
     basicProg
 
   /** Parser for the guard of a while loop (a condition of an integer) */

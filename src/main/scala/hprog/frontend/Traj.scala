@@ -134,7 +134,7 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
 
 
   lazy val getVars: Set[String] =
-    Utils.getFstDeclVars(syntax)
+    Utils.getFstDeclVarsTHEN(syntax) //AAAAAAAAAAAALTEREIIIII
 }
 
 
@@ -215,6 +215,12 @@ object Traj {
     * @return a Run: a point found, the end of the program, or an infinite run.
     */
 
+
+
+
+
+
+
     /**
      * Análise dos argumentos:
      *     r:  temos três casos possíveis, time, times e Bound.
@@ -248,6 +254,21 @@ object Traj {
      * O que devo fazer é tentar calcular para o time:RunTarget e o resultado vai ser um RFound ou REnd
      **/
 
+
+
+
+
+
+/**
+    * Evolves a program syntax at a time r (or at most r iterations of while loops)).
+    * @param r time to run or maximum number of while-iterations
+    * @param syntax program to evolve
+    * @param x current valuation
+    * @param solver to solve symbolically equations and simplify expressions
+    * @param dev to calculate deviations at if-statements
+    * @param logger to remember the time that passed, boundary points, notes, and warnings.
+    * @return a Run: a point found, the end of the program, or an infinite run.
+    */
   def run(r: RunTarget, syntax: Syntax, x: Valuation)
          (implicit solver: Solver, dev: Deviator, logger: Logger)
   : Run = {
@@ -339,7 +360,7 @@ object Traj {
   ////////////////////////////////////////////////////////////////////////
 
 
-  // Function that calls the solver
+  // Function that calls the solver and calculate de Atomic
   @scala.annotation.tailrec
   private def runAtomicUntilEnd(rb: RunTarget, at: Atomic, x: Valuation)
                                (implicit solver: Solver, logger: Logger)
@@ -384,7 +405,7 @@ object Traj {
     }
   }
 
-
+  //Calculate Atomic with time
   private def runAtomicWithTime(time: SyExpr, at:Atomic, dur:NotLin, x:Valuation,log:Boolean = false)
                                (implicit solver:Solver, logger: Logger): Run = {
     val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
