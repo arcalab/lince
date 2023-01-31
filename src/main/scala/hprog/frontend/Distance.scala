@@ -187,10 +187,11 @@ object Distance {
     case MultNotLin(l1, l2) => mul(notlin2point(l1),notlin2point(l2))
     case DivNotLin(l1, l2) => div(notlin2point(l1),notlin2point(l2))
     case ResNotLin(l1, l2) => res(notlin2point(l1),notlin2point(l2))
-    case SinNotLin(l1) => seno(notlin2point(l1)) 
-    case CosNotLin(l1) => cosseno(notlin2point(l1)) 
-    case TanNotLin(l1) => tangente(notlin2point(l1))
+    //case SinNotLin(l1) => seno(notlin2point(l1)) 
+    //case CosNotLin(l1) => cosseno(notlin2point(l1)) 
+    //case TanNotLin(l1) => tangente(notlin2point(l1))
     case PowNotLin(l1, l2) => powdef(notlin2point(l1),notlin2point(l2))
+    case FuncNotLin(s,list) => funcdef(s,list.map((l:NotLin) => notlin2point(l)))
     //case SqrtNotLin(l1, l2) => ???
 
     }
@@ -230,7 +231,45 @@ object Distance {
   def powdef(p1:Map[String,Double],p2:Map[String,Double]): Map[String,Double]=
    p1 ++ (for ((x,v) <- p2) yield x -> (if (p1.contains(x))  pow(p1(x),v) else v))
 
+  
+  def funcdef(s:String,list:List[Point]):Point ={
+    if(list.length == 0 || list.length>2){
+      s match {
+        case ("PI") => Map("" -> math.Pi)
+        case ("E") => Map("" -> math.E)
+        case (_) => throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+      }
+      
+    }
+    else {
+      if (list.length == 1){
+        s match {
+          case ("exp") => list(0).map(v => v._1 -> math.exp(v._2))
+          case ("sin") => list(0).map(v => v._1 -> math.sin(v._2))
+          case ("cos") => list(0).map(v => v._1 -> math.cos(v._2))
+          case ("tan") => list(0).map(v => v._1 -> math.tan(v._2))
+          case ("arcsin") => list(0).map(v => v._1 -> math.asin(v._2))
+          case ("arccos") => list(0).map(v => v._1 -> math.acos(v._2))
+          case ("arctan") => list(0).map(v => v._1 -> math.atan(v._2))
+          case ("sinh") => list(0).map(v => v._1 -> math.sinh(v._2))
+          case ("cosh") => list(0).map(v => v._1 -> math.cosh(v._2))
+          case ("tanh") => list(0).map(v => v._1 -> math.tanh(v._2))
+          case ("sqrt") => list(0).map(v => v._1 -> math.sqrt(v._2))
+          case ("log") => list(0).map(v => v._1 -> math.log(v._2))
+          case ("log10") => list(0).map(v => v._1 -> math.log10(v._2))
+          case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+        }
+      }
+      else {
+        s match {
+          case ("max") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.max((list(0))(x),v) else v))
+          case ("min") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.min((list(0))(x),v) else v))
+          case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+        }  
+      }
 
+    }
+  }
 /*
   def cosseno(p1:Point): Point=
     p1.mapValues((x,v)=>(x,cos(v)))
@@ -303,10 +342,11 @@ object Distance {
     case MultNotLin(l1, l2) => MultNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
     case DivNotLin(l1,l2) => DivNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
     case ResNotLin(l1,l2) => ResNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
-    case SinNotLin(l1) => SinNotLin(shiftNotLin(l1,delta))
-    case CosNotLin(l1) => CosNotLin(shiftNotLin(l1,delta))
-    case TanNotLin(l1) => TanNotLin(shiftNotLin(l1,delta))
+    //case SinNotLin(l1) => SinNotLin(shiftNotLin(l1,delta))
+    //case CosNotLin(l1) => CosNotLin(shiftNotLin(l1,delta))
+    //case TanNotLin(l1) => TanNotLin(shiftNotLin(l1,delta))
     case PowNotLin(l1,l2) => PowNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case FuncNotLin(s,list)=> FuncNotLin(s,list.map((l:NotLin) => shiftNotLin(l,delta)))
     //case SqrtNotLin(l1,l2) => SqrtNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
      
   }

@@ -334,11 +334,19 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
     case MultNotLin(l1, l2) => getVars(l1) ++ getVars(l2)
     case DivNotLin(l1,l2) => getVars(l1) ++ getVars(l2)
     case ResNotLin(l1,l2) => getVars(l1) ++ getVars(l2)
-    case SinNotLin(l) => getVars(l)
-    case CosNotLin(l) => getVars(l) 
-    case TanNotLin(l) => getVars(l)  
+    //case SinNotLin(l) => getVars(l)
+    //case CosNotLin(l) => getVars(l) 
+    //case TanNotLin(l) => getVars(l)  
     case PowNotLin(l1,l2) => getVars(l1) ++ getVars(l2)
+    case FuncNotLin(s,list) => getVarsAux(list)
    // case SqrtNotLin(l1,l2) => getVars(l1) ++ getVars(l2)
+  }
+
+
+  def getVarsAux(list:List[NotLin]): Set[String] = list match {
+    case List() => Set()
+    case n::List() => getVars(n)
+    case n::ns => getVars(n) ++ getVarsAux(ns)
   }
 
   def getVars(cond: Cond): Set[String] = cond match {
@@ -397,12 +405,19 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
     case MultNotLin(l1, l2) => getVarsList(l1) ++ getVarsList(l2)
     case DivNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2)
     case ResNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2)
-    case SinNotLin(l) => getVarsList(l)
-    case CosNotLin(l) => getVarsList(l) 
-    case TanNotLin(l) => getVarsList(l)  
+    //case SinNotLin(l) => getVarsList(l)
+    //case CosNotLin(l) => getVarsList(l) 
+    //case TanNotLin(l) => getVarsList(l)  
     case PowNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2)
+    case FuncNotLin(s,list) => getVarsListAux(list)
     //case SqrtNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2)
   }
+
+  def getVarsListAux(list:List[NotLin]): List[String] = list match {
+    case List() => List()
+    case n::List() => getVarsList(n)
+    case n::ns => getVarsList(n) ++ getVarsListAux(ns)
+  }  
 
   def getVarsList(cond: Cond): List[String] = cond match {
     case BVal(_)    => List()

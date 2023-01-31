@@ -98,7 +98,7 @@ object Syntax {
   sealed abstract class NotLin {
     def +(other:NotLin): NotLin = AddNotLin(this,other)
   }
-  case class VarNotLin(v:String)       extends NotLin {
+  case class VarNotLin(v:String)       extends NotLin { //necessary
     def :=(l: NotLin): Assign = Assign(this,l)
     def >(l: NotLin):  Cond = GT(this,l)
     def <(l: NotLin):  Cond = LT(this,l)
@@ -106,27 +106,29 @@ object Syntax {
     def <=(l: NotLin): Cond = LE(this,l)
     def ===(l: NotLin):Cond = EQ(this,l)
   }
-  case class ValueNotLin(v:Double)     extends NotLin {
+  case class ValueNotLin(v:Double)     extends NotLin { //necessary
     def *(l: NotLin): NotLin = MultNotLin(this,l) // Pode não funcionar por causa do Mult
   }
-  case class AddNotLin(l1:NotLin,l2:NotLin)  extends NotLin
+  case class AddNotLin(l1:NotLin,l2:NotLin)  extends NotLin //necessary
 
   //case class Mult(v:Value,l:Lin) extends Lin 
-  case class MultNotLin(l1:NotLin,l2:NotLin) extends NotLin 
+  case class MultNotLin(l1:NotLin,l2:NotLin) extends NotLin //necessary
 
-  case class DivNotLin(l1:NotLin,l2:NotLin) extends NotLin 
+  case class DivNotLin(l1:NotLin,l2:NotLin) extends NotLin //necessary
 
-  case class ResNotLin(l1:NotLin,l2:NotLin) extends NotLin 
+  case class ResNotLin(l1:NotLin,l2:NotLin) extends NotLin //necessary
 
-  case class SinNotLin(l1:NotLin) extends NotLin 
+  //case class SinNotLin(l1:NotLin) extends NotLin 
 
-  case class CosNotLin(l1:NotLin) extends NotLin 
+  //case class CosNotLin(l1:NotLin) extends NotLin 
 
-  case class TanNotLin(l1:NotLin) extends NotLin 
+  //case class TanNotLin(l1:NotLin) extends NotLin
+
+  case class FuncNotLin(s:String, arg:List[NotLin]) extends NotLin
 
   // Elevar uma expressão não linear a um número
   // Pow..
-  case class PowNotLin(l1:NotLin,l2:NotLin) extends NotLin 
+  case class PowNotLin(l1:NotLin,l2:NotLin) extends NotLin //necessary
 
   // Raizes
   //case class SqrtNotLin(l1:NotLin,l2:NotLin) extends NotLin 

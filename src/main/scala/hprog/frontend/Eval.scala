@@ -45,10 +45,31 @@ object Eval {
     case MultNotLin(l1,l2)  => apply(state,l1)  * apply(state,l2)
     case DivNotLin(l1,l2)  => apply(state,l1) / apply(state,l2)
     case ResNotLin(l1,l2)  => apply(state,l1) % apply(state,l2)
-    case SinNotLin(l1)  => math.sin(apply(state,l1))
-    case CosNotLin(l1)  => math.cos(apply(state,l1))
-    case TanNotLin(l1)  => math.tan(apply(state,l1))
+    //case SinNotLin(l1)  => math.sin(apply(state,l1))
+    //case CosNotLin(l1)  => math.cos(apply(state,l1))
+    //case TanNotLin(l1)  => math.tan(apply(state,l1))
     case PowNotLin(l1,l2)  => pow(apply(state,l1),apply(state,l2))
+    case FuncNotLin(s,list) => (s,list) match {
+      case ("PI",Nil) => math.Pi
+      case ("E",Nil) => math.E
+      case ("max",v1::v2::Nil) => math.max(apply(state,v1), apply(state,v2))
+      case ("min",v1::v2::Nil) => math.min(apply(state,v1), apply(state,v2))
+      case ("exp",v::Nil) => math.exp(apply(state,v))
+      case ("sin",v::Nil) => math.sin(apply(state,v))
+      case ("cos",v::Nil) => math.cos(apply(state,v))
+      case ("tan",v::Nil) => math.tan(apply(state,v))
+      case ("arcsin",v::Nil) => math.asin(apply(state,v))
+      case ("arccos",v::Nil) => math.acos(apply(state,v))
+      case ("arctan",v::Nil) => math.atan(apply(state,v))
+      case ("sinh",v::Nil) => math.sinh(apply(state,v))
+      case ("cosh",v::Nil) => math.cosh(apply(state,v))
+      case ("tanh",v::Nil) => math.tanh(apply(state,v))
+      case ("sqrt",v::Nil) => math.sqrt(apply(state,v))
+      case ("log",v::Nil) => math.log(apply(state,v))
+      case ("log10",v::Nil) => math.log10(apply(state,v))
+      case (_,_) => throw new RuntimeException(s"Unknown function '${s}(${list.mkString(",")})', or the number of arguments are incorrect")
+
+    }
     //case SqrtNotLin(l1,l2)  => pow(apply(state,l1),(1/apply(state,l2)))
   }
   
@@ -87,7 +108,10 @@ object Eval {
     case SSub(e1, e2) => apply(e1,t,x) - apply(e2,t,x)
     case s:SFun[SymbolicExpr.All] => (s.f,s.args) match {
       case (v,List(SVal(0.0))) if x contains v => apply(x(v),t,x) // could create infinite loop
+      case ("PI",Nil) => math.Pi
+      case ("E",Nil) => math.E
       case ("max",v1::v2::Nil) => math.max(apply(v1,t,x), apply(v2,t,x))
+      case ("min",v1::v2::Nil) => math.min(apply(v1,t,x), apply(v2,t,x))
       case ("exp",v::Nil) => math.exp(apply(v,t,x))
       case ("sin",v::Nil) => math.sin(apply(v,t,x))
       case ("cos",v::Nil) => math.cos(apply(v,t,x))
@@ -102,7 +126,7 @@ object Eval {
       case ("log",v::Nil) => math.log(apply(v,t,x))
       case ("log10",v::Nil) => math.log10(apply(v,t,x))
       case (_,_) => throw new RuntimeException(
-        s"Unknown function '${s.f}(${s.args.mkString(",")})'")
+        s"Unknown function '${s.f}(${s.args.mkString(",")})',or the number of arguments are incorrect")
 
     }
   }
@@ -263,9 +287,10 @@ object Eval {
     case MultNotLin(l1, l2) => SMult(notlin2sage(l1),notlin2sage(l2))
     case DivNotLin(l1, l2) => SDiv(notlin2sage(l1),notlin2sage(l2))
     case PowNotLin(l1,l2) => SPow(notlin2sage(l1),notlin2sage(l2))
-    case SinNotLin(l1) =>  SFun("sin",List(notlin2sage(l1)))
-    case CosNotLin(l1) =>  SFun("cos",List(notlin2sage(l1)))
-    case TanNotLin(l1) => SFun("tan",List(notlin2sage(l1)))
+    case FuncNotLin(s,list)=>SFun(s,list.map((l:NotLin) => notlin2sage(l)))
+    //case SinNotLin(l1) =>  SFun("sin",List(notlin2sage(l1)))
+    //case CosNotLin(l1) =>  SFun("cos",List(notlin2sage(l1)))
+    //case TanNotLin(l1) => SFun("tan",List(notlin2sage(l1)))
     //case SqrtNotLin(l1,l2) => SFun("sqrt",List(notlin2sage(l1)))
     case ResNotLin(l1,l2) => SRes(notlin2sage(l1),notlin2sage(l2)) // SFun("Res",List(notlin2sage(l1),notlin2sage(l2)))
 
