@@ -319,7 +319,7 @@ class StaticSageSolver extends Solver {
   }
 
   protected def debug(s:()=>String): Unit = {
-    println("[Solver] "+s())
+    // println("[Solver] "+s())
   }
 
 }

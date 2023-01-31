@@ -143,22 +143,22 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 // Verify if exists free variables  already been declarated before being used, and also if they are used variables that are not declareted
   def isClosed(prog:Syntax): Either[String,Unit] = {
     val declVarTHEN = getFstDeclVarsTHEN(prog) //make a set with the firsts declareted variables (THEN)
-    println("Variáveis declaradas (THEN):",declVarTHEN)
+    //println("Declared variables (THEN):",declVarTHEN)
     
     val declVarELSE = getFstDeclVarsELSE(prog) //make a set with the firsts declareted variables (ELSE)
-    println("Variáveis declaradas (ELSE):",declVarELSE)
+    //println("Declared variables (ELSE):",declVarELSE)
     
     val usedVarsTHEN = getUsedVarsTHEN(prog)   //make a set with the firsts used variables
-    println("Variáveis utilizadas (THEN):",usedVarsTHEN)
+    //println("Used variables (THEN):",usedVarsTHEN)
     
     val usedVarsELSE = getUsedVarsELSE(prog)  //make a set with the firsts used variables
-    println("Variáveis utilizadas (ELSE):",usedVarsELSE)
+    //println("Used variables (ELSE):",usedVarsELSE)
     
     val asVerify=assigmentsVerify(prog) //make a set of free variables that not had been declareted before of ther invocation.
-    println("Variáveis livres não declaradas:",asVerify)
+    //println("Free undeclared variables:",asVerify)
     
     if (asVerify.nonEmpty) //Verify if exist free variables that not had been declareted before, if exist i print it.
-      Left(s"Initial declaration has free variables non declared: ${asVerify.mkString(", ")}")
+      Left(s"Initial declaration has free variables that were not declared: ${asVerify.mkString(", ")}")
     else if (!usedVarsTHEN.forall(declVarTHEN)) 
       Left(s"Variable(s) not declared: ${((usedVarsTHEN -- declVarTHEN)++(usedVarsELSE-- declVarELSE)).mkString(", ")}")
     else if (!usedVarsELSE.forall(declVarELSE))
@@ -453,17 +453,16 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// Esta função é responsável por passar uma lista de assign para um Map[string->SyExpr], ou seja uma nova representação
+/** Convert a list of assignments to a Valuation, i.e., to a Map[String,SyExpr]. */
   def toValuation(as:List[Assign],prev:Valuation): Valuation = {
-    val vvv=as.map(kv => kv.v.v -> Eval.notlin2sage(kv.e))
-    println("prev:",prev)
-    println("vvv:",vvv)
-    println("vvv.toMap:",vvv.toMap)
-    println("vvv.toMap.viei.mapValues(e =>exprVarToExpr(e,prev)).toMap:",vvv.toMap.view.mapValues(e => exprVarToExpr(e,prev)).toMap)
+    // val vvv=as.map(kv => kv.v.v -> Eval.notlin2sage(kv.e))
+    // println("prev:",prev)
+    // println("vvv:",vvv)
+    // println("vvv.toMap:",vvv.toMap)
+    // println("vvv.toMap.viei.mapValues(e =>exprVarToExpr(e,prev)).toMap:",vvv.toMap.view.mapValues(e => exprVarToExpr(e,prev)).toMap)
     as.map(kv => kv.v.v -> Eval.notlin2sage(kv.e))
       .toMap
       .view.mapValues(e => exprVarToExpr(e,prev)).toMap
-    
   }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -476,10 +475,10 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 //////////////////////////////////////////////////////////////////////////////////////
 
-// Função responsável por passar uma variável do tipo SyExprVar para o tipo SyExpr
+  /** Convert a SyExprVar variable to a SyExpr variable. */
   def exprVarToExpr(e:SyExprVar,prev:Valuation): SyExpr = e match {
-    case SVal(v) => SVal(v) // pois o SVal já é uma extensão do SyExprVar
-    case SVar(v) => prev(v) // v é uma string, o que se fez foi ir ao prev e utilizar essa string como key e extrair o SyExpr respetctivo
+    case SVal(v) => SVal(v) // because SVal is already an extension of SyExprVar
+    case SVar(v) => prev(v) // v is a string, used as a key to the PREVious values (SyExpr) stored in prev.
     case SFun(f, args:List[SyExprVar]) => SFun(f,args.map(exprVarToExpr(_,prev)))
     case SDiv(e1, e2) => SDiv( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
     case SRes(e1, e2) => SRes( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
@@ -493,25 +492,13 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 
 
-
-
-
-
-
-
-// Não entendi a finalidade...
+  // Não entendi a finalidade...
   def asSyExpr(e:SyExprAll): SyExpr = e match {
     case e2: SyExpr @ unchecked => e2
     // bottom case never caught, since erasure will make SyExprAll = SyExpr.
     // (Runtime error will be different.)
     case _ => throw new RuntimeException(s"Failed to interpret ${Show(e)} as a simple expression.")
   }
-
-
-
-
-
-
 
   def asSyExprVar(e:SyExprAll): SyExprVar = e match {
     case e2: SyExprVar @ unchecked => e2
@@ -523,13 +510,9 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 
 
-
-
   //////
   // inferring open domains...
   //////
-
-
 
 
 

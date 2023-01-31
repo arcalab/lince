@@ -19,7 +19,7 @@ object Eval {
 
 //////////////////////////////////////////////////////////////////////////////
 
-// ALTEREI!!!!!!!!!!!!!!!!!
+  /** Evaluation of a linear expression. */
   def apply(state:Point, lin: Lin): Double = lin match {
     case Var(v) => state(v)
     case Value(v) => v
@@ -37,7 +37,7 @@ object Eval {
   }
 
 
-// ACRESCENTEI !!!!!!!!!!!!!
+  /** Evaluation of a non-linear expression. */
   def apply(state:Point, notlin: NotLin): Double = notlin match {
     case VarNotLin(v) => state(v)
     case ValueNotLin(v) => v
@@ -95,8 +95,10 @@ object Eval {
   def apply(e:SyExprAll, t: Double, x: Valuation): Double = e match {
     case SVal(v) => v
     case _:SArg => t
+    case SVar("e")  if !x.contains("e")  => math.E
+    case SVar("pi") if !x.contains("pi") => math.Pi
     case s:SVar if !x.contains(s.v) =>
-      throw new RuntimeException(s"Evaluating $e but ${s.v} not found in ${Show(x)}.")
+      throw new RuntimeException(s"Evaluating $e but ${s.v} not found in [${Show(x)}].")
     case s:SVar => apply(x(s.v),t,x)
 //    case SVar(v) => apply(x(v),t,x) // not really used - usually v(0) denotes this case
                                            // could create an infinte loop if recursive (not anymore with SExpr)

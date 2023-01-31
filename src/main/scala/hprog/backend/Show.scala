@@ -177,8 +177,8 @@ def stringList(list:List[NotLin]): String = list match{
     case BVal(b)     => b.toString
     case And(And(e1,e2),e3) => apply(And(e1,And(e2,e3)),vl) // Para que serve este caso ??
     case And(e1,e2:And)     => s"${showP(e1,vl)} /\\ ${showP(e2,vl)}" // E este??
-    case And(e1, e2) => s"${showP(e1,vl)} && ${showP(e2,vl)}"
-    case Or(e1, e2)  => s"${showP(e1,vl)} || ${showP(e2,vl)}"
+    case And(e1, e2) => s"${showP(e1,vl)} & ${showP(e2,vl)}"
+    case Or(e1, e2)  => s"${showP(e1,vl)} | ${showP(e2,vl)}"
     case Not(EQ(l1,l2)) => s"${apply(l1,vl)}!=${apply(l2,vl)}"
     case Not(e1)     => s"!(${showP(e1,vl)})"
     case EQ(l1, l2)    => s"${apply(l1,vl)}==${apply(l2,vl)}"
@@ -221,6 +221,7 @@ def stringList(list:List[NotLin]): String = list match{
     case SVal(v) => floatToFraction(v) //f"$v%1.8f"
     case _:SArg  => "_t_"
     case s:SVar  => s.v
+    case SFun("PI",Nil) => "pi"
     case s:SFun[E]  => s"${s.f}(${s.args.map(apply[E]).mkString(",")})"
     case s:SDiv[E]  => s"${applyP[E](s.e1)}/${applyP[E](s.e2)}"
     case s:SRes[E]  => s"${applyP[E](s.e1)}%${applyP[E](s.e2)}"
