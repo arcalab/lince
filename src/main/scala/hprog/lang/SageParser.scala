@@ -23,11 +23,6 @@ object SageParser extends RegexParsers {
     */
   def parseSol(c: String): ParseResult[SySolution] = {
     val res = parseAll(sols, c)
-//    res match {
-//      case Success(result, _) =>
-//        println(s"[ParserS] $c  -->  ${hprog.backend.Show(result)}")
-//      case _ =>
-//    }
     res
   }
 
@@ -39,20 +34,13 @@ object SageParser extends RegexParsers {
     */
   def parseExpr(c: String): ParseResult[SyExprAll] = {
     val res = parseAll(eqExpr, c)
-//    res match {
-//      case Success(result, _) =>
-//        println(s"[Parser] $c  -->  ${hprog.backend.Show.pp(result)}")
-//      case _ =>
-//    }
+
     res
   }
-
-  //  def pexp(c:String): ParseResult[Cond] = parseAll(condP,c)
 
   override def skipWhitespace = true
 
   override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
-//  override val whiteSpace: Regex = "[ \t\r\f\n]+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
@@ -137,17 +125,8 @@ object SageParser extends RegexParsers {
         SFun(name,arg)
       case name ~ None =>
         SVar(name)
-//      case name~_~arg~_ => (t:Double)=>(ctx:Valuation)=> (name,arg(t)(ctx)) match {
-//        case (_,0) if ctx.contains(name) => ctx(name)
-//        case ("sin",v) => Math.sin(v)
-//        case ("cos",v) => Math.cos(v)
-//        case ("sqrt",v) => Math.sqrt(v)
-//        case ("log",v) => Math.log(v)
-//        case ("log10",v) => Math.log10(v)
-//        case (_,v) => throw new ParserException(s"Unknown function '$name($v)'")
-//      }
     }|
-    identifier ~ "(" ~ ")" ^^ {
+    identifier ~ "(" ~ ")" ^^ { //new
       case name ~ _ ~ _ => SFun(name,List())
     }
 
