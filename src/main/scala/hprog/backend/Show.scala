@@ -37,7 +37,7 @@ object Show {
       val eqs = de.eqs.map(apply) // Guardo as equações diferenciais também em forma de string, tipo: "v'= v+2", no fim retorna uma lista disso
       aux_gramatic(assg.mkString(";"),eqs.mkString(","),apply(de.dur))++";"// Concateno as listas de assg e eqs, aplico o mkString para separar os assigments por virgulas e as eqs dif e no fim colo a duração, retornando uma string disso tudo
 
-    case Seq(p, q) => List(apply(p),apply(q)).filter(_.nonEmpty).mkString(";\n")
+    case Seq(p, q) => List(apply(p),apply(q)).filter(_.nonEmpty).mkString("\n")
     case ITE(ifP, thenP, elseP) =>  s"if ${apply(ifP)} then {${apply(thenP)}} else {${apply(elseP)}} "
     case While(pre, Guard(c), doP) => apply(pre) + "\n" + s"while ${apply(c)} do { ${apply(doP)} }"
     case While(pre, Counter(i), doP) => apply(pre) + "\n" +  s"while $i do { ${apply(doP)} }"
@@ -157,14 +157,20 @@ object Show {
 
 
 
-    case SinNotLin(l1) => s"sin(${apply(l1,vl)})" 
-    case CosNotLin(l1) => s"cos(${apply(l1,vl)})" 
-    case TanNotLin(l1) => s"tan(${apply(l1,vl)})"
+    //case SinNotLin(l1) => s"sin(${apply(l1,vl)})" 
+    //case CosNotLin(l1) => s"cos(${apply(l1,vl)})" 
+    //case TanNotLin(l1) => s"tan(${apply(l1,vl)})"
     case PowNotLin(l1,l2)=> s"pow(${apply(l1,vl)},${apply(l2,vl)})"
+    case FuncNotLin(s,list)=>s"${s}(${stringList(list)})"
     //case PowNotLin(l1,DivNotLin(ValueNotLin(1),l2))=> s"sqrt(${apply(l1,vl)},${apply(l2,vl)})"
   }
 
-
+def stringList(list:List[NotLin]): String = list match{
+    case List() => s""
+    case n::List() => s"${apply(n)}"
+    case n::ns => s"${apply(n)},${stringList(ns)}"
+    //case n => s"${apply(n)}"
+  }
 
   // show a condition parseable by Sage
   def apply(cond: Cond, vl:Valuation = Map()): String = cond match {

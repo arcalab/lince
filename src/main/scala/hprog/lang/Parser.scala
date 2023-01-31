@@ -202,7 +202,7 @@ object Parser extends RegexParsers {
     } 
 
     
- 
+ /*
   lazy val notlinAtP: Parser[NotLin] =
     realP ^^ {
       ValueNotLin
@@ -229,8 +229,47 @@ object Parser extends RegexParsers {
       VarNotLin 
     }
 
+*/
+
+  lazy val notlinAtP: Parser[NotLin] =
+    "pi" ~ "(" ~ ")" ^^ {
+      case _ ~ _ ~ _=> FuncNotLin("PI",List())
+    }|
+    "e" ~ "(" ~ ")" ~ opt("^" ~> notlinOthers)^^ {
+      case _ ~ _ ~ _ ~ None => FuncNotLin("E",List())
+      case _ ~ _ ~ _ ~ Some(l1) => FuncNotLin("exp",List(l1))
+    }|
+    "pow" ~ "(" ~ notlinOthers ~ "," ~ notlinOthers ~ ")" ^^{
+      case _ ~ _ ~ l1 ~ _ ~ l2 ~ _=> PowNotLin(l1,l2)
+    }|
+     notlinOthers ~ opt("^" ~>  notlinOthers)  ^^{
+      case l1 ~ Some(l2) => PowNotLin(l1,l2)
+      case l1 ~ _ => l1
+    }
+
+  lazy val notlinOthers: Parser[NotLin]=
+    realP ^^ {
+      ValueNotLin
+    }|
+    identifier ~ opt("("~>argsFunction<~")") ^^{
+      case s ~ Some(arguments) => FuncNotLin(s,arguments)
+      case s ~ _ => VarNotLin (s)
+    }|
+    "("~>notlinP<~")" ^^ {
+      case l => l
+    }
 
 
+
+  lazy val argsFunction: Parser[List[NotLin]] =
+    notlinP ~ opt("," ~> argsFunction) ^^{
+      case n ~ Some(ns) => n::ns
+      case n ~ _ => List(n)
+    }
+
+
+  
+   
 
   ////////// linear expression ///////////////
 
@@ -555,10 +594,11 @@ object Parser extends RegexParsers {
     case MultNotLin(l1, l2) => MultNotLin(invertNotLin(l1),l2)
     case DivNotLin(l1,l2) => DivNotLin(invertNotLin(l1),l2)
     case ResNotLin(l1,l2) => ResNotLin(invertNotLin(l1),l2)
-    case SinNotLin(l1) => MultNotLin(ValueNotLin(-1),SinNotLin(l1))
-    case CosNotLin(l1) => MultNotLin(ValueNotLin(-1),CosNotLin(l1))
-    case TanNotLin(l1) => MultNotLin(ValueNotLin(-1),TanNotLin(l1))
+    //case SinNotLin(l1) => MultNotLin(ValueNotLin(-1),SinNotLin(l1))
+    //case CosNotLin(l1) => MultNotLin(ValueNotLin(-1),CosNotLin(l1))
+    //case TanNotLin(l1) => MultNotLin(ValueNotLin(-1),TanNotLin(l1))
     case PowNotLin(l1,l2) => MultNotLin(ValueNotLin(-1),PowNotLin(l1,l2))
+    case FuncNotLin(s,ns) => MultNotLin(ValueNotLin(-1),FuncNotLin(s,ns)) 
     //case SqrtNotLin(l1,l2) => MultNotLin(ValueNotLin(-1),SqrtNotLin(l1,l2))
   }
 

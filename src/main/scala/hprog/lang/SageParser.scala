@@ -132,10 +132,10 @@ object SageParser extends RegexParsers {
     """-?[0-9]+(\.([0-9]+))?(e-?([0-9]+))?""".r ^^ { s: String => SVal(s.toDouble) }
 
   lazy val function: Parser[SyExprAll] =
-    identifier~opt("("~>eqExprs<~")") ^^ {
+    identifier~opt("("~> eqExprs <~")") ^^ {
       case name~Some(arg) =>
         SFun(name,arg)
-      case name~_ =>
+      case name ~ None =>
         SVar(name)
 //      case name~_~arg~_ => (t:Double)=>(ctx:Valuation)=> (name,arg(t)(ctx)) match {
 //        case (_,0) if ctx.contains(name) => ctx(name)
@@ -146,7 +146,11 @@ object SageParser extends RegexParsers {
 //        case ("log10",v) => Math.log10(v)
 //        case (_,v) => throw new ParserException(s"Unknown function '$name($v)'")
 //      }
+    }|
+    identifier ~ "(" ~ ")" ^^ {
+      case name ~ _ ~ _ => SFun(name,List())
     }
+
   lazy val eqExprs: Parser[List[SyExprAll]] =
     eqExpr ~ opt(","~>eqExprs) ^^ {
       case e~None => List(e)
