@@ -67,13 +67,9 @@ class StaticSageSolver extends Solver {
     if (!cacheDE.contains(eqs) && !cacheStrDE.contains(Show(eqs)))
       throw new LiveSageSolver.SolvingException(s"Static solver failed: unknown equations '" +
         Show(eqs) +
-//        eqs.map(Show(_)).mkString("&")+
         "' - known: "+cacheDE.keys.map(eqs => Show(eqs)).mkString(" / ") +
         " - also known: "+cacheStrDE.keys.mkString(" / "))
-  //      val instr = SageSolver.genSage(eqs)
-  //      cache += (eqs -> (s"$path/sage -c $instr".!!))
-  //      println(s"- adding ${eqs.map(Show(_)).mkString(",")} -> ${cache(eqs)}")
-
+ 
   /**
     * Throw an error if an expression was not precomputed
     * @param expr SageExpression to check if it is in cache
@@ -81,9 +77,6 @@ class StaticSageSolver extends Solver {
   def +=(expr: SyExprAll): Unit =
     if (!cacheVal.contains(expr) && !cacheStrVal.contains(Show(expr))) {
       val est = Eval(Utils.asSyExpr(expr)) // fails if expr is not a SyExpr
-//      println(s"static solver failed for ${Show(expr)}. " +
-//        s"Know only ${cacheStrVal.keys.map("'"+_+"'").mkString(", ")}. " +
-//        s"Using estimation $est instead.")
       cacheStrVal += (Show(expr) -> ((SVal(est),"")))
     }
 
@@ -96,9 +89,6 @@ class StaticSageSolver extends Solver {
   def +=(cond: Cond, valua: Valuation): Unit = {
     if (!cacheBool.contains(cond, valua) && !cacheStrBool.contains(Show(cond, valua))) {
       val est = Eval(valua.view.mapValues(Eval(_, 0)).toMap, cond)
-//      println(s"static solver failed for '${Show(cond,valua)}'. " +
-//      s"Know only ${cacheStrBool.keys.map("'"+_+"'").mkString(", ")}. " +
-//      s"Using estimation $est instead.")
       cacheStrBool += Show(cond,valua) -> (est,"")
     }
   }
@@ -135,10 +125,6 @@ class StaticSageSolver extends Solver {
 
   def ++=(systems: List[List[DiffEq]]): Unit = {
     systems.foreach(+=)
-//    val filtered = systems.filterNot(cache.contains)
-//    if (filtered.nonEmpty)
-//      throw new SageSolver.SolvingException(s"Static solver failed: unknown equations " +
-//        filtered.map(_.map(Show(_)).mkString("&")).mkString(" and "))
   }
 
   def ++=(syntax:Syntax): Unit = {
@@ -161,8 +147,6 @@ class StaticSageSolver extends Solver {
     val resParsed = SageParser.parseExpr(sageReply)
     resParsed match {
       case SageParser.Success(newExpr, _) =>
-        //val fixed = Utils.fixVars(newExpr)
-        //(Eval.update(newExpr,SVal(0),Map()),sageReply)
         (newExpr,sageReply)
       case _: SageParser.NoSuccess =>
         throw new ParserException(s"Failed to parse Sage reply '$sageReply'.")
@@ -199,7 +183,6 @@ class StaticSageSolver extends Solver {
   def importDiffEqs(eqs:List[List[DiffEq]],
                     sageReply:Iterable[String]): Unit =
     for ((eqs, res) <- eqs.zip(sageReply)) {
-      //debug(()=>s"- adding  ${eqs} -> $res")
       importDiffEqs(eqs,res)
     }
 
@@ -212,11 +195,9 @@ class StaticSageSolver extends Solver {
       replyToDiffCache(findVars(eqs),sageReply))
 
   private def findVars(str: String) = {
-    //    """Var\([a-zA-Z0-9_]*\)""".r.findAllIn(str).map(_.drop(4).dropRight(1)).toList
     val res1 = """[a-z][a-zA-Z0-9_]*\(0\)""".r.findAllIn(str).map(_.dropRight(3)).toList
     val res2 = """[a-z][a-zA-Z0-9_]*'""".r.findAllIn(str).map(_.dropRight(1)).toList
     val res = res1++res2
-    //debug(()=>s"### finding variables in $str - found $res")
     res
   }
 
@@ -225,7 +206,6 @@ class StaticSageSolver extends Solver {
       val resParsed = SageParser.parseSol(sageReply) match {
         // single solution - name is not known from the answer of Sage
         case SageParser.Success(sol, _) if sol.keySet == Set("") =>
-//          val vars = Solver.getVars(eqs).filterNot(_.startsWith("_"))
           vars match {
             case List(variable) => Map(variable -> Utils.fixVars(sol("")))
             case _ => throw new ParserException(s"Failed to parse $sageReply - " +
@@ -250,30 +230,21 @@ class StaticSageSolver extends Solver {
     */
   def exportAll: String =
     (cacheDE-Nil)
-//      .toList.sortWith((p1,p2)=>lt(p1._1,p2._1))
       .map(it => Show(it._1) +"§"+it._2._2).mkString("§§") +
     cacheStrDE
       .map(it => it._1+"§"+it._2._2).mkString("§§") +
     "§§§" +
       cacheVal
-        //      .toList.sortWith((e1,e2)=>lt(e1._1,e2._1))
         .map(it => Show(it._1)+"§"+it._2._2).mkString("§§") +
       cacheStrVal
         .map(it => it._1+"§"+it._2._2).mkString("§§") +
     "§§§" +
     cacheBool
-//      .toList.sortWith((e1,e2)=>lt(e1._1,e2._1))
       .map(it => Show(it._1._1,it._1._2)+"§"+it._2._2).mkString("§§") +
     cacheStrBool
       .map(it => it._1+"§"+it._2._2).mkString("§§") +
     "§§§" +
      warnings.map(kv => s"${Show(kv._1)}§${kv._2}").mkString("§§")
-
-
-  //  private def lt(eqs1:List[DiffEq],eqs2:List[DiffEq]): Boolean =
-//    eqs1.mkString < eqs2.mkString
-//  private def lt(e1:SageExpr,e2:SageExpr): Boolean =
-//    e1.toString < e2.toString
 
   /**
     * Loads replies compiled with "exportAll", knowing the equations and expressions
@@ -319,7 +290,6 @@ class StaticSageSolver extends Solver {
   }
 
   protected def debug(s:()=>String): Unit = {
-    // println("[Solver] "+s())
   }
 
 }

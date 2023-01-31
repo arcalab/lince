@@ -32,10 +32,10 @@ object Show {
 
 
   def apply(p:Syntax): String = p match {
-    case Atomic(as, de) => // Se for um atómico
-      val assg = as.map(a => s"${a.v.v}:=${apply(a.e)}") // Guardo aqui os assigments, em forma de string, tipo: " v:= 37", no fim retorna uma lista disso
-      val eqs = de.eqs.map(apply) // Guardo as equações diferenciais também em forma de string, tipo: "v'= v+2", no fim retorna uma lista disso
-      aux_gramatic(assg.mkString(";"),eqs.mkString(","),apply(de.dur))++";"// Concateno as listas de assg e eqs, aplico o mkString para separar os assigments por virgulas e as eqs dif e no fim colo a duração, retornando uma string disso tudo
+    case Atomic(as, de) => // If it is an atomic
+      val assg = as.map(a => s"${a.v.v}:=${apply(a.e)}") // I store the assigments here, in string form, like: " v:= 37", at the end it returns a list of these
+      val eqs = de.eqs.map(apply) // I store differential equations also in string form, like: "v'= v+2", at the end it returns a list of this
+      aux_gramatic(assg.mkString(";"),eqs.mkString(","),apply(de.dur))++";"// I concatenate the lists of assg and eqs, apply mkString to separate the assigments by commas and the diff eqs, and at the end I paste the duration, returning a string from all this
 
     case Seq(p, q) => List(apply(p),apply(q)).filter(_.nonEmpty).mkString("\n")
     case ITE(ifP, thenP, elseP) =>  s"if ${apply(ifP)} then {${apply(thenP)}} else {${apply(elseP)}} "
@@ -47,7 +47,7 @@ object Show {
   def apply(eqs:List[DiffEq]): String =
     eqs.map(apply).mkString(",")
   
-// coloca os ; nos sitios corretos, antes não estavam e dava erro no parsing
+// put the ";" in the right places
   def aux_gramatic(ass:String,diff:String,dur:String):String={
     if (ass.length==0){
       return (diff + dur)
@@ -59,23 +59,16 @@ object Show {
       }
     }
   }  
-/*
-    if (eqs.length != 0){
-      var s = ";" + eqs.map(apply).mkString(",")
-      return s
-    } else {
-      return ";"
-    }
-*/ 
+ 
 
   def apply(de: DiffEq): String = de match {
     case DiffEq(v, e) => s"${v.v}'=${apply(e)}"
   }
 
   def apply(dur: Dur): String = dur match {
-    case For(t)  => s" for ${apply(t)}" // retorna a string " for" ++ string da espressão notlin
+    case For(t)  => s" for ${apply(t)}" // return the string " for" ++ string of linear expression
     case Until(c,e,j) => s" until_$e${
-      if(j.isDefined)","+j.get else ""} ${apply(c)}"  // retorna a string "until_" ++ string do esp ++ espaço ++ string das condições
+      if(j.isDefined)","+j.get else ""} ${apply(c)}"  // return the string "until_" ++ string esp ++ space ++ string of the condictions
     case Forever => " forever"
   }
 
@@ -90,54 +83,17 @@ object Show {
     case Mult(v, l)     => s"${apply(v,vl)}*${apply(l,vl)}"
   }
 
-/*
-  def apply(lin: Lin): String = apply(lin,Map():Valuation)
 
-  def apply(lin: Lin, vl: Valuation): String = lin match {
-    case v:Var => showVar(v,vl,apply[Pure])
-    // Se Value for um inteiro vai imprimir sem o zero, senão imprime com os decimais	
-    
-    case Value(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
-    
-    case Add(l1, l2)    => s"${apply(l1,vl)} + ${apply(l2,vl)}"
-    case Mult(l1:Add, l2:Add) => s"(${apply(l1,vl)})*(${apply(l2,vl)})" 
-    case Mult(l1, l2:Add) => s"${apply(l1,vl)}*(${apply(l2,vl)})"
-    case Mult(l1:Add, l2) => s"(${apply(l1,vl)})*${apply(l2,vl)}"
-    case Mult(l1, l2) => s"${apply(l1,vl)}*${apply(l2,vl)}" 
-    /*
-    case Div(l1:Add, l2:Add) => s"(${apply(l1,vl)})/(${apply(l2,vl)})" 
-    case Div(l1, l2:Add) => s"${apply(l1,vl)}/(${apply(l2,vl)})"
-    case Div(l1:Add, l2) => s"(${apply(l1,vl)})/${apply(l2,vl)}"
-    case Div(l1, l2) => s"${apply(l1,vl)}/${apply(l2,vl)}"
-    
-
-    case Res(l1:Add, l2:Add) => s"(${apply(l1,vl)})%(${apply(l2,vl)})" 
-    case Res(l1, l2:Add) => s"${apply(l1,vl)}%(${apply(l2,vl)})"
-    case Res(l1:Add, l2) => s"(${apply(l1,vl)})%${apply(l2,vl)}"
-    case Res(l1, l2) => s"${apply(l1,vl)}%${apply(l2,vl)}"
-
-
-
-    case Sin(l1) => s"sin(${apply(l1,vl)})" 
-    case Cos(l1) => s"cos(${apply(l1,vl)})" 
-    case Tan(l1) => s"tan(${apply(l1,vl)})"
-    case Pow(l1,l2)=> s"pow(${apply(l1,vl)},${apply(l2,vl)})"
-    case Sqrt(l1,l2)=> s"sqrt(${apply(l1,vl)},${apply(l2,vl)})"
-    */
-  }
-
-*/
 
   
   def apply(notlin:NotLin): String= apply(notlin,Map():Valuation)
 
   def apply(notlin: NotLin, vl: Valuation): String = notlin match {
     case v:VarNotLin => showVarNotLin(v,vl,apply[Pure])
-    // Se Value for um inteiro vai imprimir sem o zero, senão imprime com os decimais	
+    // If Value is an integer it will print without the zero, otherwise it prints with decimals 
     case ValueNotLin(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
     
-    // Aqui estes não estão bem, pois agora são expressões lineares no argumento, não outra coisa!
-    // Alterei isto tudo !!
+ //new
     case AddNotLin(l1, l2)    => s"${apply(l1,vl)} + ${apply(l2,vl)}"
     case MultNotLin(l1:AddNotLin, l2:AddNotLin) => s"(${apply(l1,vl)})*(${apply(l2,vl)})" 
     case MultNotLin(l1, l2:AddNotLin) => s"${apply(l1,vl)}*(${apply(l2,vl)})"
@@ -156,27 +112,21 @@ object Show {
     case ResNotLin(l1, l2) => s"${apply(l1,vl)}%${apply(l2,vl)}"
 
 
-
-    //case SinNotLin(l1) => s"sin(${apply(l1,vl)})" 
-    //case CosNotLin(l1) => s"cos(${apply(l1,vl)})" 
-    //case TanNotLin(l1) => s"tan(${apply(l1,vl)})"
     case PowNotLin(l1,l2)=> s"pow(${apply(l1,vl)},${apply(l2,vl)})"
     case FuncNotLin(s,list)=>s"${s}(${stringList(list)})"
-    //case PowNotLin(l1,DivNotLin(ValueNotLin(1),l2))=> s"sqrt(${apply(l1,vl)},${apply(l2,vl)})"
   }
 
 def stringList(list:List[NotLin]): String = list match{
     case List() => s""
     case n::List() => s"${apply(n)}"
     case n::ns => s"${apply(n)},${stringList(ns)}"
-    //case n => s"${apply(n)}"
   }
 
   // show a condition parseable by Sage
   def apply(cond: Cond, vl:Valuation = Map()): String = cond match {
     case BVal(b)     => b.toString
-    case And(And(e1,e2),e3) => apply(And(e1,And(e2,e3)),vl) // Para que serve este caso ??
-    case And(e1,e2:And)     => s"${showP(e1,vl)} /\\ ${showP(e2,vl)}" // E este??
+    case And(And(e1,e2),e3) => apply(And(e1,And(e2,e3)),vl) 
+    case And(e1,e2:And)     => s"${showP(e1,vl)} & ${showP(e2,vl)}" 
     case And(e1, e2) => s"${showP(e1,vl)} & ${showP(e2,vl)}"
     case Or(e1, e2)  => s"${showP(e1,vl)} | ${showP(e2,vl)}"
     case Not(EQ(l1,l2)) => s"${apply(l1,vl)}!=${apply(l2,vl)}"
@@ -186,42 +136,37 @@ def stringList(list:List[NotLin]): String = list match{
     case LT(l1, l2)    => s"${apply(l1,vl)}<${apply(l2,vl)}"
     case GE(l1, l2)    => s"${apply(l1,vl)}>=${apply(l2,vl)}"
     case LE(l1, l2)    => s"${apply(l1,vl)}<=${apply(l2,vl)}"
-    //case IsoletedCond(l1) => s"${apply(l1,vl)}"
   }
   
-  // já vi e faz sentido
   private def showP(exp:Cond, vl:Valuation):String = exp match {
     case BVal(b) => b.toString
     case _ => s"(${apply(exp,vl)})"
   }
 
 
-  // O que é o SyExpr?
   private def showVarNotLin(v: VarNotLin, valuation: Valuation,cont:SyExpr => String): String = {
     valuation.get(v.v) match {
-      case Some(exp) => cont(Eval.updInput(exp,valuation))  // NÃO PERCEBI!!!!!!!!!!
+      case Some(exp) => cont(Eval.updInput(exp,valuation))  
       case None => v.v 
     }
   }
 
 
-// O QUE FAZ ESTA FUNÇÃO E AS SEGUINTES??? 
-  // O que é o SyExpr?
   private def showVar(v: Var, valuation: Valuation,cont:SyExpr => String): String = {
     valuation.get(v.v) match {
-      case Some(exp) => cont(Eval.updInput(exp,valuation))  // NÃO PERCEBI!!!!!!!!!!
+      case Some(exp) => cont(Eval.updInput(exp,valuation))  
       case None => v.v 
     }
   }
 
 
 
-  // NÃO PERCEBI PARA O QUE SERVE
   def apply[E<:SymbolicExpr.All](expr: SymbolicExpr[E]): String = expr match {
     case SVal(v) => floatToFraction(v) //f"$v%1.8f"
     case _:SArg  => "_t_"
     case s:SVar  => s.v
     case SFun("PI",Nil) => "pi"
+    case SFun("E",Nil) => "e"
     case s:SFun[E]  => s"${s.f}(${s.args.map(apply[E]).mkString(",")})"
     case s:SDiv[E]  => s"${applyP[E](s.e1)}/${applyP[E](s.e2)}"
     case s:SRes[E]  => s"${applyP[E](s.e1)}%${applyP[E](s.e2)}"
@@ -240,7 +185,6 @@ def stringList(list:List[NotLin]): String = list match{
   }
 
 
-  // NÃO PERCEBI PARA O QUE SERVE
   def pp[E<:SymbolicExpr.All](expr: SymbolicExpr[E]): String = expr match {
     case SVal(v) => if (v.round == v) v.toInt.toString else v.toString // f"$v%1.8f"
     case _:SArg  => "t"
@@ -254,14 +198,10 @@ def stringList(list:List[NotLin]): String = list match{
     case SMult(SArg(),d@SVal(_))=> s"${pp[E](d)}t"
     case SMult(d@SVal(_),SVar(x))=> s"${pp[E](d)}$x"
     case SMult(d@SVal(_),SArg())=> s"${pp[E](d)}t"
-//    case SMult(e1,e2@SAdd(_,_))=> s"${ppP[E](e1)}*${ppP[E](e2)}"
     case SAdd(SVal(0),e)=> s"${pp[E](e)}"
     case SAdd(e,SVal(0))=> s"${pp[E](e)}"
     case SAdd(e1,e2@SAdd(_,_)) => s"${ppP[E](e1)}+${pp[E](e2)}"
-//    case SSub(e1,e2@SAdd(_,_)) => s"${ppP[E](e1)}-${ppP[E](e2)}"
-//    case SMult(e1@SAdd(_,_),e2)=> s"${ppP[E](e1)}*${ppP[E](e2)}"
     case SAdd(e1@SAdd(_,_),e2)=> s"${pp[E](e1)}+${ppP[E](e2)}"
-//    case SSub(e1@SAdd(_,_),e2)=> s"${ppP[E](e1)}-${ppP[E](e2)}"
     case SSub(SVal(0),e)=> s"-${ppP[E](e)}"
     case SSub(e,SVal(0))=> s"${pp[E](e)}"
     //// General cases
@@ -293,23 +233,19 @@ def stringList(list:List[NotLin]): String = list match{
   }
 
 
-  // NÃO PERCEBI O QUE ESTA FAZ
   def floatToFraction(v: Double): String = try {
     var den: BigInt = 1
     var num: BigDecimal = v
     while (num.toBigIntExact.isEmpty) { // && num < BigDecimal.apply("100000000000000000000000")) {
       num *= 10
       den *= 10
-      //println(s"   - $num/$den")
     }
-    //println(s"-- $v -> ${num.toBigInt.toString}/${den.toString}")
     if (den == 1) num.toBigInt.toString
     else s"${num.toBigInt.toString}/${den.toString}"
     } catch {
     case e: java.lang.NumberFormatException => "NaN"
   }
 
-  // NÃO PERCEBI PARA O QUE SERVE
   def apply(r:RunTarget): String = r match {
     case Traj.Time(t) => apply(t)
     case Traj.Times(from,to,step) => s"${from.toString}:${step.toString}:${to.toString}" //ts.map(apply[SymbolicExpr.All]).mkString(", ")

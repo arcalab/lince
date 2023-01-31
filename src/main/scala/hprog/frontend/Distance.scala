@@ -29,8 +29,6 @@ object Distance {
 
 
 
-
-  // PEDIR AO PROF AJUDA PARA PERCEBER MELHOR
   def closest(p:Point,c:Cond,max:Double): Option[Point] = {
     val res = if (max<=0) {
       if (normaliseCond(c) contains p) Some(p) else None
@@ -44,8 +42,6 @@ object Distance {
 
 
 
-
-// PEDIR AO PROF AJUDA PARA PERCEBER MELHOR
   type DNF = Or
   case class Or(ands:Set[And]) {
     def contains(p:Point): Boolean = ands.exists(_ contains p)
@@ -55,8 +51,7 @@ object Distance {
   }
   sealed abstract class Ineq {
     def contains(p:Point): Boolean = this match {
-      //case EQ(l1, l2) => Eval(p,l1) == Eval(p,l2)
-      case GT(l1, l2) => Eval(p,l1) >  Eval(p,l2) // COMO FOI POSSÍVEL ACEDER AO EVAL??
+      case GT(l1, l2) => Eval(p,l1) >  Eval(p,l2)
       case LT(l1, l2) => Eval(p,l1) <  Eval(p,l2)
       case GE(l1, l2) => Eval(p,l1) >= Eval(p,l2)
       case LE(l1, l2) => Eval(p,l1) <= Eval(p,l2)
@@ -65,7 +60,7 @@ object Distance {
 
 
 
-  // ALTEREI!!!!!!!!!!!!
+  // New
   case class GT(l1:NotLin,l2:NotLin)      extends Ineq
   case class LT(l1:NotLin,l2:NotLin)      extends Ineq
   case class GE(l1:NotLin,l2:NotLin)      extends Ineq
@@ -73,12 +68,10 @@ object Distance {
 
 //////////////////////////////////////////////////////////////////
 
-// ALTEREI!
-
-// TENHO DUVIDAS NOS BVALS, AND E OR
+// New
   def normaliseCond(c:Cond): DNF = c match {
     case BVal(true) => Or(Set(And(Set())))
-    case BVal(false) => Or(Set()) // PORQUE ESTE É ASSIM E O DO BVAL(TRUE) NÃO?
+    case BVal(false) => Or(Set()) 
     case ast.Syntax.And(c1, c2) => (normaliseCond(c1),normaliseCond(c2)) match {
       case (Or(ands1),Or(ands2)) => Or( for(a1<-ands1;a2<-ands2) yield And(a1.ineqs++a2.ineqs))
     }
@@ -94,7 +87,7 @@ object Distance {
   }
   
 
-  // no fundo faz o swap da condição
+  // Condition swap
   def swapOps(c: Cond): Cond = c match {
     case BVal(b)        => BVal(!b)
     case ast.Syntax.And(c1, c2)=> ast.Syntax.Or(swapOps(c1),swapOps(c2))
@@ -124,10 +117,6 @@ object Distance {
           closest(p, Or(dnf.ands.tail),max)
       }
     case None => None
-//      val p1 = closest(p1,and)
-//      val p2 = closest(p1,Or(dnf.ands.tail))
-//      if (dist(p,p1) <= dist(p,p2)) p1 else p2
-//    case None => throw new RuntimeException(s"No point in the domain of $dnf.")
   }
 
   def dist(p1:Point,p2:Point): Double = {
@@ -138,20 +127,14 @@ object Distance {
 
   def closest(p:Point,and:And,max:Double): Option[Point] =
     closest(p,and.ineqs.map(closeIneq),max)
-//      .flatMap(p2 =>
-//      if (and contains p2) Some(p2)
-//      else None
-//    )
+
 
 
   def closest(p:Point,ineqs:Set[Ineq],max:Double): Option[Point] = {
     for (ineq <- ineqs) {
-      //println(s"manual closest of ${p} to ${ineq}")
       val p2: Point = closest(p,ineq)
-      //println(s"got ${p2}")
       if (And(ineqs - ineq) contains p2) return Some(p2)
     }
-    // no trivial solution; solve quadratic programming optimisation problem
     quadraticProgrm(p,ineqs,max)
   }
 
@@ -171,7 +154,6 @@ object Distance {
     val delta = neg(p)
     val p1 = notlin2point(shiftNotLin(l1,delta))
     val p2 = notlin2point(shiftNotLin(l2,delta))
-    //    val plane = add(add(p1,neg(p2)),neg(p)) // p1-p2 - p
     val plane = add(p1,neg(p2))
     val d = 0.0 - plane.getOrElse("",0.0) // extra value without variable from p1-p2
     val plane2 = plane - "" // take out empty variable
@@ -179,7 +161,8 @@ object Distance {
     //println(s"closest to origin solving ${plane2} = $d\n returned $p3")
     add(p3 , p) // add point p in the end
   }
-// ALTEREI!!!!
+
+//New
   def notlin2point(notlin: NotLin): Point = notlin match {
     case VarNotLin(v) => Map(v->1.0)
     case ValueNotLin(v) => Map("" -> v)
@@ -187,23 +170,20 @@ object Distance {
     case MultNotLin(l1, l2) => mul(notlin2point(l1),notlin2point(l2))
     case DivNotLin(l1, l2) => div(notlin2point(l1),notlin2point(l2))
     case ResNotLin(l1, l2) => res(notlin2point(l1),notlin2point(l2))
-    //case SinNotLin(l1) => seno(notlin2point(l1)) 
-    //case CosNotLin(l1) => cosseno(notlin2point(l1)) 
-    //case TanNotLin(l1) => tangente(notlin2point(l1))
     case PowNotLin(l1, l2) => powdef(notlin2point(l1),notlin2point(l2))
     case FuncNotLin(s,list) => funcdef(s,list.map((l:NotLin) => notlin2point(l)))
-    //case SqrtNotLin(l1, l2) => ???
+   
 
     }
 
-  // Porque só tem 'x' depois do yield?   
+  // Why 'x' exist before '->'??  
   def add(p1:Point,p2:Point): Point =
-    p1 ++ (for ((x,v) <- p2) yield x -> (p1.getOrElse(x,0.0)+v)) // getOrElse retira o valor de p1 e se não existir retorna (x,0)
+    p1 ++ (for ((x,v) <- p2) yield x -> (p1.getOrElse(x,0.0)+v)) // getOrElse remove the value of p1, if it not exist, return (x,0)
 
 
 //////////////////////////////////////////////////////////////////
 
-// ADICIONEI ESTAs (PROVAVELMENTE ESTÁ MAL)
+//New
   def mul(p1:Point,p2:Point): Point=
     p1 ++ (for ((x,v) <- p2) yield x -> (p1.getOrElse(x,1.0)*v))
 
@@ -270,19 +250,7 @@ object Distance {
 
     }
   }
-/*
-  def cosseno(p1:Point): Point=
-    p1.mapValues((x,v)=>(x,cos(v)))
 
-  def tangente(p1:Point): Point=
-    p1.mapValues((x,v)=>(x,tan(v)))
-
-
-  def powdef(p1:Point,p2:Point): Point=
-  
-
-  def sqrtdef(p1:Point,p2:Point): Point=
-*/
   
 /////////////////////////////////////////////////////////////////
 
@@ -297,14 +265,12 @@ object Distance {
   }
 
   def left(ineq: Ineq): NotLin = ineq match {
-    //case EQ(l1,_) => l1
     case GT(l1,_) => l1
     case LT(l1,_) => l1
     case GE(l1,_) => l1
     case LE(l1,_) => l1
   }
   def right(ineq: Ineq): NotLin = ineq match {
-    //case EQ(_,l2) => l2
     case GT(_,l2) => l2
     case LT(_,l2) => l2
     case GE(_,l2) => l2
@@ -315,11 +281,8 @@ object Distance {
   // need to shift based on `max` because variables will only get positive values
   def quadraticProgrm(p: Point, ineqs: Set[Ineq], max:Double): Option[Point] = {
     val delta = p.view.mapValues(x => if (x<max) max-x else 0).toMap
-    //println(s"before: ${ineqs.mkString(", ")}")
-    //println(s"delta: ${delta.map(kv=>kv._1+"->"+kv._2).mkString(", ")}")
     val shiftedP = add(p,delta)
     val shiftedIneqs = ineqs.map(i => shiftIneq(i,delta))
-    //println(s"after:  ${shiftedIneqs.mkString(", ")}")
     quadraticProgrm(shiftedP,shiftedIneqs)
       .map(p2 => add(p2,neg(delta)))
   }
@@ -334,7 +297,7 @@ object Distance {
 
 
 
-  //ALTEREI!!!
+  //New
   def shiftNotLin(notlin: NotLin, delta:Point): NotLin = notlin match {
     case VarNotLin(v) => if (delta(v)!=0) AddNotLin(notlin,ValueNotLin(-delta(v))) else notlin // Porquê o menos ??
     case ValueNotLin(_) => notlin
@@ -342,12 +305,9 @@ object Distance {
     case MultNotLin(l1, l2) => MultNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
     case DivNotLin(l1,l2) => DivNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
     case ResNotLin(l1,l2) => ResNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
-    //case SinNotLin(l1) => SinNotLin(shiftNotLin(l1,delta))
-    //case CosNotLin(l1) => CosNotLin(shiftNotLin(l1,delta))
-    //case TanNotLin(l1) => TanNotLin(shiftNotLin(l1,delta))
     case PowNotLin(l1,l2) => PowNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
     case FuncNotLin(s,list)=> FuncNotLin(s,list.map((l:NotLin) => shiftNotLin(l,delta)))
-    //case SqrtNotLin(l1,l2) => SqrtNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+
      
   }
 
@@ -365,18 +325,18 @@ object Distance {
 
     val sumSquares: Expression = squares.fold(0:Expression)(_+_)
 
-    //println(s"minimizing: $sumSquares")
+ 
     minimize(sumSquares)(model)
 
     // subject to constraints
     for (ineq<-ineqs) {
-      ///println(s"add constraint: ${ineqToConstr(ineq,vars)}")
+     
       subjectTo(ineqToConstr(ineq, vars))(model)
     }
 
-    //println(s"constraints: ${ineqs.mkString(",")}")
+  
     val ok = start()(model)
-    //println(s" - $ok")
+   
 
     release()(model)
 
@@ -390,36 +350,7 @@ object Distance {
     else
       None
 
-    /*
-import optimus.optimization._
-import optimus.optimization.enums.SolverLib
-import optimus.optimization.model.MPFloatVar
-
-implicit val model = MPModel(SolverLib.oJSolver)
-
-  Ok! Let's create a couple of variables:
-
-// Both variables are positive, that is, bounds are in [0, +inf]
-val x = MPFloatVar.positive("x")
-val y = MPFloatVar.positive("y")
-
-  Then we can define our optimization problem subject to a couple of constraints using our known maths:
-
-minimize(-8*x - 16*y + x*x + 4*y^2)
-subjectTo(
-          x + y <:= 5,
-          x <:= 3
-         )
-  At last.Syntax, we can solve the problem by starting the solver and displaying the results:
-
-start()
-println(s"objective: $objectiveValue")
-println(s"x = ${x.value} y = ${y.value}")
-
-  Finally, don't forget to release the memory used by the internal solver:
-
-release()
-     */
+ 
   }
 
   def ineqToConstr(ineq: Ineq, vars: Map[String, MPVar]): Constraint = {
@@ -455,7 +386,6 @@ release()
     val c = hprog.lang.Parser.parseAll(hprog.lang.Parser.condP,s)
     c match {
       case hprog.lang.Parser.Success(cond, _) =>
-        //println("parsed")
         val res = closest(p,cond,max)
         if (res.isEmpty) println("no closest point")
         else

@@ -17,8 +17,6 @@ object SymbolicExpr {
 
 sealed trait SymbolicExpr[+X<:SymbolicExpr.All] {
   override def toString: String = this match {
-//    case SVal(v) if (v-v.round)==0 => v.toInt.toString
-//    case SVal(v) => v.toString
     case s:SVal => Show.floatToFraction(s.v)
     case _:SArg => "t"
     case s:SVar => s.v
@@ -36,12 +34,6 @@ sealed trait SymbolicExpr[+X<:SymbolicExpr.All] {
   def *(that: SyExprAll): SyExprAll = SMult(this,that)
   def /(that: SyExprAll): SyExprAll = SDiv(this,that)
   def ^(that: SyExprAll): SyExprAll = SPow(this,that)
-
-  //  def -[X2<:X](that: SageExpr[X2]): SageExpr[X] = SSub(this,that)
-//  def *[X2<:X](that: SageExpr[X2]): SageExpr[X] = SMult(this,that)
-//  def /[X2<:X](that: SageExpr[X2]): SageExpr[X] = SDiv(this,that)
-//  def ^[X2<:X](that: SageExpr[X2]): SageExpr[X] = SPow(this,that)
-
 }
 
 case class SVal(v:Double)                     extends SymbolicExpr[Pure]

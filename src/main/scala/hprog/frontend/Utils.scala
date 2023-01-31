@@ -9,8 +9,7 @@ import hprog.frontend.CommonTypes.Valuation
 
 
 
-// Este script serve para verificar se variáveis já foram declaradas antes de serem
-// chamadas e cenas assim!
+// Scrip with auxiliar functions 
 
 
 
@@ -18,11 +17,11 @@ object Utils {
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // pego em conteúdo do tipo syntax e retorno conteúdo do tipo List[List[DiffEq]]
-  // No fundo o que esta função faz é retirar todas as equações diferenciais de um programa
+  // take content of type syntax and return content of type List[List[DiffEq]]
+  // Basically what this function does is to remove all differential equations from a program
   def getDiffEqs(prog:Syntax): List[List[DiffEq]]  = prog match {
     case Atomic(_, DiffEqs(eqs,_)) => List(eqs)
-    case Seq(p, q) => getDiffEqs(p) ::: getDiffEqs(q) // junta as duas listas
+    case Seq(p, q) => getDiffEqs(p) ::: getDiffEqs(q) // joins the two lists
     case ITE(_, thenP, elseP) => getDiffEqs(thenP) ::: getDiffEqs(elseP)
     case While(pre, _, doP) => getDiffEqs(pre) ::: getDiffEqs(doP)
   }
@@ -31,16 +30,14 @@ object Utils {
 
 
 
-// NOVO
+// New
 def extractAssigments(prog:Syntax):List[Assign] = prog match {
   
   case Atomic(as,_) => {
-       // println("asATomic:",as)
   	return as
   }
   case Seq(Atomic(as,_),q) => {
   	var ac=as++extractAssigments(q)
-  	//println("acSeq:",ac)
   	return ac
   }
   case Seq(p,q) =>{
@@ -48,7 +45,6 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
    return extractAssigments(p) ++ extractAssigments(q)
   }
   case While(pre,c,p) => {
-  	//println("ww:",extractAssigments(pre))
   	return extractAssigments(pre)
   
   }
@@ -60,13 +56,12 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 
 
-////// NOVO /////// 
+////// New /////// 
 //verify if the free varibles had already been declarated before being used.
   def assigmentsVerify(prog:Syntax): Set[String] = prog match {
     
     case Seq(p,q) => {
       var as=extractAssigments(p) ++ extractAssigments(q)
-      //println("assgmverify:",as)
       var declVar= as.map(_.v.v).toList //list of declarated variables in atomic
       var aux=0
       var aux2=1
@@ -110,7 +105,6 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
        
        return zz
     }   
-    //case Seq(p,_) => assigmentsVerify(p)
     case ITE(ifP,thenP,elseP) =>getVars(ifP)++assigmentsVerify(thenP)++assigmentsVerify(elseP) //probably this case does not have any effect because it is obligatory the declaration of variables above the instructions 
     case While(pre,c,p) => assigmentsVerify(pre)  
   }
@@ -126,7 +120,7 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
     * @return the free variables of the first atomic expression
     */
 
-  // O que faz é tipo chegar a p:=3+v e ficar com Set(v), mas apenas lhe interessa as do primeiro atomico
+  // What this function does is to get p:=3+v and get Set(v), but it only cares about the first set of atomic
   def getFstFreeVars(prog:Syntax): Set[String] = prog match {
     case Atomic(as, _) => as.toSet.flatMap((a:Assign)=>getVars(a.e))
     case Seq(p, _) => getFstFreeVars(p)
@@ -143,19 +137,14 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 // Verify if exists free variables  already been declarated before being used, and also if they are used variables that are not declareted
   def isClosed(prog:Syntax): Either[String,Unit] = {
     val declVarTHEN = getFstDeclVarsTHEN(prog) //make a set with the firsts declareted variables (THEN)
-    //println("Declared variables (THEN):",declVarTHEN)
-    
+     
     val declVarELSE = getFstDeclVarsELSE(prog) //make a set with the firsts declareted variables (ELSE)
-    //println("Declared variables (ELSE):",declVarELSE)
     
     val usedVarsTHEN = getUsedVarsTHEN(prog)   //make a set with the firsts used variables
-    //println("Used variables (THEN):",usedVarsTHEN)
     
     val usedVarsELSE = getUsedVarsELSE(prog)  //make a set with the firsts used variables
-    //println("Used variables (ELSE):",usedVarsELSE)
     
     val asVerify=assigmentsVerify(prog) //make a set of free variables that not had been declareted before of ther invocation.
-    //println("Free undeclared variables:",asVerify)
     
     if (asVerify.nonEmpty) //Verify if exist free variables that not had been declareted before, if exist i print it.
       Left(s"Initial declaration has free variables that were not declared: ${asVerify.mkString(", ")}")
@@ -183,7 +172,7 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // pega numa lista de equações diferenciais e retira as variáveis com o til em cima! (ex: p'=1+x retorna set(p))
+  // take a list of differential equations and remove the variables with the tilde on top! (ex: p'=1+x returns set(p))
   def getDefVars(eqs: List[DiffEq]): Set[String] =
     eqs.map(_.v.v).toSet
 
@@ -200,10 +189,10 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//NOVOOO
-  // a função getUsedVars é defenida para List[DiffEq],Syntax,DiffEqs e Dur, retornado as variáveis utilizadas lá
+//New
+  // The function getUsedVars is defined for List[DiffEq],Syntax,DiffEqs and Dur, returning the variables used there
   def getUsedVarsTHEN(eqs: List[DiffEq]): Set[String] =
-    eqs.flatMap(eq => getVars(eq.e)+eq.v.v).toSet  // ALTEREIIIIIIII
+    eqs.flatMap(eq => getVars(eq.e)+eq.v.v).toSet  // New
 
   def getUsedVarsTHEN(prog:Syntax): Set[String] = prog match {
     case Atomic(as, de) => as.toSet.flatMap((a:Assign)=>getVars(a.e)+a.v.v) ++ getUsedVarsTHEN(de)
@@ -217,7 +206,7 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
   def getUsedVarsTHEN(dur: Dur): Set[String] = dur match {
     case Until(c,_,_) =>getVars(c)
-    case For(nl) => getVars(nl) // NOVO!!!!!!!!!!!  
+    case For(nl) => getVars(nl) //New  
     case _ => Set()
   }
 
@@ -225,9 +214,9 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 
 
-//NOVOOOO
+//New
  def getUsedVarsELSE(eqs: List[DiffEq]): Set[String] =
-    eqs.flatMap(eq => getVars(eq.e)+eq.v.v).toSet  // ALTEREIIIIIIII
+    eqs.flatMap(eq => getVars(eq.e)+eq.v.v).toSet  //New
 
   def getUsedVarsELSE(prog:Syntax): Set[String] = prog match {
     case Atomic(as, de) => as.toSet.flatMap((a:Assign)=>getVars(a.e)+a.v.v) ++ getUsedVarsELSE(de)
@@ -241,7 +230,7 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
   def getUsedVarsELSE(dur: Dur): Set[String] = dur match {
     case Until(c,_,_) =>getVars(c)
-    case For(nl) => getVars(nl) // NOVO!!!!!!!!!!!  
+    case For(nl) => getVars(nl) //New 
     case _ => Set()
   }
 
@@ -255,19 +244,18 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-// NOVOOO
-  // Pega num programa e retira as primeiras variáveis declaradas (do primiero atómico)
+// New
+  // Take a program and remove the first declared variables (from the first atomic)
   //@scala.annotation.tailrec
   def getFstDeclVarsTHEN(prog:Syntax): Set[String] = prog match {
     
     case Seq(p,q) => {
       var as=extractAssigments(Seq(p,q))
-      //println("then:",as)
       var asSet=as.map(_.v.v).toSet
       
       return asSet
       }
-    case Atomic(a, _)     => a.map(_.v.v).toSet // cria um conjunto com as primeiras variáveis declaradas
+    case Atomic(a, _)     => a.map(_.v.v).toSet // creates an set of the first variables declared
    
     
       
@@ -280,9 +268,9 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 
 
-//NOVOOO
+//New
   def getFstDeclVarsELSE(prog:Syntax): Set[String] = prog match {
-    case Atomic(a, _)     => a.map(_.v.v).toSet // cria um conjunto com as primeiras variáveis declaradas
+    case Atomic(a, _)     => a.map(_.v.v).toSet // creates an set of the first variables declared
    
     case Seq(p,q) => {
       var as=extractAssigments(p) ++ extractAssigments(q)
@@ -303,43 +291,30 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// criam conjuntos com as variáveis aí utilizadas
+// create sets with the variables used there
   def getVars(guard: LoopGuard): Set[String] = guard match {
     case Counter(_) => Set()
     case Guard(c) => getVars(c)
   }
 
-  // ALTEREI PARA ESTAR DE ACORDO
+  //new
   def getVars(lin: Lin): Set[String] = lin match {
     case Var(v) => Set(v)
     case Value(_) => Set()
     case Add(l1, l2) => getVars(l1) ++ getVars(l2)
     case Mult(l1, l2) => getVars(l1) ++ getVars(l2)
-    /*
-    case Div(l1,l2) => getVars(l1) ++ getVars(l2)
-    case Res(l1,l2) => getVars(l1) ++ getVars(l2)
-    case Sin(l) => getVars(l)
-    case Cos(l) => getVars(l) 
-    case Tan(l) => getVars(l)  
-    case Pow(l1,l2) => getVars(l1) ++ getVars(l2)
-    case Sqrt(l1,l2) => getVars(l1) ++ getVars(l2)
-    */
   }
 
-    // ACRESCENTEI ESTA:
+    // new
   def getVars(notlin: NotLin): Set[String] = notlin match {
     case VarNotLin(v) => Set(v)
     case ValueNotLin(_) => Set()
     case AddNotLin(l1, l2) => getVars(l1) ++ getVars(l2)
     case MultNotLin(l1, l2) => getVars(l1) ++ getVars(l2)
     case DivNotLin(l1,l2) => getVars(l1) ++ getVars(l2)
-    case ResNotLin(l1,l2) => getVars(l1) ++ getVars(l2)
-    //case SinNotLin(l) => getVars(l)
-    //case CosNotLin(l) => getVars(l) 
-    //case TanNotLin(l) => getVars(l)  
+    case ResNotLin(l1,l2) => getVars(l1) ++ getVars(l2)  
     case PowNotLin(l1,l2) => getVars(l1) ++ getVars(l2)
     case FuncNotLin(s,list) => getVarsAux(list)
-   // case SqrtNotLin(l1,l2) => getVars(l1) ++ getVars(l2)
   }
 
 
@@ -359,7 +334,7 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
     case LT(l1,l2)    => getVars(l1) ++ getVars(l2)
     case GE(l1,l2)    => getVars(l1) ++ getVars(l2)
     case LE(l1,l2)    => getVars(l1) ++ getVars(l2)
-    //case IsoletedCond(l) => getVars(l) // ACRESCENTEI ISTO!
+    
   }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -370,47 +345,35 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 
 
-///// NOVO 
+///// New
 
 /////////////////////////////////////////////////////////////////////////////////
 
-// criam conjuntos com as variáveis aí utilizadas
+// create lists with the variables used there
   def getVarsList(guard: LoopGuard): List[String] = guard match {
     case Counter(_) => List()
     case Guard(c) => getVarsList(c)
   }
 
-  // ALTEREI PARA ESTAR DE ACORDO
+  // new
   def getVarsList(lin: Lin): List[String] = lin match {
     case Var(v) => List(v)
     case Value(_) => List()
     case Add(l1, l2) => getVarsList(l1) ++ getVarsList(l2)
     case Mult(l1, l2) => getVarsList(l1) ++ getVarsList(l2)
-    /*
-    case Div(l1,l2) => getVars(l1) ++ getVars(l2)
-    case Res(l1,l2) => getVars(l1) ++ getVars(l2)
-    case Sin(l) => getVars(l)
-    case Cos(l) => getVars(l) 
-    case Tan(l) => getVars(l)  
-    case Pow(l1,l2) => getVars(l1) ++ getVars(l2)
-    case Sqrt(l1,l2) => getVars(l1) ++ getVars(l2)
-    */
   }
 
-    // ACRESCENTEI ESTA:
+    // new
   def getVarsList(notlin: NotLin): List[String] = notlin match {
     case VarNotLin(v) => List(v)
     case ValueNotLin(_) => List()
     case AddNotLin(l1, l2) => getVarsList(l1) ++ getVarsList(l2)
     case MultNotLin(l1, l2) => getVarsList(l1) ++ getVarsList(l2)
     case DivNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2)
-    case ResNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2)
-    //case SinNotLin(l) => getVarsList(l)
-    //case CosNotLin(l) => getVarsList(l) 
-    //case TanNotLin(l) => getVarsList(l)  
+    case ResNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2) 
     case PowNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2)
     case FuncNotLin(s,list) => getVarsListAux(list)
-    //case SqrtNotLin(l1,l2) => getVarsList(l1) ++ getVarsList(l2)
+    
   }
 
   def getVarsListAux(list:List[NotLin]): List[String] = list match {
@@ -429,7 +392,7 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
     case LT(l1,l2)    => getVarsList(l1) ++ getVarsList(l2)
     case GE(l1,l2)    => getVarsList(l1) ++ getVarsList(l2)
     case LE(l1,l2)    => getVarsList(l1) ++ getVarsList(l2)
-    //case IsoletedCond(l) => getVars(l) // ACRESCENTEI ISTO!
+    
   }
 
 
@@ -455,11 +418,6 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 /** Convert a list of assignments to a Valuation, i.e., to a Map[String,SyExpr]. */
   def toValuation(as:List[Assign],prev:Valuation): Valuation = {
-    // val vvv=as.map(kv => kv.v.v -> Eval.notlin2sage(kv.e))
-    // println("prev:",prev)
-    // println("vvv:",vvv)
-    // println("vvv.toMap:",vvv.toMap)
-    // println("vvv.toMap.viei.mapValues(e =>exprVarToExpr(e,prev)).toMap:",vvv.toMap.view.mapValues(e => exprVarToExpr(e,prev)).toMap)
     as.map(kv => kv.v.v -> Eval.notlin2sage(kv.e))
       .toMap
       .view.mapValues(e => exprVarToExpr(e,prev)).toMap
@@ -492,7 +450,7 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 
 
-  // Não entendi a finalidade...
+
   def asSyExpr(e:SyExprAll): SyExpr = e match {
     case e2: SyExpr @ unchecked => e2
     // bottom case never caught, since erasure will make SyExprAll = SyExpr.
@@ -552,8 +510,6 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
       val compat = isLess(h1.to,h2.from) && isLess(h2.to,h1.from)
       if (compat)
         (getP(to),getP(from)) match {
-//          case (None, _) => Some(Hole(Inf, from))
-//          case (_, None) => Some(Hole(to, Inf))
           case (Some(t1), Some(t2)) if t1>t2 => Some(All)
           case (Some(t1), Some(t2)) if t1==t2 =>
             if (to == Close(t1) || from == Close(t1)) Some(All)
@@ -658,9 +614,6 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
     case BVal(true) =>  Some(Map()) //Set(Map())
     case BVal(false) =>  None
     case And(c1, c2) =>
-//      (for (d1<-getDomains(c1); d2<-getDomains(c2)) yield andD(d1,d2))
-//        .filter(_.isDefined)
-//        .map(_.get)
       for (d1<-getDomain(c1); d2<-getDomain(c2); d12 <- andD(d1,d2)) yield d12
     case Or(c1, c2) =>
       for (d1<-getDomain(c1); d2<-getDomain(c2)) yield orD(d1,d2)
