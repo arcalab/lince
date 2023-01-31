@@ -512,9 +512,9 @@ object Parser extends RegexParsers {
   /** Parser of a (possibly negated) block of a condition or a literal or inequality `bopP` */
   lazy val negP: Parser[Cond] =
     "!" ~ "(" ~> condP <~ ")" ^^ Not |
-    "("~>condP<~")"|
     bopP |
-    condP 
+    "("~>condP<~")"|
+    condP
    
 
 
