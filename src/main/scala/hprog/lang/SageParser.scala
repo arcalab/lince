@@ -99,14 +99,15 @@ object SageParser extends RegexParsers {
       case None~_~_~e => SFun("exp",List(e))//(t:Double) => (ctx:Valuation) => Math.exp(e(t)(ctx))
       case _~_~_~e => invert(SFun("exp",List(e)))//(t:Double) => (ctx:Valuation) => Math.exp(e(t)(ctx))
     } |
-    lit ~ opt("^"~>lit) ^^ {
-      case e ~ None => e
-      case e1 ~ Some(e2) => SPow(e1,e2)//(t:Double) => (ctx:Valuation) => Math.pow(e1(t)(ctx),e2(t)(ctx))
+    opt("-") ~ lit ~ opt("^"~>lit) ^^ {
+      case None ~ e ~ None => e
+      case Some(_) ~ e ~ None => SSub(SVal(0.0),e)
+      case None ~ e1 ~ Some(e2) => SPow(e1,e2)//(t:Double) => (ctx:Valuation) => Math.pow(e1(t)(ctx),e2(t)(ctx))
+      case Some(_) ~ e1 ~ Some(e2) => SSub(SVal(0.0),SPow(e1,e2))
     }
 
   lazy val lit: Parser[SyExprAll] =
-    function | rational | time | "("~>eqExpr<~")" | negation
-
+    function | rational | time | "("~>eqExpr<~")" //| negation
   lazy val negation: Parser[SyExprAll] =
     "-"~>lit ^^ (e => SSub(SVal(0.0),e)) // (e => (t: Double) => (ctx: Valuation) => -e(t)(ctx))
   def time: Parser[SyExprTime] =
