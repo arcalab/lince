@@ -9,6 +9,7 @@ import hprog.frontend.Utils
 
 import scala.util.matching.Regex
 import scala.util.parsing.combinator._
+import scala.math._
 
 /**
   * Parser for Hybrid Programs, using parsing combinators.
@@ -254,35 +255,175 @@ object Parser extends RegexParsers {
       case l1~_        => invert(l1)
   }
 
-  /** Parser for a parcel (element being added/subtracted) */
+
+/** Parser for a parcel (element being added/subtracted) */
   lazy val linParcelP: Parser[Lin] =
     "-"~>linMultP ^^ invert |
     linMultP
 
 
 
-  /** Parser for the multiplication of atomic values (real, variables, or
+  /** Parser for the multiplication of atomic values (real, variable, or
     * linear expressions), guaranteeing the result is a linear expression:
-    * multiplications must have a real in one of its sides. */
-  lazy val linMultP: Parser[Lin] = //...r | r*linAt | var*r |
-    realP ~ opt("*"~>linAtP) ^^ {
-      case r ~ Some(l) => Mult(Value(r),l)
-      case r ~ _ => Value(r)
-    } |
-    linAtP ~ opt(("*" ~ realP) | ("/" ~ realP)) ^^ {
-      case l ~ Some("*"~r) => Mult(Value(r),l)
-      case l ~ Some("/"~r) => Mult(Value(1/r),l)
-      case l ~ _ => l
+    * multiplications must have a real (just a real number or a result of an expression) in one of its sides, or in both. */
+  lazy val linMultP: Parser[Lin] = 
+    opt(seqRealP <~ "*")  ~  linAtP ~ opt(seqMultDiv) ^^ {
+      case None  ~ l ~ None => l
+      case Some(s1) ~ l ~ None => Mult(Value(s1),l)
+      case None  ~ l ~ Some(s1) => Mult(Value(s1),l)
+      case Some(s1) ~ l ~ Some(s2) => Mult(Value(s1*s2),l)
     } 
   
-  /** Atomic linear expression is a variable or a linear expression */
+  /** Atomic linear expression is a variable, a real (just a real number or a result of an expression) or a linear expression */
   lazy val linAtP: Parser[Lin] =
     identifier ^^ Var |
-    "("~>linP<~")"
+    reallinAtP ^^ Value |
+    "("~>linP<~")" 
+    //realP ^^ Value |
 
+
+// Sequence of a multiplication/division of a real expressions in the right side of the atomic values
+lazy val seqMultDiv:Parser[Double]=
+  "*" ~ reallinAtP ~ opt(seqMultDiv) ^^ {
+    case _ ~ r ~ None => r
+    case _ ~ r ~ Some(s) => r*s
+  } |
+  "/" ~ reallinAtP ~ opt(seqMultDiv) ^^ {
+    case _ ~ r ~ None => 1/r
+    case _ ~ r ~ Some(s) => (1/r)*s
+  } |
+  "*" ~ "(" ~ realLinP ~ ")" ~ opt(seqMultDiv) ^^ {
+    case _ ~ _ ~ r ~ _ ~ None => r
+    case _ ~ _ ~ r ~ _ ~ Some(s)  => r*s
+  } |
+  "/" ~ "(" ~ realLinP ~ ")" ~ opt(seqMultDiv) ^^ {
+    case _ ~ _ ~ r ~ _ ~ None => 1/r
+    case _ ~ _ ~ r ~ _ ~ Some(s)  => (1/r)*s
+  }
+
+
+// // Sequence of a multiplication/division of a real expressions in the left side of the atomic values
+lazy val seqRealP:Parser[Double]=
+   reallinAtP ~ opt(seqMultDiv) ^^ {
+    case r ~ None => r
+    case r ~ Some(s) => r*s
+   }
+
+// Parser of real expressions
+lazy val realLinP: Parser[Double]=
+  reallinParcelP ~opt(("+"~>realLinP)|("-"~>realnegLinP)) ^^ {
+  case l1~Some(l2) => l1+l2
+  case l1~_        => l1
+}
+private lazy val realnegLinP: Parser[Double] =
+reallinParcelP ~opt(("+"~>realLinP)|("-"~>realnegLinP)) ^^ {
+  case l1~Some(l2) => -l1+l2
+  case l1~_        => -l1
+}
+
+lazy val reallinParcelP: Parser[Double] =
+  "-"~>reallinMultP ^^ {
+   case r => -r
+  }|
+  reallinMultP
+
+
+lazy val reallinMultP: Parser[Double] = 
+    reallinDivP ~ opt("*"~>reallinMultP) ^^ {
+      case l1 ~ Some(l2) => l1*l2
+      case l1 ~ None => l1
+      
+    } 
+
+  lazy val reallinDivP: Parser[Double] = 
+    reallinResP ~ opt("/"~>reallinDivP) ^^ {
+      case l1 ~ Some(l2) => l1/l2
+      case l1 ~ None => l1
+      
+    }
+
+
+  lazy val reallinResP: Parser[Double] = 
+    reallinAtP ~ opt("%"~>reallinResP) ^^ {
+      case l1 ~ Some(l2) => l1%l2
+      case l1 ~ None => l1
+      
+    } 
 
     
-  
+ 
+ // atomics of the real expressions
+  lazy val reallinAtP: Parser[Double] =
+    "pi" ~ "(" ~ ")" ^^ {
+      case _ ~ _ ~ _=> math.Pi
+    }|
+    opt("-") ~ "e" ~ "(" ~ ")" ~ opt("^" ~> reallinOthers)^^ {
+      case None ~ _ ~ _ ~ _ ~ None => math.E
+      case None ~ _ ~ _ ~ _ ~ Some(l1) => math.exp(l1)
+      case Some(_) ~ _ ~ _ ~ _ ~ None => - math.E 
+      case Some(_) ~ _ ~ _ ~ _ ~ Some(l1) => - math.exp(l1)
+    }|
+    opt("-") ~ "pow" ~ "(" ~ reallinOthers ~ "," ~ reallinOthers ~ ")" ^^{
+      case None ~ _ ~ _ ~ l1 ~ _ ~ l2 ~ _=> math.pow(l1,l2)
+      case Some(_) ~ _ ~ _ ~ l1 ~ _ ~ l2 ~ _=> - math.pow(l1,l2)
+    }|
+     opt("-") ~ reallinOthers ~ opt("^" ~>  reallinOthers)  ^^{
+      case None ~ l1 ~ Some(l2) => math.pow(l1,l2)
+      case None ~ l1 ~ None => l1
+      case Some(_) ~ l1 ~ None => -l1
+      case Some(_) ~ l1 ~ Some(l2) => -math.pow(l1,l2)
+    }
+
+  lazy val reallinOthers: Parser[Double]=
+    realP |
+    "sin" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.sin(r)
+    }|
+    "cos" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.cos(r)
+    }|
+    "tan" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.tan(r)
+    }|
+    "arcsin" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.asin(r)
+    }|
+    "arccos" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.acos(r)
+    }|
+    "arctan" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.atan(r)
+    }|
+    "sinh" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.sinh(r)
+    }|
+    "cosh" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.cosh(r)
+    }|
+    "tanh" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.tanh(r)
+    }|
+    "sqrt" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.sqrt(r)
+    }|
+    "log" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.log(r)
+    }|
+    "log10" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.log10(r)
+    }|
+    "max" ~ "(" ~ realLinP ~ "," ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r1 ~ _ ~ r2 ~ _ => math.max(r1,r2)
+    }|
+    "min" ~ "(" ~ realLinP ~ "," ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r1 ~ _ ~ r2 ~ _ => math.min(r1,r2)
+    }|
+    "exp" ~ "(" ~ realLinP ~ ")" ^^ {
+      case _ ~ _ ~ r ~ _ => math.exp(r)
+    }|
+    "("~>realLinP<~")" ^^ {
+      case l => l
+    }  
   
  //////////////////// Conditions //////////////////////////////////////////
  
