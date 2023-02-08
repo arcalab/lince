@@ -73,6 +73,7 @@ object Show {
   }
 
 
+/*
   def apply(lin: Lin): String = apply(lin,Map():Valuation)
 
   def apply(lin: Lin, vl: Valuation): String = lin match {
@@ -87,7 +88,7 @@ object Show {
     case Add(_,_) => s"(${apply(lin,vl)})"
     case _ => apply(lin,vl)
   }
-
+*/
   
   def apply(notlin:NotLin): String= apply(notlin,Map():Valuation)
 
@@ -155,13 +156,14 @@ def stringList(list:List[NotLin]): String = list match{
   }
 
 
+/*
   private def showVar(v: Var, valuation: Valuation,cont:SyExpr => String): String = {
     valuation.get(v.v) match {
       case Some(exp) => cont(Eval.updInput(exp,valuation))  
       case None => v.v 
     }
   }
-
+*/
 
 
   def apply[E<:SymbolicExpr.All](expr: SymbolicExpr[E]): String = expr match {

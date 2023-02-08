@@ -54,7 +54,7 @@ object Syntax {
   }
 
   // DiffEq
-  case class DiffEq(v:Var,e:Lin)
+  case class DiffEq(v:VarNotLin,e:NotLin)
 
   // duration
   sealed abstract class Dur
@@ -71,7 +71,8 @@ object Syntax {
   sealed abstract class NotLin {
     def +(other:NotLin): NotLin = AddNotLin(this,other)
   }
-  case class VarNotLin(v:String)       extends NotLin { 
+  case class VarNotLin(v:String)       extends NotLin {
+    def ^=(l: NotLin): DiffEq = DiffEq(this,l) //New
     def :=(l: NotLin): Assign = Assign(this,l)
     def >(l: NotLin):  Cond = GT(this,l)
     def <(l: NotLin):  Cond = LT(this,l)
@@ -95,7 +96,7 @@ object Syntax {
   case class PowNotLin(l1:NotLin,l2:NotLin) extends NotLin 
 
 
-
+/*
   // linear expression
   sealed abstract class Lin {
     def +(other:Lin): Lin = Add(this,other)
@@ -110,6 +111,7 @@ object Syntax {
 
   case class Mult(l1:Lin,l2:Lin) extends Lin 
 
+*/
 
   // Conditions
   sealed abstract class Cond {

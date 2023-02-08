@@ -147,7 +147,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   private def genSage(eqs:List[DiffEq]): String = {
     var res = "_t_ = var('_t_'); "
     val undefinedVars = (Utils.getUsedVarsTHEN(eqs)++Utils.getUsedVarsELSE(eqs)) -- Utils.getDefVars(eqs) //AAAAAAAAAAAAAAAAAAAALLLTEREIIIII
-    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(Var(v),Value(0))).toList
+    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(VarNotLin(v),ValueNotLin(0))).toList //NEW
 
     for (e <- eqs2)
       res += s"${e.v.v} = function('${e.v.v}')(_t_); "

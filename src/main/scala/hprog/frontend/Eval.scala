@@ -15,6 +15,7 @@ object Eval {
 
 //////////////////////////////////////////////////////////////////////////////
 
+/*
   /** Evaluation of a linear expression. */
   def apply(state:Point, lin: Lin): Double = lin match {
     case Var(v) => state(v)
@@ -23,7 +24,7 @@ object Eval {
     case Mult(l1,l2)  => apply(state,l1)  * apply(state,l2)
    
   }
-
+*/
 
   /** Evaluation of a non-linear expression. */
   def apply(state:Point, notlin: NotLin): Double = notlin match {
@@ -190,7 +191,7 @@ object Eval {
   }
 
   
-
+/*
   def lin2sage(l:Lin): SyExprVar = l match {
     case Var(v) => SVar(v) //SFun(v,List(SVal(0))) //SVar(v)
     case Value(v) => SVal(v)
@@ -199,6 +200,9 @@ object Eval {
 
 
   }
+  */
+
+  
 
 
  // New
