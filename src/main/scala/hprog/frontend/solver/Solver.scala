@@ -59,7 +59,7 @@ object Solver {
     case Var(v) => List(v)
     case Value(v) => List("_"+base)
     case Add(l1, l2) => getVars(l1,base) ::: getVars(l2,base)
-    case Mult(v, l) => getVars(l,base)
+    case Mult(l1, l2) => getVars(l1,base) ::: getVars(l2,base)
   }
 
   def getMatrix(eqs:List[DiffEq]): (List[String],List[List[Double]]) = {
@@ -84,7 +84,7 @@ object Solver {
     case Var(v) => Map(v->1)
     case Value(v) => Map(("_"+base)->v)
     case Add(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
-    case Mult(v, l) => getRowValues(l,base).view.mapValues(_*v.v).toMap
+    case Mult(l1, l2) => multjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
      
   }
 
@@ -95,6 +95,16 @@ object Solver {
     var res = m2
     for ((k, v1) <- m1) m2.get(k) match {
       case Some(v2) => val v = v1+v2; res += k -> v
+      case None => res += k->v1
+    }
+    res
+  }
+
+//New
+    private def multjoin(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
+    var res = m2
+    for ((k, v1) <- m1) m2.get(k) match {
+      case Some(v2) => val v = v1*v2; res += k -> v
       case None => res += k->v1
     }
     res

@@ -20,7 +20,7 @@ object Eval {
     case Var(v) => state(v)
     case Value(v) => v
     case Add(l1, l2) => apply(state,l1) + apply(state,l2)
-    case Mult(v,l2)  => apply(state,v)  * apply(state,l2)
+    case Mult(l1,l2)  => apply(state,l1)  * apply(state,l2)
    
   }
 
@@ -195,7 +195,7 @@ object Eval {
     case Var(v) => SVar(v) //SFun(v,List(SVal(0))) //SVar(v)
     case Value(v) => SVal(v)
     case Add(l1, l2) => SAdd(lin2sage(l1),lin2sage(l2))
-    case Mult(v, l2) => SMult(SVal(v.v),lin2sage(l2))
+    case Mult(l1, l2) => SMult(lin2sage(l1),lin2sage(l2)) //new
 
 
   }

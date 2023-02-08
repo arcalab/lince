@@ -262,7 +262,23 @@ object Parser extends RegexParsers {
     linMultP
 
 
+  lazy val linMultP: Parser[Lin] =  
+    seqRealIdentP 
+ 
+  lazy val seqRealIdentP: Parser[Lin]=
+    seqRealIdentATP ~ opt("*"~>seqRealIdentP) ^^{
+      case s ~ None => s
+      case s ~ Some(l) => Mult(s,l)
+    } 
 
+  lazy val seqRealIdentATP:Parser[Lin]=
+    realP ^^ Value|
+    identifier ^^ Var|
+    "("~>linP<~")"
+
+
+ 
+/*
   /** Parser for the multiplication of atomic values (real, variable, or
     * linear expressions), guaranteeing the result is a linear expression:
     * multiplications must have a real (just a real number or a result of an expression) in one of its sides, or in both. */
@@ -277,7 +293,7 @@ object Parser extends RegexParsers {
   /** Atomic linear expression is a variable, a real (just a real number or a result of an expression) or a linear expression */
   lazy val linAtP: Parser[Lin] =
     identifier ^^ Var |
-    reallinAtP ^^ Value |
+    realP ^^ Value |
     "("~>linP<~")" 
     //realP ^^ Value |
 
@@ -372,10 +388,10 @@ lazy val reallinMultP: Parser[Double] =
       case None ~ l1 ~ None => l1
       case Some(_) ~ l1 ~ None => -l1
       case Some(_) ~ l1 ~ Some(l2) => -math.pow(l1,l2)
-    }
+    } 
 
   lazy val reallinOthers: Parser[Double]=
-    realP |
+    realP|
     "sin" ~ "(" ~ realLinP ~ ")" ^^ {
       case _ ~ _ ~ r ~ _ => math.sin(r)
     }|
@@ -424,7 +440,8 @@ lazy val reallinMultP: Parser[Double] =
     "("~>realLinP<~")" ^^ {
       case l => l
     }  
-  
+  */
+
  //////////////////// Conditions //////////////////////////////////////////
  
   lazy val condP: Parser[Cond] =
@@ -501,7 +518,7 @@ lazy val reallinMultP: Parser[Double] =
     case Var(v) =>  Mult(Value(-1),Var(v))
     case Value(v) => Value(-v)
     case Add(l1, l2) => Add(invert(l1),invert(l2))
-    case Mult(Value(v), l) => Mult(Value(-v),l)
+    case Mult(l1, l2) => Mult(Mult(Value(-1),l1),l2) //new
   }
     
 

@@ -108,7 +108,7 @@ object Syntax {
   }
   case class Add(l1:Lin,l2:Lin)  extends Lin
 
-  case class Mult(v:Value,l2:Lin) extends Lin 
+  case class Mult(l1:Lin,l2:Lin) extends Lin 
 
 
   // Conditions

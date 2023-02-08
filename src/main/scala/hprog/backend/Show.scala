@@ -79,11 +79,14 @@ object Show {
     case v:Var => showVar(v,vl,apply[Pure])
     case Value(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
     case Add(l1, l2)    => s"${apply(l1,vl)} + ${apply(l2,vl)}"
-    case Mult(v, l:Add) => s"${apply(v,vl)}*(${apply(l,vl)})"
-    case Mult(v, l)     => s"${apply(v,vl)}*${apply(l,vl)}"
+    //case Mult(l1, l2:Add) => s"${apply(l1,vl)}*(${apply(l2,vl)})"
+    case Mult(l1, l2)     => s"${applyMP(l1,vl)}*${applyMP(l2,vl)}"
   }
 
-
+  def applyMP(lin: Lin, vl: Valuation): String = lin match {
+    case Add(_,_) => s"(${apply(lin,vl)})"
+    case _ => apply(lin,vl)
+  }
 
   
   def apply(notlin:NotLin): String= apply(notlin,Map():Valuation)

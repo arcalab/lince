@@ -5,7 +5,8 @@ import hprog.ast._
 import Syntax._
 import hprog.backend.Show
 import hprog.frontend.CommonTypes.Valuation
-
+import scala.math._
+import scala.util.control.Breaks._
 
 
 
@@ -54,6 +55,89 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 }
 
 
+// New
+// Function with de responsability to extract a list of lists of  differential equations
+def extractDifEqs(prog:Syntax):List[List[DiffEq]] = prog match {
+  
+  case Atomic(as,de) => {
+    return List(de.eqs)
+  }
+  case Seq(Atomic(as,de),q) => {
+    var ac=List(de.eqs)++extractDifEqs(q)
+    return ac
+  }
+  case Seq(p,q) =>{
+  
+   return extractDifEqs(p) ++ extractDifEqs(q)
+  }
+  case While(pre,c,p) => {
+    return extractDifEqs(pre) ++ extractDifEqs(p)
+  
+  }
+  case ITE(ifP,thenP,elseP) =>  {
+    return extractDifEqs(thenP) ++ extractDifEqs(elseP)
+  }
+
+}
+
+// New
+// Function with the responsibility to extract de variables of the differential equations
+def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
+  var eqsdiff=extractDifEqs(prog)
+  var listVars:List[List[String]]=List()
+
+  for (lsteqDiff <- eqsdiff){
+    var aux:List[String]=List()
+    for (eqDiff <- lsteqDiff){
+      aux=aux ++ List((eqDiff.v).v)
+      //println("eqDiff:"+(eqDiff.v).v)
+      //println("aux:"+aux)
+    }
+    listVars=listVars ++ List(aux)
+
+  }
+
+  return listVars
+}
+
+
+//New
+// This function verify if the linear expressions of the Eqs.Diffs are linears
+ def verifyLinearityEqsDiff(prog:Syntax):Option[List[DiffEq]] =  {
+   var diffeqs=extractDifEqs(prog) //List of List of Diff.eqs
+   var varsDifEqs=extractVarsDifEqs(prog) // List of List of Diff.Eqs variables
+   var iteration=0
+   var aux=0
+
+   for (lsteqDiff <- diffeqs){
+    var aux=0
+    for (eqDiff <- lsteqDiff){
+     aux=extractVarsLinearExp(eqDiff.e,varsDifEqs(iteration)) // extract the number of variables in a linear expressions 
+     //println("aux:"+aux)
+     if (aux > 1 ) return Some(lsteqDiff)
+     }
+  iteration=iteration + 1
+  }
+  return None   
+ }
+ 
+ // chamar sets em vez de listas
+ // New
+ // This function extract the number of variables in a linear expression of an Eq.Diff
+ def extractVarsLinearExp(lin:Lin,listOfVars:List[String]):Int = lin match {
+
+  case Value(value) =>  0
+  
+  case Var(v) => {
+   if (listOfVars.contains(v))  1 
+   else  0
+  }
+  case Add(l1,l2) => math.max(extractVarsLinearExp(l1,listOfVars),extractVarsLinearExp(l2,listOfVars))
+  
+  case Mult(l1,l2) => (extractVarsLinearExp(l1,listOfVars) + extractVarsLinearExp(l2,listOfVars))
+  
+
+ }
 
 
 ////// New /////// 
@@ -135,6 +219,7 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
 
 
 // Verify if exists free variables  already been declarated before being used, and also if they are used variables that are not declareted
+// Verify if the linear expressions of the Eq.Diffs are linears
   def isClosed(prog:Syntax): Either[String,Unit] = {
     val declVarTHEN = getFstDeclVarsTHEN(prog) //make a set with the firsts declareted variables (THEN)
      
@@ -145,14 +230,20 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
     val usedVarsELSE = getUsedVarsELSE(prog)  //make a set with the firsts used variables
     
     val asVerify=assigmentsVerify(prog) //make a set of free variables that not had been declareted before of ther invocation.
-    
+
+    val varsEqDiffVerify=verifyLinearityEqsDiff(prog)
+    //println("linear?:"+varsEqDiffVerify)
+
+
     if (asVerify.nonEmpty) //Verify if exist free variables that not had been declareted before, if exist i print it.
       Left(s"Initial declaration has free variables that were not declared: ${asVerify.mkString(", ")}")
     else if (!usedVarsTHEN.forall(declVarTHEN)) 
       Left(s"Variable(s) not declared: ${((usedVarsTHEN -- declVarTHEN)++(usedVarsELSE-- declVarELSE)).mkString(", ")}")
     else if (!usedVarsELSE.forall(declVarELSE))
        Left(s"Variable(s) not declared: ${((usedVarsTHEN -- declVarTHEN)++(usedVarsELSE-- declVarELSE)).mkString(", ")}")
-    else
+    else if (varsEqDiffVerify.nonEmpty)
+      Left(s"There are differential equations that are not linear: ${varsEqDiffVerify.get.map(Show.apply).mkString(", ")}")
+    else 
       Right(())
   }
 
