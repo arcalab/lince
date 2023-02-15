@@ -41,7 +41,7 @@ object SageParser extends RegexParsers {
   override def skipWhitespace = true
 
   override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
-  val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
+  val identifier: Parser[String] = """[a-z_][a-zA-Z0-9_]*""".r
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
   val floatP: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
@@ -107,7 +107,7 @@ object SageParser extends RegexParsers {
     }
 
   lazy val lit: Parser[SyExprAll] =
-    function | rational | time | "("~>eqExpr<~")" //| negation
+    time | function | rational | "("~>eqExpr<~")" //| negation
   lazy val negation: Parser[SyExprAll] =
     "-"~>lit ^^ (e => SSub(SVal(0.0),e)) // (e => (t: Double) => (ctx: Valuation) => -e(t)(ctx))
   def time: Parser[SyExprTime] =

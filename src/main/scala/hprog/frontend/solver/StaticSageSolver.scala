@@ -147,11 +147,13 @@ class StaticSageSolver extends Solver {
     val resParsed = SageParser.parseExpr(sageReply)
     resParsed match {
       case SageParser.Success(newExpr, _) =>
-        (newExpr,sageReply)
+        (fixSageVars(newExpr),sageReply)
       case _: SageParser.NoSuccess =>
         throw new ParserException(s"Failed to parse Sage reply '$sageReply'.")
     }
   }
+
+  private def fixSageVars(e:SyExprAll) = e
 
   /**
     * Import the reply from Sage from evaluating a boolean expression
@@ -196,6 +198,8 @@ class StaticSageSolver extends Solver {
 
   private def findVars(str: String) = {
     val res1 = """[a-z][a-zA-Z0-9_]*\(0\)""".r.findAllIn(str).map(_.dropRight(3)).toList
+      .filter(x => x!="sin" && x!="cos")
+
     val res2 = """[a-z][a-zA-Z0-9_]*'""".r.findAllIn(str).map(_.dropRight(1)).toList
     val res = res1++res2
     res
@@ -290,6 +294,7 @@ class StaticSageSolver extends Solver {
   }
 
   protected def debug(s:()=>String): Unit = {
+    println(s())
   }
 
 }

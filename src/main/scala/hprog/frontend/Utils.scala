@@ -627,20 +627,30 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
 
 
 
-  def fixVars(e:SyExprAll): SyExprAll = e match {
-    case SVal(_) => e
-    case SVar(_) => e
-    case SArg() => e
-    case SFun(f, List(SVal(0))) => SVar(f)
-    case SFun(f, args) => SFun(f,args.map(fixVars))
-    case SDiv(e1, e2) => SDiv( fixVars(e1),fixVars(e2))
-    case SRes(e1, e2) => SRes( fixVars(e1),fixVars(e2))
-    case SMult(e1, e2)=> SMult(fixVars(e1),fixVars(e2))
-    case SPow(e1, e2) => SPow( fixVars(e1),fixVars(e2))
-    case SAdd(e1, e2) => SAdd( fixVars(e1),fixVars(e2))
-    case SSub(e1, e2) => SSub( fixVars(e1),fixVars(e2))
+  /** Fixes conventions produced by SageMath */
+  def fixVars(e:SyExprAll): SyExprAll = {
+    val res = e match {
+      case SVal(_) => e
+      case SVar("e") => SFun("E", Nil)
+      case SVar("pi") => SFun("PI", Nil)
+      case SVar(_) => e
+      case SArg() => e
+      case SFun("_e", List(SVal(0))) => SVar("e")
+      case SFun("_pi", List(SVal(0))) => SVar("pi")
+      case SFun(f, List(SVal(0)))
+        if f != "sin" && f != "cos" => SVar(f)
+      case SFun("e", args) => SFun("E", args.map(fixVars))
+      case SFun(f, args) => SFun(f, args.map(fixVars))
+      case SDiv(e1, e2) => SDiv(fixVars(e1), fixVars(e2))
+      case SRes(e1, e2) => SRes(fixVars(e1), fixVars(e2))
+      case SMult(e1, e2) => SMult(fixVars(e1), fixVars(e2))
+      case SPow(e1, e2) => SPow(fixVars(e1), fixVars(e2))
+      case SAdd(e1, e2) => SAdd(fixVars(e1), fixVars(e2))
+      case SSub(e1, e2) => SSub(fixVars(e1), fixVars(e2))
+    }
+    println(s"Fixing ${(e)} into ${(res)}")
+    res
   }
-
 
 
 //  type Domains = Set[Domain] // possible domains (disjunction)
