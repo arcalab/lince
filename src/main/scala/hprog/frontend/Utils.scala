@@ -105,14 +105,14 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
 // This function verify if the linear expressions of the Eqs.Diffs are linears
  def verifyLinearityEqsDiff(prog:Syntax):Option[List[DiffEq]] =  {
    var diffeqs=extractDifEqs(prog) //List of List of Diff.eqs
-   var varsDifEqs=extractVarsDifEqs(prog) // List of List of Diff.Eqs variables
+   var varsDifEqs=getFstDeclVarsTHEN(prog) // set of declared variables NEWWW
    var iteration=0
    var aux=0
 
    for (lsteqDiff <- diffeqs){
     var aux=0
     for (eqDiff <- lsteqDiff){
-     aux=extractVarsLinearExp(eqDiff.e,varsDifEqs(iteration)) // extract the number of variables in a linear expressions 
+     aux=extractVarsLinearExp(eqDiff.e,varsDifEqs) // extract the number of variables in a linear expressions 
      //println("aux:"+aux)
      if (aux > 1 ) return Some(lsteqDiff)
      }
@@ -121,6 +121,9 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
   return None   
  }
  
+
+ /*
+ // LINEAR EXPRESSIONS ONLY
  // chamar sets em vez de listas
  // New
  // This function extract the number of variables in a linear expression of an Eq.Diff
@@ -139,6 +142,58 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
 
  }
 
+*/
+
+// NON LINEAR EXPRESSIONS ONLY
+ // chamar sets em vez de listas
+ // New
+ // This function extract the number of variables in a linear expression of an Eq.Diff
+ def extractVarsLinearExp(notlin:NotLin,listOfVars:Set[String]):Int = notlin match {
+
+  case ValueNotLin(value) =>  0
+  
+  case VarNotLin(v) => {
+   if (listOfVars.contains(v))  1 
+   else  0
+  }
+  case AddNotLin(l1,l2) => math.max(extractVarsLinearExp(l1,listOfVars),extractVarsLinearExp(l2,listOfVars))
+  
+  case MultNotLin(l1,l2) => (extractVarsLinearExp(l1,listOfVars) + extractVarsLinearExp(l2,listOfVars))
+  
+  case DivNotLin(l1,l2) => (extractVarsLinearExp(l1,listOfVars) + 1000*extractVarsLinearExp(l2,listOfVars)) //Only linear in the dividend, in the divisor it is always non-linear 
+
+  case ResNotLin(l1,l2) => (1000*extractVarsLinearExp(l1,listOfVars) + 1000*extractVarsLinearExp(l2,listOfVars)) // remainder never can be linear
+
+  case PowNotLin(l1,l2) => (1000*extractVarsLinearExp(l1,listOfVars) + 1000*extractVarsLinearExp(l2,listOfVars)) // pow never can be linear
+
+  case FuncNotLin(s,list) => funcextract(s,list,listOfVars)
+
+ }
+
+
+//new
+ def funcextract(s:String,list:List[NotLin],listOfVars:Set[String]):Int = (s,list) match {
+  case ("PI",List()) => 0
+  case ("E",List()) => 0
+  case ("max",List(n1,n2)) => math.max(extractVarsLinearExp(n1,listOfVars),extractVarsLinearExp(n2,listOfVars))
+  case ("min",List(n1,n2)) => math.min(extractVarsLinearExp(n1,listOfVars),extractVarsLinearExp(n2,listOfVars))
+  // Any variables found in the following functions make the expression non-linear 
+  case ("exp",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("sin",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("cos",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("tan",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("arcsin",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("arccos",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("arctan",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("sinh",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("cosh",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("tanh",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("sqrt",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("log",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case ("log10",List(n)) => 1000*extractVarsLinearExp(n,listOfVars)
+  case (_,_) => throw new RuntimeException(s"Unknown function '${s}(${list.mkString(",")})', or the number of arguments are incorrect")
+
+  }
 
 ////// New /////// 
 //verify if the free varibles had already been declarated before being used.
@@ -388,6 +443,8 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
     case Guard(c) => getVars(c)
   }
 
+
+/*
   //new
   def getVars(lin: Lin): Set[String] = lin match {
     case Var(v) => Set(v)
@@ -395,6 +452,8 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
     case Add(l1, l2) => getVars(l1) ++ getVars(l2)
     case Mult(l1, l2) => getVars(l1) ++ getVars(l2)
   }
+
+*/
 
     // new
   def getVars(notlin: NotLin): Set[String] = notlin match {
@@ -446,6 +505,7 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
     case Guard(c) => getVarsList(c)
   }
 
+/*
   // new
   def getVarsList(lin: Lin): List[String] = lin match {
     case Var(v) => List(v)
@@ -453,6 +513,7 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
     case Add(l1, l2) => getVarsList(l1) ++ getVarsList(l2)
     case Mult(l1, l2) => getVarsList(l1) ++ getVarsList(l2)
   }
+  */
 
     // new
   def getVarsList(notlin: NotLin): List[String] = notlin match {

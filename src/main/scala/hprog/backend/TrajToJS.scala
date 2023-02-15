@@ -14,7 +14,7 @@ object TrajToJS {
 
 
   def apply(traj:Traj,divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true): String = {
-
+    
     val dur = traj.getDur
 
     // trick to avoid many sampling when already lots of boundaries exist

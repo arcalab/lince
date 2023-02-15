@@ -98,10 +98,11 @@ object Parser2 {
 
 
 
-
+/*
 
 //////////////////////////////////////////////////////////////////////
 // ALTEREI !!!!!!!!!!!!!!!!!!!!!
+
   def linP: P[Lin] = P.recursive((linRec:P[Lin]) => {
     def lit: P[Lin] = P.recursive((litRec:P[Lin]) => {
       char('(') *> linRec.surroundedBy(sps) <* char(')') |
@@ -136,6 +137,7 @@ object Parser2 {
     listSep(listSep(lit, mult), plusminus)
   })
 
+*/
 
 
   def notlinP: P[NotLin] = P.recursive((linRec:P[NotLin]) => {
@@ -301,8 +303,8 @@ object Parser2 {
             char(',').as((x:DiffEqs,y:DiffEqs) => DiffEqs(x.eqs:::y.eqs,Forever)))
 
   def diffEqP: P[DiffEq] =
-    (varName ~ char('\'') ~ char('=').surroundedBy(sps) ~ linP)
-      .map(x => Var(x._1._1._1) ^= x._2)
+    (varName ~ char('\'') ~ char('=').surroundedBy(sps) ~ notlinP) //New
+      .map(x => VarNotLin(x._1._1._1) ^= x._2) //New
 //
 //
 //  ////// auxiliary ////

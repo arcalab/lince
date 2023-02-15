@@ -132,9 +132,9 @@ object Parser extends RegexParsers {
 
   /** Parser for  differential equations */
   lazy val diffEqsP: Parser[DiffEqs] =
-    identifier ~ "'" ~ "=" ~ linP ~ opt("," ~> diffEqsP) ^^ {
-      case v ~ _ ~ _ ~ l ~ Some(eqs) => DiffEqs(List(Var(v) ^= l), Forever) & eqs
-      case v ~ _ ~ _ ~ l ~ None => DiffEqs(List(Var(v) ^= l), Forever)
+    identifier ~ "'" ~ "=" ~ notlinP ~ opt("," ~> diffEqsP) ^^ {
+      case v ~ _ ~ _ ~ l ~ Some(eqs) => DiffEqs(List(VarNotLin(v) ^= l), Forever) & eqs
+      case v ~ _ ~ _ ~ l ~ None => DiffEqs(List(VarNotLin(v) ^= l), Forever)
     }
 
   /** Parser for the duration part ("until" or "for") after the differential equations */
@@ -240,6 +240,7 @@ object Parser extends RegexParsers {
 
   
    
+ /*  
 
   ////////// linear expression ///////////////
 
@@ -276,6 +277,7 @@ object Parser extends RegexParsers {
     identifier ^^ Var|
     "("~>linP<~")"
 
+*/
 
  
 /*
@@ -513,6 +515,7 @@ lazy val reallinMultP: Parser[Double] =
     """[0-9]+""".r ^^ { s: String => s.toInt }
 
 
+/*
   /** Auxiliary: function that negates a (linear) integer expression */
   private def invert(lin: Lin): Lin = lin match {
     case Var(v) =>  Mult(Value(-1),Var(v))
@@ -520,7 +523,7 @@ lazy val reallinMultP: Parser[Double] =
     case Add(l1, l2) => Add(invert(l1),invert(l2))
     case Mult(l1, l2) => Mult(Mult(Value(-1),l1),l2) //new
   }
-    
+*/
 
 
 /** Auxiliary: function that negates a (non linear) integer expression */
@@ -536,9 +539,12 @@ lazy val reallinMultP: Parser[Double] =
   }
 
 
+/*
   /** Auxiliary: experimental function that also negates a (linear)
     * integer expression, possibly avoiding negation.   */
   private def mbInvert(sign:Option[_],lin:Lin): Lin =
     if (sign.isDefined) invert(lin) else lin
+
+    */
 }
 

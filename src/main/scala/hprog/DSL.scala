@@ -15,10 +15,10 @@ import scala.language.implicitConversions
  * Created by jose on 17/07/18.
  */
 object DSL {
-  implicit def str2Var(s:String): Var = Var(s)
+  implicit def str2VarNotLin(s:String): VarNotLin = VarNotLin(s) //new
   implicit def bool2Cond(b:Boolean): BVal = BVal(b)
-  implicit def real2Lin(n:Double): Value = Value(n)
-  implicit def int2Lin(n:Int): Value = Value(n)
+  implicit def real2NotLin(n:Double): ValueNotLin = ValueNotLin(n)//new
+  implicit def int2NotLin(n:Int): ValueNotLin = ValueNotLin(n)//new
   implicit def real2Dur(n:Double): Dur = For(ValueNotLin(n))
   implicit def int2Dur(n:Int): Dur = For(ValueNotLin(n))
   implicit def cond2Dur(c:Cond): Dur = Until(c,None,None)
