@@ -104,11 +104,11 @@ object Syntax {
     def ^=(l: Lin): DiffEq = DiffEq(this,l)
   }
   case class Value(v:Double)     extends Lin {
-    def *(l: Lin): Lin = Mult(this,l) 
+    def *(l: Lin): Lin = Mult(this,l)
   }
   case class Add(l1:Lin,l2:Lin)  extends Lin
 
-  case class Mult(l1:Lin,l2:Lin) extends Lin 
+  case class Mult(l1:Lin,l2:Lin) extends Lin
 
 
   // Conditions
