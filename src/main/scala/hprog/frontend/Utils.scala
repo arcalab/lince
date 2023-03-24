@@ -859,13 +859,6 @@ def updateSyntax(prog:Cond,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:L
       case SVar("pi") => SFun("PI", Nil)
       case SVar(_) => e
       case SArg() => e
-<<<<<<< HEAD
-      case SFun("_e", List(SVal(0))) => SVar("e")
-      case SFun("_pi", List(SVal(0))) => SVar("pi")
-      case SFun(f, List(SVal(0)))
-        if f != "sin" && f != "cos" => SVar(f)
-      case SFun("e", args) => SFun("E", args.map(fixVars))
-=======
       case SFun("_e", List(SVal(0))) => SVar("_e")
       case SFun("_pi", List(SVal(0))) => SVar("_pi")
       case SFun(f, List(SVal(0)))
@@ -873,7 +866,6 @@ def updateSyntax(prog:Cond,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:L
       case SFun("e", args) => SFun("E", args.map(fixVars))
       case SFun("pi",args)=> SFun("PI", args.map(fixVars))
       case SFun("log10",args)=>SDiv(fixVars(SFun("log",args)),fixVars(SFun("log",List(SVal(10)))))
->>>>>>> b032e87
       case SFun(f, args) => SFun(f, args.map(fixVars))
       case SDiv(e1, e2) => SDiv(fixVars(e1), fixVars(e2))
       case SRes(e1, e2) => SRes(fixVars(e1), fixVars(e2))
@@ -882,17 +874,7 @@ def updateSyntax(prog:Cond,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:L
       case SAdd(e1, e2) => SAdd(fixVars(e1), fixVars(e2))
       case SSub(e1, e2) => SSub(fixVars(e1), fixVars(e2))
     }
-<<<<<<< HEAD
-    // println(s"Fixing ${(e)} into ${(res)}")
-||||||| d7fdfc7
-    println(s"Fixing ${(e)} into ${(res)}")
-=======
-<<<<<<< HEAD
-    println(s"Fixing ${(e)} into ${(res)}")
-=======
     //println(s"Fixing ${(e)} into ${(res)}")
->>>>>>> b032e87
->>>>>>> 15751d985bb05ed30554a998e11f301c4ba5fac6
     res
   }
 
