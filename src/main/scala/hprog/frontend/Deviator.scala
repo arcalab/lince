@@ -1,6 +1,7 @@
 package hprog.frontend
 
-import hprog.ast.Cond
+import hprog.ast._
+import Syntax._
 import hprog.frontend.CommonTypes.Point
 
 trait Deviator {

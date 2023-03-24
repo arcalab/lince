@@ -2,6 +2,11 @@ package hprog.frontend
 
 import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime, SyExprVar}
 
+
+
+
+
+
 object CommonTypes {
 
   // symbolic level
@@ -21,6 +26,27 @@ object CommonTypes {
   // extra information for trajectories
   type Warnings = Set[(SyExpr,String)]
   type Notes    = Set[(SyExpr,String)]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //
 //

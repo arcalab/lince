@@ -3,13 +3,16 @@ package hprog.frontend
 import hprog.ast
 import hprog.ast.SymbolicExpr.{Pure, SyExpr}
 import hprog.ast._
+import Syntax._
 import hprog.backend.Show
 import hprog.common.TimeOutOfBoundsException
 import hprog.frontend.CommonTypes.{Point, SySolution, Valuation, Warnings, Solution}
 import hprog.frontend.Traj._
-import hprog.frontend.solver.Solver
+import hprog.frontend.solver._
+
 
 import scala.collection.mutable
+
 
 class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
 
@@ -17,7 +20,6 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
     eval(SVal(t)).map(e => Eval(e._1))
 
   def eval(t:SyExpr,logger: Logger = new Logger()): Option[(Valuation,TimeClosure)] = {
-//    val logger = new Logger()
     Traj.run(Time(t), syntax, Map())(solver, dev, logger) match {
       case RFound(x,tc) => Some(x,tc)
       case RInf =>
@@ -37,29 +39,22 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
     }
   }
 
-//  def evalBatch(times:List[SyExpr]): List[(SyExpr,Valuation)] = {
+
   def evalBatch(from:SyExpr, to:SyExpr, step:SyExpr): List[(SyExpr,Valuation)] = {
 
     val fromv = Eval(from)
     val tov = Eval(solver.solveSymbExpr(to))
     val stepv = Eval(solver.solveSymbExpr(step))
-//    if(times.isEmpty) return Nil
     if (fromv > tov) return Nil
 
     val logger = new Logger()
-    //val times2 = times.map(solver.solveSymbExpr)
-    //        println("batch: "+times2.mkString(","))
     Traj.run(Times(fromv,tov,stepv), syntax, Map())(solver, dev, logger) match {
       case RFoundMany(found) => found
       case REnd(_, _,found) =>
-        //            println("REnd")
-        // Nil
-              found // but there may still missing times
+              found 
       case Traj.RInf =>
-        //            println("Inf")
         Nil
       case RFound(_,_) =>
-        //            println("##"+RFound(x))
         Nil
     }
   }
@@ -74,20 +69,6 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
     Traj.debug(()=>"endss: "+logger.getEnds)
     Traj.debug(()=>"run: "+rn)
     Traj.debug(()=>"dur: "+logger.time)
-
-//    val max: Double = rn match {
-//      case REnd(at, x, found) => Eval(logger.time)
-//      case _ => 10
-//    }
-//    val samples = if ((max)<=0)
-//      List(SVal(0))
-//    else
-//      SVal(0) :: (1 to 9).toList.map(_=> SDiv(SSub(SVal(max),SVal(0)),SVal(10)))
-//
-//    // add values of the trace (line) of thr traj
-//    println(" ## samples "+samples.mkString(","))
-//    val sampleValues = evalBatch(samples)
-//    println(" ## values: "+sampleValues.mkString(", "))
 
     rn
   }
@@ -107,7 +88,6 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
   }
 
   def doFullRun: Unit = {
-//    bounds = Bound(b._2,b._1)
     afterFullRun(()=>())
   }
 
@@ -126,7 +106,7 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
 
 
   lazy val getVars: Set[String] =
-    Utils.getFstDeclVars(syntax)
+    Utils.getFstDeclVarsTHEN(syntax) //new
 }
 
 
@@ -139,8 +119,13 @@ object Traj {
       case _ => true
     }
   }
+
   case class Time(t:SyExpr)             extends RunTarget
+
+
   case class Times(from:Double,to:Double,step:Double)  extends RunTarget
+
+
   case class Bound(n:Int, timer:SyExpr)  extends RunTarget
 
   sealed abstract class Run {
@@ -150,10 +135,17 @@ object Traj {
       case run => run
     }
   }
+
+  
+
   case object RInf                                  extends Run
-  case class REnd(at: RunTarget, x: Valuation,
-                  found:List[(SyExpr,Valuation)])   extends Run
+
+  
+  case class REnd(at: RunTarget, x: Valuation,found:List[(SyExpr,Valuation)])   extends Run
+
   case class RFound(x: Valuation,tc:TimeClosure)    extends Run
+
+
   case class RFoundMany(found:List[(SyExpr,Valuation)])    extends Run
 
   case class TimeClosure(e:SySolution, t:SyExpr)
@@ -193,14 +185,16 @@ object Traj {
     * @param logger to remember the time that passed, boundary points, notes, and warnings.
     * @return a Run: a point found, the end of the program, or an infinite run.
     */
+
   def run(r: RunTarget, syntax: Syntax, x: Valuation)
          (implicit solver: Solver, dev: Deviator, logger: Logger)
   : Run = {
-    val res = syntax match { //(TimeOrBound, Syntax, Valuation) = syntax match {
+    
+      val res = syntax match { //(TimeOrBound, Syntax, Valuation) = syntax match {
       // Rule Atom: atomic case - stop evolving and evaluate
       case a@Atomic(_, _) => runAtomicUntilEnd(r, a, x) //(r,syntax,x)
       // Rule Seq: evolve first part (non-atomic) of at sequence
-      case ast.Seq(p, q) =>
+      case ast.Syntax.Seq(p, q) =>
         runSeq(r, p, q, x)
       // Rule ITE 1 and 2
       case ITE(ifP, thenP, elseP) =>
@@ -209,7 +203,6 @@ object Traj {
       case While(pre, d, doP) =>
         runWhile(r, pre, d, doP, x)
     }
-//    println(s"<<< got ${res}")
     res
   }
 
@@ -251,13 +244,11 @@ object Traj {
       // Rule While-2
       case preAtomic: Atomic =>
         b match {
-          // counter for "repeat" instructions
           case Counter(0) => run(r, pre, x)
-          case Counter(i) => run(r, ast.Seq(pre, While(q, Counter(i - 1), q)), x)
+          case Counter(i) => run(r,ast.Syntax.Seq(pre, While(q, Counter(i - 1), q)), x)
           // guards for traditional while loops
           case Guard(c) =>
             runAtomicUntilEnd(r, preAtomic, x) match {
-//              case RFound(t2, x2) =>
               case REnd(r2,x2,found2) =>
                 r2 match {
                   case Bound(z,till) if z <= 0 => // no need to check for "till" - it will set "z" to zero if finished
@@ -270,7 +261,6 @@ object Traj {
               case run => run
             }
         }
-      // Rule While-1
       case _ =>
         run(r, pre, x) match {
           case REnd(r2, x2, found) =>
@@ -284,14 +274,14 @@ object Traj {
   ////////////////////////////////////////////////////////////////////////
 
 
-  // Function that calls the solver
+  // Function that calls the solver and calculate de Atomic
   @scala.annotation.tailrec
   private def runAtomicUntilEnd(rb: RunTarget, at: Atomic, x: Valuation)
                                (implicit solver: Solver, logger: Logger)
   : Run = {
     at.de.dur match {
       // special case: (0 duration - log 0-time event (if some valuation))
-      case For(Value(0)) =>
+      case For(ValueNotLin(0)) =>
         val delta = Utils.toValuation(at.as,x)
         val x2 = x++delta
         if (delta.nonEmpty) logger.init(x2)
@@ -322,35 +312,44 @@ object Traj {
         val durEstimation = Solver.estimateDur(u, at.de.eqs, x2, solver) match {
           case Some((d,ws)) =>
             for (w<-ws) logger.warn(w,SVal(d))
-            For(Value(d))
+            For(ValueNotLin(d))
           case None => Forever
         }
         runAtomicUntilEnd(rb, Atomic(at.as, DiffEqs(at.de.eqs, durEstimation)), x)
     }
   }
 
-
-  private def runAtomicWithTime(time: SyExpr, at:Atomic, dur:Lin, x:Valuation,log:Boolean = false)
+  //Calculate Atomic with time
+  private def runAtomicWithTime(time: SyExpr, at:Atomic, dur:NotLin, x:Valuation,log:Boolean = false)
                                (implicit solver:Solver, logger: Logger): Run = {
-    val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
+    
+    var extractVDE=Utils.extractVarsDifEqs(at) //Extracting the continuous variables from a diff.eq.
+    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x
+    var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,valToPoint,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+    var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
+    
+    println("AQUIIIIIIII")
+    val phi = solver.solveSymb(updateAtomic.de.eqs) // try to solve sybmolically
+    println("phi:",phi)
     val phiBkp:Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
     debug(()=>s"running $at @ ${Eval(time)} (${Show(time)}) for $dur on $x2.")
     val realTime = Eval(time)
-    val durSy = Eval.lin2sage(dur)
+    val durSy = Eval.notlin2sage(dur)
     val durSy2 = Eval.updInput(durSy,x2)
     val durVal = solver.solveSymbExpr(SFun("max",List(SVal(0),durSy2))) //Eval(durSy2) max 0
     debug(()=>s"duration: $dur ~~> $durSy ~~> $durSy2 ~~> $durVal.")
 
     // Rule Atom-1 (time < dur)
-    if (realTime < Eval(durVal)) {
+     if (realTime < Eval(durVal)) {
       if (phi.nonEmpty) {
         val x3 = x2 ++ Eval.update(phi, time, x2) // update x with phi @ given time
         val tc = Eval.updInputFun(x2, phi) // replace in phi the variables in x2 (before diff eqs)
           .view.mapValues(solver.solveSymb).toMap // simplify/solve result
         //if (log) logger += time
-        val x4 = x3.view.mapValues(solver.solveSymbExpr).toMap
+         val x4 = x3.view.mapValues(solver.solveSymbExpr).toMap
         debug(()=> s"simplified updated state: $x4" )
         RFound(x4, TimeClosure(tc, time))
       } else {
@@ -373,6 +372,8 @@ object Traj {
         REnd(Time(r2), x3, Nil)
       }
     }
+
+
   }
 
 
@@ -384,18 +385,15 @@ object Traj {
   //////////////////////////////////////////////////////////////////
 
   @scala.annotation.tailrec
-  private def runAtomicWithTimes(times:Times, at:Atomic, durLin:Lin, x:Valuation,
+  private def runAtomicWithTimes(times:Times, at:Atomic, durLin:NotLin, x:Valuation,
                                  found:List[(SyExpr,Valuation)])
                                 (implicit  logger: Logger, solver: Solver): Run= {
     debug(()=>s"RunAtomicTimes @ ${Show(times)} - ${Show(at)} for ${Show(durLin)}")
     times match {
       case Times(from,to,_) if to<= (Eval(logger.time)+from) =>
-//      case Nil =>
         debug(()=>s"time to stop ($to > ${Eval(logger.time)+from})")
         RFoundMany(found)
-      //        REnd(times, x, found)
 
-//      case time::rest =>
       case Times(from,to,step) =>
         debug(()=>s"continuing")
         val time = from
@@ -404,15 +402,11 @@ object Traj {
             // time2 is the global time when the element was found.
             //val time2 = solver.solveSymbExpr(SAdd(logger.time, time))
             val realTime = SVal(Eval(logger.time) + time)
-            //println(s"found next @${Eval(time2)} -> ${Show(x2)}")
             val found2 = (realTime->x2) :: found
             val realNext = from + step
             debug(()=>s"atomc run found @ $time (real: $realTime, real next: $realNext)")
             if (realNext >= to)
-//            rest match {
-//              case Nil =>
                         RFoundMany(found2) //++ List(time2 -> x2)
-//              case hd :: tl =>
             else {
                 // rest2 updates the next time value to include the time spent to find x2
 //                val rest2 = solver.solveSymbExpr(SAdd(hd, time)) :: tl
@@ -430,22 +424,29 @@ object Traj {
   }
 
 
-  private def runAtomicWithBounds(b:Bound,at:Atomic,durLin:Lin,x:Valuation)
+  private def runAtomicWithBounds(b:Bound,at:Atomic,durLin:NotLin,x:Valuation)
                                  (implicit solver: Solver, logger: Logger): Run = {
-    val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
+    
+
+
+    var extractVDE=Utils.extractVarsDifEqs(at) //Extracting the continuous variables from a diff.eq.
+    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x
+    var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,valToPoint,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+    var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
+  
+    println("AQUIIIIIIII")
+    val phi = solver.solveSymb(updateAtomic.de.eqs) 
+    //val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
     val phiBkp: Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
     logger.note(Show.pp(phi,x2))
 
     debug(()=>s"running $at bounded $b for $durLin on $x2.")
-    val durSy = Eval.lin2sage(durLin)
-    //debug(()=>s" - $durSy")
+    val durSy = Eval.notlin2sage(durLin)
     val durSy2 = Eval.updInput(durSy,x2)
-    //debug(()=>s" - $durSy2")
     val durValue = solver.solveSymbExpr( SFun("max",List(SVal(0),durSy2)))
-    //     val durVal = solver.solveSymbExpr(SFun("max",List(SVal(0),durSy2)))
-
     // manually comparing values that should be simplified already
     val stop = Eval(durValue) >= Eval(b.timer)
 
@@ -472,17 +473,6 @@ object Traj {
       REnd(Bound(b.n,newTimer),x3,Nil)
     }
 
-
-//    val durMin = Eval(durSy2) max 0
-//    debug(()=>s" - $durMin")
-//    val dur = durMin min b.timer
-//    debug(()=>s" - $dur")
-
-//    val x3 = x2++ solver.solveSymb(Eval.update(phi, SVal(dur), x2)) // update x with phi
-//    logger.init(x2)
-//    logger += SVal(dur)
-//    logger.end(x3)
-//    REnd(Bound(b.n,b.SSub(timer,dur)), x3, Nil)
   }
 
   // AUxiliar function to log warnings and notes
@@ -509,10 +499,9 @@ object Traj {
     }
   }
 
-  private val skip = Atomic(Nil, DiffEqs(Nil, For(Value(0))))
+  private val skip = Atomic(Nil, DiffEqs(Nil, For(ValueNotLin(0))))
 
   private def debug(str: () => String): Unit = {
-    // println("[Traj] "+str())
   }
 
 

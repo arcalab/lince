@@ -13,15 +13,13 @@ object TrajToJS {
   private type BoundaryVar = Map[Either[Double,Double],(Double,String)] // left/right of a time t -> value and comment
 
 
-  def apply(traj:Traj, divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true): String = {
-
-    ////println("> starting script generation")
+  def apply(traj:Traj,divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true): String = {
+    
     val dur = traj.getDur
 
     // trick to avoid many sampling when already lots of boundaries exist
     val nbrSamples = 0.max(100 - traj.getInits.getOrElse(Map()).size)
 
-    ////println(s"> run 1 completed - got duration $dur & boundary points")
 
     val max: Double = Eval(dur.getOrElse(SVal(10)),0)
 
@@ -55,21 +53,12 @@ object TrajToJS {
     // checks if a time value is within the scope
     def inScope(t:Double): Boolean = t>=start && t<=end
 
-    ////println(s"> starting run 2 ($nbrSamples samples)")
-//    println(s"> "+samples.mkString(","))
 
     val sampleValues = traj.evalBatch(SVal(start),SVal(end), SDiv(SSub(SVal(end),SVal(start)),SVal(nbrSamples))) //(samples)
 
-    ////println("> run 2 completed - got samples")
 
     for ((t,x) <- sampleValues; (variable,value) <- x)
       traces += variable -> (traces(variable) + (Eval(t)->Left(Eval(value))))
-//    for (t: Double <- samples)
-//      for (x <- traj.eval(t); (variable, value) <- x)
-//        traces += variable -> (traces(variable) + (t->Left(value)))
-    //      println("d")
-
-    ////println("> building boundaries, warnings, and notes")
     // Add ending points to "boundaries" and to "traces"
     for (e <- traj.getEnds;
          (t,endValues) <- e if inScope(Eval(t,0));
@@ -123,12 +112,10 @@ object TrajToJS {
     /////
     var js = "var colors = Plotly.d3.scale.category10();\n"
 
-    //      println("e")
 
     js += buildTraces(traces,colorIDs)
     js += buildBoundaries(boundaries,colorIDs)
     js += buildWarnings(traj,inScope,colorIDs)
-    ////println("> done")
 
 
     val traceNames = traces.keys.map("t_"+_).toList ++
@@ -141,7 +128,6 @@ object TrajToJS {
       s"\nvar layout = {hovermode:'closest'};" +
       s"\nPlotly.newPlot('$divName', data, layout, {showSendToCloud: true});"
 
-    //println("JS:\n"+js)
     js
   }
 
@@ -159,8 +145,8 @@ object TrajToJS {
            |   y: ${ys.mkString("[",",","]")},
            |   mode: 'lines',
            |   line: {color: colors(${colorIDs.getOrElse(variable,0)})},
-           |   legendgroup: 'g_$variable',
-           |   name: '$variable'
+           |   legendgroup: 'g_${remove_variable(variable)}',
+           |   name: '${remove_variable(variable)}'
            |};
              """.stripMargin
     }
@@ -200,7 +186,11 @@ object TrajToJS {
     js
   }
 
-
+ def remove_variable(variable:String):String = {
+  //var aux=variable.substring(0,variable.length-1)
+  var aux=variable.substring(1,variable.length)
+  return aux
+ }
 
   private def expandPoint(point:(Double,Either[Double,(Double,Double)])): List[(Double,String)] =
     point match {
@@ -232,8 +222,8 @@ object TrajToJS {
        |   mode: 'markers',
        |   marker: $style,
        |   type: 'scatter',
-       |   legendgroup: 'g_$variable',
-       |   name: 'boundary of $variable',
+       |   legendgroup: 'g_${remove_variable(variable)}',
+       |   name: 'boundary of ${remove_variable(variable)}',
        |   showlegend: false
        |};""".stripMargin
 
@@ -248,18 +238,13 @@ object TrajToJS {
         val values = (ends ++ inits).map(kv => Eval(kv._1) -> kv._2)
         val (x,y,msg) = warns
           .toList
-          // list: timeExpr->warning
           .map(es => (Eval(es._1, 0), "'" + fixStr(es._2) + "'"))
-          // list realTime -> fixedWarning
           .filter(es => inScope(es._1))
-          // list with in-scope realTime
           .sorted
-          // sorted list
           .map(warn=>(warn._1, Eval(
             values.getOrElse(warn._1,Map():Valuation) // get Valuation at warning warn
                   .getOrElse(variable, SVal(0)) // get expression of Variable
             ), warn._2))
-          // for each rt->warn, find the valuation of "rt", find the variable, and get its value
           .unzip3
 
         s"""var w_$variable = {
@@ -269,7 +254,7 @@ object TrajToJS {
            |   mode: 'markers',
            |   marker: $style,
            |   type: 'scatter',
-           |   legendgroup: 'g_$variable',
+           |   legendgroup: 'g_${remove_variable(variable)}',
            |   name: 'Warning',
            |   showlegend: false
            |};""".stripMargin
