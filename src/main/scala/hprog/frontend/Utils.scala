@@ -648,7 +648,7 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
       case SAdd(e1, e2) => SAdd(fixVars(e1), fixVars(e2))
       case SSub(e1, e2) => SSub(fixVars(e1), fixVars(e2))
     }
-    println(s"Fixing ${(e)} into ${(res)}")
+    // println(s"Fixing ${(e)} into ${(res)}")
     res
   }
 

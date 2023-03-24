@@ -135,6 +135,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     val instructions = genSage(eqs) // + "; print(\"§\")"
     debug(()=>s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
+    println(s"/---\neqs: ${Show(eqs)}\n---\neqs2: ${eqs}\n---\ninstructions: $instructions\n---\nreply: ${rep}\n\\---")
     debug(()=>s"reply: '$rep'")
     rep
   }

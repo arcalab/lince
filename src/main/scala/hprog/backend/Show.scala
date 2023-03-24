@@ -103,6 +103,7 @@ object Show {
     case MultNotLin(l1, l2:AddNotLin) => s"${apply(l1,vl)}*(${apply(l2,vl)})"
     case MultNotLin(l1:AddNotLin, l2) => s"(${apply(l1,vl)})*${apply(l2,vl)}"
     case MultNotLin(l1, l2) => s"${apply(l1,vl)}*${apply(l2,vl)}"
+    // MultNotLin(l1,l2) => s"${applyP(l1,vl)}*${applyP(l2,vl)}}"
 
     case DivNotLin(l1:AddNotLin, l2:AddNotLin) => s"(${apply(l1,vl)})/(${apply(l2,vl)})" 
     case DivNotLin(l1, l2:AddNotLin) => s"${apply(l1,vl)}/(${apply(l2,vl)})"
