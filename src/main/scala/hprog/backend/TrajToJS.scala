@@ -145,8 +145,8 @@ object TrajToJS {
            |   y: ${ys.mkString("[",",","]")},
            |   mode: 'lines',
            |   line: {color: colors(${colorIDs.getOrElse(variable,0)})},
-           |   legendgroup: 'g_$variable',
-           |   name: '$variable'
+           |   legendgroup: 'g_${remove_variable(variable)}',
+           |   name: '${remove_variable(variable)}'
            |};
              """.stripMargin
     }
@@ -186,7 +186,11 @@ object TrajToJS {
     js
   }
 
-
+ def remove_variable(variable:String):String = {
+  //var aux=variable.substring(0,variable.length-1)
+  var aux=variable.substring(1,variable.length)
+  return aux
+ }
 
   private def expandPoint(point:(Double,Either[Double,(Double,Double)])): List[(Double,String)] =
     point match {
@@ -218,8 +222,8 @@ object TrajToJS {
        |   mode: 'markers',
        |   marker: $style,
        |   type: 'scatter',
-       |   legendgroup: 'g_$variable',
-       |   name: 'boundary of $variable',
+       |   legendgroup: 'g_${remove_variable(variable)}',
+       |   name: 'boundary of ${remove_variable(variable)}',
        |   showlegend: false
        |};""".stripMargin
 
@@ -250,7 +254,7 @@ object TrajToJS {
            |   mode: 'markers',
            |   marker: $style,
            |   type: 'scatter',
-           |   legendgroup: 'g_$variable',
+           |   legendgroup: 'g_${remove_variable(variable)}',
            |   name: 'Warning',
            |   showlegend: false
            |};""".stripMargin

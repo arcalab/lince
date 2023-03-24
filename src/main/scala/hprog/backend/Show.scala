@@ -92,33 +92,75 @@ object Show {
   
   def apply(notlin:NotLin): String= apply(notlin,Map():Valuation)
 
+
+/*
   def apply(notlin: NotLin, vl: Valuation): String = notlin match {
     case v:VarNotLin => showVarNotLin(v,vl,apply[Pure])
     // If Value is an integer it will print without the zero, otherwise it prints with decimals 
     case ValueNotLin(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
     
  //new
-    case AddNotLin(l1, l2)    => s"${apply(l1,vl)} + ${apply(l2,vl)}"
+    case AddNotLin(l1, l2)    => s"(${apply(l1,vl)} + ${apply(l2,vl)})"
     case MultNotLin(l1:AddNotLin, l2:AddNotLin) => s"(${apply(l1,vl)})*(${apply(l2,vl)})" 
-    case MultNotLin(l1, l2:AddNotLin) => s"${apply(l1,vl)}*(${apply(l2,vl)})"
-    case MultNotLin(l1:AddNotLin, l2) => s"(${apply(l1,vl)})*${apply(l2,vl)}"
-    case MultNotLin(l1, l2) => s"${apply(l1,vl)}*${apply(l2,vl)}"
-    // MultNotLin(l1,l2) => s"${applyP(l1,vl)}*${applyP(l2,vl)}}"
-
+    case MultNotLin(l1, l2:AddNotLin) => s"(${apply(l1,vl)})*(${apply(l2,vl)})"
+    case MultNotLin(l1:AddNotLin, l2) => s"(${apply(l1,vl)})*(${apply(l2,vl)})"
+    case MultNotLin(l1, l2) => s"(${apply(l1,vl)})*(${apply(l2,vl)})"
+    // MultNotLin(l1,l2)=> s"${applyp(l1,cl)}*{applyp(l2,vl)}
+    
     case DivNotLin(l1:AddNotLin, l2:AddNotLin) => s"(${apply(l1,vl)})/(${apply(l2,vl)})" 
-    case DivNotLin(l1, l2:AddNotLin) => s"${apply(l1,vl)}/(${apply(l2,vl)})"
-    case DivNotLin(l1:AddNotLin, l2) => s"(${apply(l1,vl)})/${apply(l2,vl)}"
-    case DivNotLin(l1, l2) => s"${apply(l1,vl)}/${apply(l2,vl)}"
+    case DivNotLin(l1, l2:AddNotLin) => s"(${apply(l1,vl)})/(${apply(l2,vl)})"
+    case DivNotLin(l1:AddNotLin, l2) => s"(${apply(l1,vl)})/(${apply(l2,vl)})"
+    case DivNotLin(l1, l2) => s"(${apply(l1,vl)})/(${apply(l2,vl)})"
     
 
     case ResNotLin(l1:AddNotLin, l2:AddNotLin) => s"(${apply(l1,vl)})%(${apply(l2,vl)})" 
-    case ResNotLin(l1, l2:AddNotLin) => s"${apply(l1,vl)}%(${apply(l2,vl)})"
-    case ResNotLin(l1:AddNotLin, l2) => s"(${apply(l1,vl)})%${apply(l2,vl)}"
-    case ResNotLin(l1, l2) => s"${apply(l1,vl)}%${apply(l2,vl)}"
+    case ResNotLin(l1, l2:AddNotLin) => s"(${apply(l1,vl)})%(${apply(l2,vl)})"
+    case ResNotLin(l1:AddNotLin, l2) => s"(${apply(l1,vl)})%(${apply(l2,vl)})"
+    case ResNotLin(l1, l2) => s"(${apply(l1,vl)})%(${apply(l2,vl)})"
 
 
     case PowNotLin(l1,l2)=> s"pow(${apply(l1,vl)},${apply(l2,vl)})"
+    case FuncNotLin("PI",Nil)=>s"pi"
+    case FuncNotLin("E",Nil)=>s"e"
+    case FuncNotLin("log10",list)=> s"log(${stringList(list)})/log(10)"
     case FuncNotLin(s,list)=>s"${s}(${stringList(list)})"
+
+  }
+*/
+
+
+
+def apply(notlin: NotLin, vl: Valuation): String = notlin match {
+    case v:VarNotLin => showVarNotLin(v,vl,apply[Pure])
+    // If Value is an integer it will print without the zero, otherwise it prints with decimals 
+    case ValueNotLin(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
+    
+ //new
+    case AddNotLin(l1, l2)    => s"${apply_paranteses(l1,vl)} + ${apply_paranteses(l2,vl)}"
+
+    case MultNotLin(l1, l2) => s"${apply_paranteses(l1,vl)}*${apply_paranteses(l2,vl)}"
+
+    case DivNotLin(l1, l2) => s"${apply_paranteses(l1,vl)}/${apply_paranteses(l2,vl)}"
+    
+    case ResNotLin(l1, l2) => s"${apply_paranteses(l1,vl)}%${apply_paranteses(l2,vl)}"
+
+    case PowNotLin(l1,l2)=> s"pow(${apply_paranteses(l1,vl)},${apply_paranteses(l2,vl)})"
+    
+    case FuncNotLin("PI",Nil)=>s"pi"
+    case FuncNotLin("E",Nil)=>s"e"
+    case FuncNotLin("log10",list)=> s"log(${stringList(list)})/log(10)"
+    case FuncNotLin(s,list)=>s"${s}(${stringList(list)})"
+
+  }
+
+  def apply_paranteses(notlin:NotLin,vl:Valuation):String= notlin match {
+    case v:VarNotLin => showVarNotLin(v,vl,apply[Pure])
+    case ValueNotLin(v) => floatToFraction(v)
+    case FuncNotLin("PI",Nil)=>s"pi"
+    case FuncNotLin("E",Nil)=>s"e"
+    case FuncNotLin("log10",list)=> s"log(${stringList(list)})/log(10)"
+    case FuncNotLin(s,list)=>s"${s}(${stringList(list)})"
+    case _ => s"(${apply(notlin,vl)})"
   }
 
 def stringList(list:List[NotLin]): String = list match{
@@ -173,7 +215,11 @@ def stringList(list:List[NotLin]): String = list match{
     case s:SVar  => s.v
     case SFun("PI",Nil) => "pi"
     case SFun("E",Nil) => "e"
-    case s:SFun[E]  => s"${s.f}(${s.args.map(apply[E]).mkString(",")})"
+    //case SFun("log10",list) => s"log(${list.map(apply).mkString(",")})/log(10)"
+    case s:SFun[E]  => {
+      if(s.f!="log10") s"${s.f}(${s.args.map(apply[E]).mkString(",")})"
+      else s"log(${s.args.map(apply[E]).mkString(",")})/log(10)"
+    }
     case s:SDiv[E]  => s"${applyP[E](s.e1)}/${applyP[E](s.e2)}"
     case s:SRes[E]  => s"${applyP[E](s.e1)}%${applyP[E](s.e2)}"
     case s:SMult[E] => s"${applyP[E](s.e1)}*${applyP[E](s.e2)}"
@@ -211,7 +257,13 @@ def stringList(list:List[NotLin]): String = list match{
     case SSub(SVal(0),e)=> s"-${ppP[E](e)}"
     case SSub(e,SVal(0))=> s"${pp[E](e)}"
     //// General cases
-    case s:SFun[E]  => s"${s.f}(${s.args.map(pp[E]).mkString(",")})"
+    case SFun("PI",Nil) => "pi"
+    case SFun("E",Nil) => "e"
+    //case SFun("log10",list) => s"log(${list.map(pp).mkString(",")})/log(10)"
+    case s:SFun[E]  => {
+      if (s.f != "log10") s"${s.f}(${s.args.map(pp[E]).mkString(",")})"
+      else s"log(${s.args.map(pp[E]).mkString(",")})/log(10)"
+    }
     case s:SDiv[E]  => s"${ppP[E](s.e1)}/${ppP[E](s.e2)}"
     case s:SRes[E]  => s"${ppP[E](s.e1)}%${ppP[E](s.e2)}"
     case s:SMult[E] => s"${ppP[E](s.e1)}*${ppP[E](s.e2)}"
