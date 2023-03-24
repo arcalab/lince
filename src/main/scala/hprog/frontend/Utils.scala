@@ -41,13 +41,21 @@ def extractAssigments(prog:Syntax):List[Assign] = prog match {
   	var ac=as++extractAssigments(q)
   	return ac
   }
-  case Seq(p,q) =>{
-  
-   return extractAssigments(p) ++ extractAssigments(q)
+  case Seq(While(pre,c,p),q) => {
+    var ac=extractAssigments(pre)
+    return ac
   }
+  //case Seq(p,q) =>{
+  
+  // return extractAssigments(p) ++ extractAssigments(q)
+  //}
   case While(pre,c,p) => {
   	return extractAssigments(pre)
   
+  }
+  case Seq(p,q) =>{
+  
+   return extractAssigments(p) ++ extractAssigments(q)
   }
   case _ =>  List()
 
@@ -100,23 +108,238 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
   return listVars
 }
 
+def extractVarsDifEqs(prog:Atomic):List[String] = {
+  
+  var listVars:List[String]=List()
+
+  for (eqDiff <- prog.de.eqs){
+    //var aux:List[String]=List()
+      var aux:String=eqDiff.v.v
+      listVars=listVars ++ List(aux)
+      //println("eqDiff:"+(eqDiff.v).v)
+      //println("aux:"+aux)   
+
+  }
+
+  return listVars
+}
+//def extractDeclarationSyntax(prog:Assign):Map[String,NotLin]={}
+
+//This function converts the Syntax coming from the Parser, into a Syntax where the parsing of the constant variables becomes the parsing of the linear expression that defines it
+def updateSyntax(prog:Syntax,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:List[List[String]],control:Int):(Syntax,Map[String,NotLin],Int)={
+ prog match {
+  case Atomic(as,de) => {
+    var listAcum:List[Assign]=List()
+   // var aux:(Assign,Map[String,NotLin])=updateSyntax(as(0),varsDcl,iteration,varsDifEqs,0)
+    var aux1:Map[String,NotLin]=varsDcl
+    //listAcum=listAcum ++ aux(0)
+
+    for (a<-as){
+       var aux= updateSyntax(a,aux1,iteration,varsDifEqs,0)
+       listAcum=listAcum ::: aux._1 :: Nil
+       aux1=aux._2
+    }
+    var auxDe=updateSyntax(de,aux1,iteration + 1,varsDifEqs,1)
+    return (Atomic(listAcum,auxDe._1),auxDe._2,iteration+1)
+  }
+  case Seq(p,q) =>{
+    var auxP=updateSyntax(p,varsDcl,iteration,varsDifEqs,0)
+    var auxQ=updateSyntax(q,auxP._2,auxP._3,varsDifEqs,0)
+   return (Seq(auxP._1,auxQ._1),auxQ._2,auxQ._3)
+  }
+  case While(pre,c,p) => {
+    var auxPre=updateSyntax(pre,varsDcl,iteration,varsDifEqs,0)
+    var auxP=updateSyntax(p,auxPre._2,auxPre._3,varsDifEqs,0)
+    return (While(auxPre._1,c,auxP._1),auxP._2,auxP._3)
+  
+  }
+  case ITE(ifP,thenP,elseP) =>  {
+    var choice:Map[String,NotLin]=Map()
+    var auxifp=updateSyntax(ifP,varsDcl,iteration,varsDifEqs,0)
+    var bol:Boolean=Eval.apply(Map(),auxifp._1)
+    var auxThenP=updateSyntax(thenP,varsDcl,iteration,varsDifEqs,0)
+    var auxElseP=updateSyntax(elseP,varsDcl,auxThenP._3,varsDifEqs,0)
+
+    if (bol) {
+      choice=auxThenP._2
+    } else {
+      choice=auxElseP._2
+    }
+    
+    return (ITE(ifP,auxThenP._1,auxElseP._1),choice,auxElseP._3)
+  }
+
+ }
+
+}
+
+def updateSyntax(prog:NotLin,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:List[List[String]],control:Int):(NotLin,Map[String,NotLin],Int)={
+ prog match {
+  case VarNotLin(v)=> {
+    if (control==1) {
+        println("iteration:",iteration)
+        println("varsDifEqs:",varsDifEqs)
+        println("varsDifEqs(iteration-1).contains(v):",varsDifEqs(iteration-1).contains(v))
+        if (varsDifEqs(iteration-1).contains(v)) {
+            return (VarNotLin(v),varsDcl,iteration)
+        } else {
+          return (varsDcl(v),varsDcl,iteration)
+        }
+  } else {
+    return (varsDcl(v),varsDcl,iteration)
+  }
+}
+  case ValueNotLin(v) => {
+    return (ValueNotLin(v),varsDcl,iteration)
+  }
+  case AddNotLin(x,y)=> {
+    var auxX=updateSyntax(x,varsDcl,iteration,varsDifEqs,control)
+    var auxY=updateSyntax(y,varsDcl,iteration,varsDifEqs,control)
+    return (AddNotLin(auxX._1,auxY._1),varsDcl,iteration)
+  }
+  case MultNotLin(x,y)=> {
+    var auxX=updateSyntax(x,varsDcl,iteration,varsDifEqs,control)
+    var auxY=updateSyntax(y,varsDcl,iteration,varsDifEqs,control)
+    return (MultNotLin(auxX._1,auxY._1),varsDcl,iteration)
+  }
+  case DivNotLin(x,y)=> {
+    var auxX=updateSyntax(x,varsDcl,iteration,varsDifEqs,control)
+    var auxY=updateSyntax(y,varsDcl,iteration,varsDifEqs,control)
+    return (DivNotLin(auxX._1,auxY._1),varsDcl,iteration)
+    }
+  case ResNotLin(x,y)=> {
+    var auxX=updateSyntax(x,varsDcl,iteration,varsDifEqs,control)
+    var auxY=updateSyntax(y,varsDcl,iteration,varsDifEqs,control)
+    return (ResNotLin(auxX._1,auxY._1),varsDcl,iteration)
+  }
+  case PowNotLin(x,y)=> {
+    var auxX=updateSyntax(x,varsDcl,iteration,varsDifEqs,control)
+    var auxY=updateSyntax(y,varsDcl,iteration,varsDifEqs,control)
+    return (PowNotLin(auxX._1,auxY._1),varsDcl,iteration)
+  }
+  case FuncNotLin(s,xs)=> {
+    var listNotLin:List[NotLin]=List()
+    for(x<-xs){
+      var aux=updateSyntax(x,varsDcl,iteration,varsDifEqs,control)
+      listNotLin=listNotLin ::: aux._1 :: Nil
+    }
+    return (FuncNotLin(s,listNotLin),varsDcl,iteration)
+  }
+  }
+}
+
+
+def updateSyntax(prog:Assign,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:List[List[String]],control:Int):(Assign,Map[String,NotLin],Int)={
+ prog match {
+  case Assign(v,e) => {
+    //println("old:",varsDcl)
+    var aux=updateSyntax(e,varsDcl,iteration,varsDifEqs,0)
+    var newvarsDcl=aux._2+(v.v->aux._1)
+    println("new:",newvarsDcl)
+    return (Assign(v,aux._1),newvarsDcl,iteration)
+  }
+}
+}
+
+def updateSyntax(prog:DiffEq,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:List[List[String]],control:Int):(DiffEq,Map[String,NotLin],Int)={
+  prog match {
+  case DiffEq(v,e) => {
+    var aux=updateSyntax(e,varsDcl,iteration,varsDifEqs,1)
+    return (DiffEq(v,aux._1),aux._2,iteration)
+  }
+}
+}
+
+def updateSyntax(prog:DiffEqs,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:List[List[String]],control:Int):(DiffEqs,Map[String,NotLin],Int)={
+ prog match {
+  case DiffEqs(eqs,dur) => {
+    var listDiffEq:List[DiffEq]=List()
+    //var aux=updateSyntax(eqs(0),varsDcl,iteration,varsDifEqs,1)
+    var aux1:Map[String,NotLin]=varsDcl
+    //listDiffEq=listDiffEq ++ aux(0)
+
+    for (e<-eqs){
+       var aux= updateSyntax(e,aux1,iteration,varsDifEqs,1)
+       listDiffEq=listDiffEq ::: aux._1 :: Nil
+       aux1=aux._2
+    }
+
+    return (DiffEqs(listDiffEq,dur),aux1,iteration)
+  }
+}
+}
+
+
+def updateSyntax(prog:Cond,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs:List[List[String]],control:Int):(Cond,Map[String,NotLin],Int)={
+ prog match {
+  case BVal(b)=> {
+   return (BVal(b),varsDcl,iteration)
+  }
+  case And(c1,c2)=> {
+    var auxC1=updateSyntax(c1,varsDcl,iteration,varsDifEqs,0)
+    var auxC2=updateSyntax(c2,auxC1._2,iteration,varsDifEqs,0)
+    return (And(auxC1._1,auxC2._1),auxC2._2,iteration)
+  }
+  case Or(c1,c2)=> {
+    var auxC1=updateSyntax(c1,varsDcl,iteration,varsDifEqs,0)
+    var auxC2=updateSyntax(c2,auxC1._2,iteration,varsDifEqs,0)
+    return (Or(auxC1._1,auxC2._1),auxC2._2,iteration)
+  }
+  case Not(c1)=> {
+    var auxC1=updateSyntax(c1,varsDcl,iteration,varsDifEqs,0)
+    return (Not(auxC1._1),auxC1._2,iteration)
+  }
+  case EQ(x1,x2)=> {
+    var auxX1=updateSyntax(x1,varsDcl,iteration,varsDifEqs,0)
+    var auxX2=updateSyntax(x2,auxX1._2,iteration,varsDifEqs,0)
+    return (EQ(auxX1._1,auxX2._1),auxX2._2,iteration)
+  }
+  case GT(x1,x2)=> {
+    var auxX1=updateSyntax(x1,varsDcl,iteration,varsDifEqs,0)
+    var auxX2=updateSyntax(x2,auxX1._2,iteration,varsDifEqs,0)
+    return (GT(auxX1._1,auxX2._1),auxX2._2,iteration)
+  }
+  case GE(x1,x2)=> {
+    var auxX1=updateSyntax(x1,varsDcl,iteration,varsDifEqs,0)
+    var auxX2=updateSyntax(x2,auxX1._2,iteration,varsDifEqs,0)
+    return (GE(auxX1._1,auxX2._1),auxX2._2,iteration)
+  }
+  case LT(x1,x2)=> {
+    var auxX1=updateSyntax(x1,varsDcl,iteration,varsDifEqs,0)
+    var auxX2=updateSyntax(x2,auxX1._2,iteration,varsDifEqs,0)
+    return (LT(auxX1._1,auxX2._1),auxX2._2,iteration)
+  }
+  case LE(x1,x2)=> {
+    var auxX1=updateSyntax(x1,varsDcl,iteration,varsDifEqs,0)
+    var auxX2=updateSyntax(x2,auxX1._2,iteration,varsDifEqs,0)
+    return (LE(auxX1._1,auxX2._1),auxX2._2,iteration)
+  }
+}
+}
+
+
+
+
+
+
 
 //New
 // This function verify if the linear expressions of the Eqs.Diffs are linears
  def verifyLinearityEqsDiff(prog:Syntax):Option[List[DiffEq]] =  {
    var diffeqs=extractDifEqs(prog) //List of List of Diff.eqs
-   var varsDifEqs=getFstDeclVarsTHEN(prog) // set of declared variables NEWWW
+   var varsDifEqs=extractVarsDifEqs(prog) // extract de variables of the differential equations
+   //var varsDifEqs=getFstDeclVarsTHEN(prog) // set of declared variables NEWWW
    var iteration=0
    var aux=0
 
    for (lsteqDiff <- diffeqs){
     var aux=0
     for (eqDiff <- lsteqDiff){
-     aux=extractVarsLinearExp(eqDiff.e,varsDifEqs) // extract the number of variables in a linear expressions 
+     aux=extractVarsLinearExp(eqDiff.e,varsDifEqs(iteration)) // extract the number of variables in a linear expressions 
      //println("aux:"+aux)
      if (aux > 1 ) return Some(lsteqDiff)
      }
-  iteration=iteration + 1
+     iteration=iteration + 1
   }
   return None   
  }
@@ -148,7 +371,7 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
  // chamar sets em vez de listas
  // New
  // This function extract the number of variables in a linear expression of an Eq.Diff
- def extractVarsLinearExp(notlin:NotLin,listOfVars:Set[String]):Int = notlin match {
+ def extractVarsLinearExp(notlin:NotLin,listOfVars:List[String]):Int = notlin match {
 
   case ValueNotLin(value) =>  0
   
@@ -172,7 +395,7 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
 
 
 //new
- def funcextract(s:String,list:List[NotLin],listOfVars:Set[String]):Int = (s,list) match {
+ def funcextract(s:String,list:List[NotLin],listOfVars:List[String]):Int = (s,list) match {
   case ("PI",List()) => 0
   case ("E",List()) => 0
   case ("max",List(n1,n2)) => math.max(extractVarsLinearExp(n1,listOfVars),extractVarsLinearExp(n2,listOfVars))
@@ -318,7 +541,7 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // take a list of differential equations and remove the variables with the tilde on top! (ex: p'=1+x returns set(p))
+  // take a list of differential equations and take the variables with the tilde on top! (ex: p'=1+x returns set(p))
   def getDefVars(eqs: List[DiffEq]): Set[String] =
     eqs.map(_.v.v).toSet
 
@@ -589,6 +812,10 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
   def exprVarToExpr(e:SyExprVar,prev:Valuation): SyExpr = e match {
     case SVal(v) => SVal(v) // because SVal is already an extension of SyExprVar
     case SVar(v) => prev(v) // v is a string, used as a key to the PREVious values (SyExpr) stored in prev.
+<<<<<<< HEAD
+=======
+    case SFun("log10",args:List[SyExprVar]) =>SDiv(exprVarToExpr(SFun("log",args),prev),exprVarToExpr(SFun("log",List(SVal(10))),prev))
+>>>>>>> b032e87
     case SFun(f, args:List[SyExprVar]) => SFun(f,args.map(exprVarToExpr(_,prev)))
     case SDiv(e1, e2) => SDiv( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
     case SRes(e1, e2) => SRes( exprVarToExpr(e1,prev),exprVarToExpr(e2,prev))
@@ -635,11 +862,21 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
       case SVar("pi") => SFun("PI", Nil)
       case SVar(_) => e
       case SArg() => e
+<<<<<<< HEAD
       case SFun("_e", List(SVal(0))) => SVar("e")
       case SFun("_pi", List(SVal(0))) => SVar("pi")
       case SFun(f, List(SVal(0)))
         if f != "sin" && f != "cos" => SVar(f)
       case SFun("e", args) => SFun("E", args.map(fixVars))
+=======
+      case SFun("_e", List(SVal(0))) => SVar("_e")
+      case SFun("_pi", List(SVal(0))) => SVar("_pi")
+      case SFun(f, List(SVal(0)))
+        if (f != "sin" && f != "cos" && f != "tan" && f != "exp" && f != "arcsin" && f != "arccos" && f != "arctan" && f != "sinh" && f != "cosh" && f != "tanh" && f != "sqrt" && f != "log" && f != "log10")=> SVar(f)
+      case SFun("e", args) => SFun("E", args.map(fixVars))
+      case SFun("pi",args)=> SFun("PI", args.map(fixVars))
+      case SFun("log10",args)=>SDiv(fixVars(SFun("log",args)),fixVars(SFun("log",List(SVal(10)))))
+>>>>>>> b032e87
       case SFun(f, args) => SFun(f, args.map(fixVars))
       case SDiv(e1, e2) => SDiv(fixVars(e1), fixVars(e2))
       case SRes(e1, e2) => SRes(fixVars(e1), fixVars(e2))
@@ -648,7 +885,11 @@ def extractVarsDifEqs(prog:Syntax):List[List[String]] = {
       case SAdd(e1, e2) => SAdd(fixVars(e1), fixVars(e2))
       case SSub(e1, e2) => SSub(fixVars(e1), fixVars(e2))
     }
+<<<<<<< HEAD
     println(s"Fixing ${(e)} into ${(res)}")
+=======
+    //println(s"Fixing ${(e)} into ${(res)}")
+>>>>>>> b032e87
     res
   }
 

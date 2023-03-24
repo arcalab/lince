@@ -189,7 +189,8 @@ object Traj {
   def run(r: RunTarget, syntax: Syntax, x: Valuation)
          (implicit solver: Solver, dev: Deviator, logger: Logger)
   : Run = {
-    val res = syntax match { //(TimeOrBound, Syntax, Valuation) = syntax match {
+    
+      val res = syntax match { //(TimeOrBound, Syntax, Valuation) = syntax match {
       // Rule Atom: atomic case - stop evolving and evaluate
       case a@Atomic(_, _) => runAtomicUntilEnd(r, a, x) //(r,syntax,x)
       // Rule Seq: evolve first part (non-atomic) of at sequence
@@ -321,7 +322,16 @@ object Traj {
   //Calculate Atomic with time
   private def runAtomicWithTime(time: SyExpr, at:Atomic, dur:NotLin, x:Valuation,log:Boolean = false)
                                (implicit solver:Solver, logger: Logger): Run = {
-    val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
+    
+    var extractVDE=Utils.extractVarsDifEqs(at) //Extracting the continuous variables from a diff.eq.
+    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x
+    var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,valToPoint,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+    var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
+    
+    println("AQUIIIIIIII")
+    val phi = solver.solveSymb(updateAtomic.de.eqs) // try to solve sybmolically
+    println("phi:",phi)
     val phiBkp:Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
@@ -416,7 +426,18 @@ object Traj {
 
   private def runAtomicWithBounds(b:Bound,at:Atomic,durLin:NotLin,x:Valuation)
                                  (implicit solver: Solver, logger: Logger): Run = {
-    val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
+    
+
+
+    var extractVDE=Utils.extractVarsDifEqs(at) //Extracting the continuous variables from a diff.eq.
+    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x
+    var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,valToPoint,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+    var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
+  
+    println("AQUIIIIIIII")
+    val phi = solver.solveSymb(updateAtomic.de.eqs) 
+    //val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
     val phiBkp: Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 

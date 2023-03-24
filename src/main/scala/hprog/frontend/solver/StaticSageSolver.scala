@@ -144,7 +144,9 @@ class StaticSageSolver extends Solver {
      cacheStrVal += expr -> replyToExprCache(sageReply)
 
   private def replyToExprCache(sageReply:String): ExprCache = {
+    //println("sageReply:"+sageReply)
     val resParsed = SageParser.parseExpr(sageReply)
+    //println("resParsed:"+resParsed)
     resParsed match {
       case SageParser.Success(newExpr, _) =>
         (fixSageVars(newExpr),sageReply)
@@ -190,28 +192,46 @@ class StaticSageSolver extends Solver {
 
   def importDiffEqs (eqs:List[DiffEq], sageReply:String): Unit =
     cacheDE = cacheDE + (eqs ->
-      replyToDiffCache(Solver.getVars(eqs).filterNot(_.startsWith("_")),sageReply))
+      replyToDiffCache(returnVars(eqs),sageReply))
+  
+  //NEW 
+  def returnVars (eqs:List[DiffEq]): List[String] ={
+    println("eqs:",eqs)
+    var vars= Solver.getVars(eqs)
+    println ("Vars:",vars)
+    var filterVars=vars.filter(_.startsWith("_"))
+    println("filterVars:",filterVars)
+    var reducefilterVars=filterVars.toSet.toList
+    return reducefilterVars
+  }
 
   def importDiffEqs(eqs:String, sageReply:String): Unit =
     cacheStrDE = cacheStrDE + (eqs ->
       replyToDiffCache(findVars(eqs),sageReply))
 
   private def findVars(str: String) = {
-    val res1 = """[a-z][a-zA-Z0-9_]*\(0\)""".r.findAllIn(str).map(_.dropRight(3)).toList
+    val res1 = """_[a-z][a-zA-Z0-9_]*\(0\)""".r.findAllIn(str).map(_.dropRight(3)).toList
       .filter(x => x!="sin" && x!="cos")
-
-    val res2 = """[a-z][a-zA-Z0-9_]*'""".r.findAllIn(str).map(_.dropRight(1)).toList
+    val res2 = """_[a-z][a-zA-Z0-9_]*'""".r.findAllIn(str).map(_.dropRight(1)).toList
     val res = res1++res2
     res
   }
 
   def replyToDiffCache(vars:List[String], sageReply:String): DiffCache = {
+    println("vars:",vars)
+    println("sageReply:",sageReply)
+    println("SageParser:",SageParser.parseSol(sageReply))
+
     if (sageReply.nonEmpty) {
       val resParsed = SageParser.parseSol(sageReply) match {
         // single solution - name is not known from the answer of Sage
         case SageParser.Success(sol, _) if sol.keySet == Set("") =>
           vars match {
-            case List(variable) => Map(variable -> Utils.fixVars(sol("")))
+            case List(variable) => {
+              println("sol():",sol(""))
+              println(" Map(variable -> Utils.fixVars(sol())):", Map(variable -> Utils.fixVars(sol(""))))
+              Map(variable -> Utils.fixVars(sol("")))
+            }
             case _ => throw new ParserException(s"Failed to parse $sageReply - " +
               s"only one variable expected, but found [${vars.mkString(",")}].")
           }
@@ -220,6 +240,7 @@ class StaticSageSolver extends Solver {
           result.view.mapValues(Utils.fixVars).toMap
         case _: SageParser.NoSuccess => throw new ParserException(s"Failed to parse '$sageReply'.")
       }
+     // println("resParsed:"+resParsed)
       (resParsed,sageReply)
     }
     else
@@ -294,7 +315,7 @@ class StaticSageSolver extends Solver {
   }
 
   protected def debug(s:()=>String): Unit = {
-    println(s())
+    //println(s())
   }
 
 }

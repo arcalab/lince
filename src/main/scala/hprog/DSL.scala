@@ -8,7 +8,7 @@ import hprog.frontend.CommonTypes.Valuation
 import hprog.frontend.solver.LiveSageSolver
 import hprog.frontend.{CommonTypes, Deviator, Distance, Traj}
 import hprog.lang.{Parser, Parser2, SageParser}
-
+import hprog.frontend.Utils
 import scala.language.implicitConversions
 
 /**

@@ -20,7 +20,7 @@ object Syntax {
   sealed abstract class Syntax {
     /** Sequential composition of programs with some pre-processing */
     def ~(other:Syntax): Syntax = other match {
-      case While(pre,d,doP) => While(this~pre,d,doP)
+      //case While(pre,d,doP) => While(this~pre,d,doP)
       case _ => Seq(this,other)
     }
   }

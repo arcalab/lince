@@ -22,7 +22,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   protected val lockSnd = new Object
   protected var last: Option[String] = None
   debug(()=>s" - Sage process: creating (last=$last)")
-  protected val proc = LiveSageSolver.createSageProcess(path,addUpdate)
+  protected val proc = LiveSageSolver.createSageProcess(path,addUpdate) // cria um processo, para correr em paralelo com o Sage
 
   // wait for process to be created (and first output out)
   var count = 10
@@ -89,11 +89,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
 
   }
 
-  def askSage(s:String): Option[String] = {
-    last = None // clear last answer
-    proc._1(s) // put string in input queue of Sage process
-    waitForReply()
-  }
+
 
   private def waitForReply(): Option[String] = {
     var prev = ""
@@ -130,13 +126,30 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   }
 
 
-  ///
+  def askSage(s:String): Option[String] = {
+    last = None // clear last answer
+    proc._1(s) // put string in input queue of Sage process
+    waitForReply()
+  }
+
+  /// 
   def askSage(eqs: List[DiffEq]): Option[String] = {
-    val instructions = genSage(eqs) // + "; print(\"§\")"
-    debug(()=>s"solving: ${Show(eqs)}")
+    val instructions = genSage(eqs) // cria uma string das equações diferenciais para enviar para o Sage (ex: _t_=var('_t_'), function('...'))
+    println("eqs_withoutShow:",eqs)
+    println("eqs:",Show(eqs))
+    println("genSage:",instructions)
+    //debug(()=>s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
-    debug(()=>s"reply: '$rep'")
-    rep
+   // println("olaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    println("askSage:",rep)
+   // println("rep.get.contains(g1634):",rep.get.contains("g1634"))
+    if (rep.get.contains("g1634")) {
+     // println("FIND ERROR")
+     return throw new TimeoutException(s"Sage could not find the solution(s) to the differential equation(s): ${Show(eqs)}")
+    } else {
+    return rep
+    }
+   
   }
 
   /**
@@ -146,8 +159,8 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     */
   private def genSage(eqs:List[DiffEq]): String = {
     var res = "_t_ = var('_t_'); "
-    val undefinedVars = (Utils.getUsedVarsTHEN(eqs)++Utils.getUsedVarsELSE(eqs)) -- Utils.getDefVars(eqs) //AAAAAAAAAAAAAAAAAAAALLLTEREIIIII
-    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(VarNotLin(v),ValueNotLin(0))).toList //NEW
+    val undefinedVars = (Utils.getUsedVarsTHEN(eqs)++Utils.getUsedVarsELSE(eqs)) -- Utils.getDefVars(eqs) //constant vars= Used vars - continuous vars
+    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(VarNotLin(v),ValueNotLin(0))).toList //NEW  Obliging not to vary in time
 
     for (e <- eqs2)
       res += s"${e.v.v} = function('${e.v.v}')(_t_); "
@@ -156,6 +169,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     res += s"print(expand(desolve_system([${(for(i<-eqs2.indices)yield s"_de${i}_").mkString(",")}]," +
       s"[${eqs2.map(_.v.v).mkString(",")}])))"
     res += ";\"ok\""
+    //println("res:"+res)
     res
   }
 

@@ -27,38 +27,65 @@ object Eval {
 */
 
   /** Evaluation of a non-linear expression. */
-  def apply(state:Point, notlin: NotLin): Double = notlin match {
-    case VarNotLin(v) => state(v)
-    case ValueNotLin(v) => v
-    case AddNotLin(l1, l2) => apply(state,l1) + apply(state,l2)
-    case MultNotLin(l1,l2)  => apply(state,l1)  * apply(state,l2)
-    case DivNotLin(l1,l2)  => apply(state,l1) / apply(state,l2)
-    case ResNotLin(l1,l2)  => apply(state,l1) % apply(state,l2)
-    case PowNotLin(l1,l2)  => pow(apply(state,l1),apply(state,l2))
-    case FuncNotLin(s,list) => (s,list) match {
-      case ("PI",Nil) => math.Pi
-      case ("E",Nil) => math.E
-      case ("max",v1::v2::Nil) => math.max(apply(state,v1), apply(state,v2))
-      case ("min",v1::v2::Nil) => math.min(apply(state,v1), apply(state,v2))
-      case ("exp",v::Nil) => math.exp(apply(state,v))
-      case ("sin",v::Nil) => math.sin(apply(state,v))
-      case ("cos",v::Nil) => math.cos(apply(state,v))
-      case ("tan",v::Nil) => math.tan(apply(state,v))
-      case ("arcsin",v::Nil) => math.asin(apply(state,v))
-      case ("arccos",v::Nil) => math.acos(apply(state,v))
-      case ("arctan",v::Nil) => math.atan(apply(state,v))
-      case ("sinh",v::Nil) => math.sinh(apply(state,v))
-      case ("cosh",v::Nil) => math.cosh(apply(state,v))
-      case ("tanh",v::Nil) => math.tanh(apply(state,v))
-      case ("sqrt",v::Nil) => math.sqrt(apply(state,v))
-      case ("log",v::Nil) => math.log(apply(state,v))
-      case ("log10",v::Nil) => math.log10(apply(state,v))
-      case (_,_) => throw new RuntimeException(s"Unknown function '${s}(${list.mkString(",")})', or the number of arguments are incorrect")
+  def apply(state:Point, notlin: NotLin): Double = {
+    val res = notlin match {
+            case VarNotLin(v) => state(v)
+            case ValueNotLin(v) => v
+            case AddNotLin(l1, l2) => apply(state,l1) + apply(state,l2)
+            case MultNotLin(l1,l2)  => apply(state,l1)  * apply(state,l2)
+            case DivNotLin(l1,l2)  => apply(state,l1) / apply(state,l2)
+            case ResNotLin(l1,l2)  => apply(state,l1) % apply(state,l2)
+            case PowNotLin(l1,l2)  => pow(apply(state,l1),apply(state,l2))
+            case FuncNotLin(s,list) => (s,list) match {
+              case ("PI",Nil) => math.Pi
+              case ("E",Nil) => math.E
+              case ("max",v1::v2::Nil) => math.max(apply(state,v1), apply(state,v2))
+              case ("min",v1::v2::Nil) => math.min(apply(state,v1), apply(state,v2))
+              case ("exp",v::Nil) => math.exp(apply(state,v))
+              case ("sin",v::Nil) => math.sin(apply(state,v))
+              case ("cos",v::Nil) => math.cos(apply(state,v))
+              case ("tan",v::Nil) => math.tan(apply(state,v))
+              case ("arcsin",v::Nil) => math.asin(apply(state,v))
+              case ("arccos",v::Nil) => math.acos(apply(state,v))
+              case ("arctan",v::Nil) => math.atan(apply(state,v))
+              case ("sinh",v::Nil) => math.sinh(apply(state,v))
+              case ("cosh",v::Nil) => math.cosh(apply(state,v))
+              case ("tanh",v::Nil) => math.tanh(apply(state,v))
+              case ("sqrt",v::Nil) => math.sqrt(apply(state,v))
+              case ("log",v::Nil) => math.log(apply(state,v))
+              case ("log10",v::Nil) => math.log10(apply(state,v))
+              case (_,_) => throw new RuntimeException(s"Unknown function '${s}(${list.mkString(",")})', or the number of arguments are incorrect")
 
-    }
+            }
     
   }
-  
+  println(s"Eval: notlin->${notlin} to ${res}")
+  res
+}
+
+  def updateNotlin(state:Point, notlin: NotLin,vars:List[String]): NotLin = {
+    val res = notlin match {
+            case VarNotLin(v) => {if (vars.contains(v)) {VarNotLin(v)} else {ValueNotLin(state(v))} }
+            case ValueNotLin(v) => ValueNotLin(v)
+            case AddNotLin(l1, l2) => AddNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case MultNotLin(l1,l2)  => MultNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case DivNotLin(l1,l2)  => DivNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case ResNotLin(l1,l2)  => ResNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case PowNotLin(l1,l2)  => PowNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case FuncNotLin(s,list) => FuncNotLin(s,list.map(l=>updateNotlin(state,l,vars)).toList)
+
+            }
+    res
+}
+
+ // The purpose of this function is to replace the constant variables of a diff.eq. by their respective constant values 
+  def updateDiffEq(diffeq:DiffEq,point:Point,vars:List[String]):DiffEq = {
+     
+     var newNotLin= updateNotlin(point,diffeq.e,vars)
+     var newdiffeq= DiffEq(diffeq.v,newNotLin)
+     return newdiffeq
+  }
+
 
   // New
   def apply(state:Point, cond: Cond): Boolean =
@@ -218,13 +245,14 @@ object Eval {
 
   }
 
-  
 
-
+//NEWWWW
   def sFunToSVar(e: SyExprVar): SyExprVar = e match {
     case _:SVal => e
     case _:SArg => e
-    case _:SVar => e
+    case SVar(_) => e
+    case SFun("_e", List(SVal(0))) => SVar("e")
+    case SFun("_pi", List(SVal(0))) => SVar("pi")
     case SFun(f, List(SVal(0))) => SVar(f)
     case SFun(f,a) =>
       error(s"Trying to calculate the value of an expression with a function $f(${a.map(Show(_)).mkString(",")}")
