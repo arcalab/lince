@@ -105,7 +105,8 @@ object Eval {
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-  def apply(e:SyExprAll, t: Double, x: Valuation): Double = e match {
+  def apply(e:SyExprAll, t: Double, x: Valuation): Double = {
+    val res = e match {
     case SVal(v) => v
     case _:SArg => t
     case SVar("e")  if !x.contains("e")  => math.E
@@ -113,7 +114,7 @@ object Eval {
     case s:SVar if !x.contains(s.v) =>
       throw new RuntimeException(s"Evaluating $e but ${s.v} not found in [${Show(x)}].")
     case s:SVar => apply(x(s.v),t,x)
-    case SDiv(e1, e2) => apply(e1,t,x) / apply(e2,t,x)
+    case SDiv(e1, e2) => apply(e1,t,x) / apply(e2,t,x)                  
     case SRes(e1, e2) => apply(e1,t,x) % apply(e2,t,x)
     case SMult(e1, e2) =>apply(e1,t,x) * apply(e2,t,x)
     case SPow(e1, e2) => math.pow(apply(e1,t,x),apply(e2,t,x))
@@ -143,6 +144,15 @@ object Eval {
 
     }
   }
+ /*
+  {
+                          if (apply(e2,t,x)==0) {return throw new RuntimeException(s"Error: the denominator of the division '${Show.apply(e)}' is zero.")}
+                          else {return (apply(e1,t,x) / apply(e2,t,x))}
+                         }
+                         */
+  //println(s"Eval(SY): SyExprAll->${e} to ${res}")
+  res
+}
 
   // Ignore variables or time arguments 
   def apply(e:SyExprTime, t:Double): Double = apply(e,t,Map())
@@ -186,7 +196,7 @@ object Eval {
 
   def updInput(e:SyExprVar, sol:Valuation): SyExpr = updInputFun(e,sol) match {
     case t:SyExpr @unchecked => t // guaranteed to succeed (but type eliminated by erasure)
-    case v => throw new RuntimeException(s"updating variable in ${Show(e)} does nt yield an SExpr (${Show(v)}).")
+    case v => throw new RuntimeException(s"updating variable in ${Show(e)} does not yield an SExpr (${Show(v)}).")
   }
 
   def updTime(t:SyExpr, phi:SySolution): SySolutionVar =
@@ -200,7 +210,7 @@ object Eval {
 
   def updTime(newt: SyExprVar, expr: SyExprAll): SyExprVar = updTimeFun(newt, expr) match {
     case e: SyExprVar @unchecked => e  // guaranteed to succeed (but type eliminated by erasure)
-    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does nt yield an SExprV (${Show(v)}).")
+    case v => throw new RuntimeException(s"updating time in ${Show(expr)} does not yield an SExprV (${Show(v)}).")
   }
 
   def updTimeFun(newt: SyExprAll, expr:SyExprAll): SyExprAll = expr match {
