@@ -21,7 +21,18 @@ object Parser2 {
     * @param c string representing a program
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parse(c: String): Either[String,Syntax] = pp(prog,c)
+  def parset(c: String): Either[String,Syntax] =
+    pp(prog,c)
+    //pp(notlinP.map(x=>Atomic(Nil,DiffEqs(Nil,For(x)))),c)
+
+  def parse(c:String) = {
+    println(s"== parsing $c ==")
+    val v = System.currentTimeMillis
+    val res = parset(c)
+    println("-- measuring time --")
+    println(s"-- ${System.currentTimeMillis - v} --")
+    res
+  }
 
   /**
     * Main function that parses a string into a Condition.
@@ -145,7 +156,7 @@ object Parser2 {
       char('(') *> linRec.surroundedBy(sps) <* char(')') |
       (char('-') ~ litRec).map(x => MultNotLin(ValueNotLin(-1), x._2)) |
       realP.map(ValueNotLin.apply) |
-      varName.map(VarNotLin.apply)
+      varName.map(s => VarNotLin("_"+s))
     })
 
     def multnotlin: P[(NotLin, NotLin) => NotLin] =
@@ -269,14 +280,22 @@ object Parser2 {
         char('{') *> commRec.surroundedBy(sps) <* char('}') |
           basicRec
 
-      skip | waitc | ite | whilec | repeat | assign.backtrack | diffEqsP
+      skip | waitc | ite | whilec | repeat | assign.backtrack  | diffEqsP
+//      skip | waitc | assign
 //      skip | waitc | ite | whilec | repeat | assign
     })
 
-    def seqOp =
-      char(';').as((x:Syntax,y:Syntax)=>x ~ y)
+//    def seqOp =
+//      char(';').as((x:Syntax,y:Syntax)=>x ~ y)
+//    listSep(basicCommand, seqOp)
 
-    listSep(basicCommand, seqOp)
+    basicCommand.repSep(sps).map(x => x.toList match {
+      case List(bc) => bc
+      case hd :: tl => tl.foldLeft(hd)(_ ~ _)
+      case Nil => skipComm // unreachable
+    })
+
+
 //    (basicCommand ~ ((sps~char(';')~sps) *> basicCommand).?)
 //      .map(x => x._2 match {
 //        case None => x._1
@@ -286,15 +305,15 @@ object Parser2 {
 
   val skipComm: Syntax = Atomic(Nil, DiffEqs(Nil, For(ValueNotLin(0))))
   def skip: P[Syntax] =
-    string("skip").as(skipComm)
+    (string("skip")<*(sps~char(';'))).as(skipComm)
   def waitc: P[Syntax] =
-    (string("wait")~sps *> notlinP).map(l => Atomic(Nil,DiffEqs(Nil,For(l))))
+    (string("wait")~sps *> notlinP <* (sps~char(';'))).map(l => Atomic(Nil,DiffEqs(Nil,For(l))))
   def assign: P[Syntax] = //: P[Assign] =
-    (varName ~ string(":=").surroundedBy(sps) ~ notlinP)
-      .map(x => Atomic(List(Assign(VarNotLin(x._1._1), x._2)),DiffEqs(Nil,For(ValueNotLin(0)))))
+    (varName ~ string(":=").surroundedBy(sps) ~ notlinP <* (sps~char(';')))
+      .map(x => Atomic(List(Assign(VarNotLin("_"+x._1._1), x._2)),DiffEqs(Nil,For(ValueNotLin(0)))))
 
   def diffEqsP: P[Syntax] =
-    (diffEqsCoreP ~ sps ~ durP.?)
+    (diffEqsCoreP ~ sps ~ durP.? <* (sps~char(';')))
       .map(x => Atomic(Nil, x._1._1 & x._2.getOrElse(Forever)))
 
   def diffEqsCoreP: P[DiffEqs] =
@@ -304,7 +323,7 @@ object Parser2 {
 
   def diffEqP: P[DiffEq] =
     (varName ~ char('\'') ~ char('=').surroundedBy(sps) ~ notlinP) //New
-      .map(x => VarNotLin(x._1._1._1) ^= x._2) //New
+      .map(x => VarNotLin("_"+x._1._1._1) ^= x._2) //New
 //
 //
 //  ////// auxiliary ////

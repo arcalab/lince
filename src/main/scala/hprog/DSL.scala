@@ -43,6 +43,20 @@ object DSL {
   }
 
   /**
+    * Parses a string into a program, using an alternative parsing library.
+    * Unfortunately it has some issues, that makes it too slow.
+    *
+    * @param s string representing a program
+    * @return parsed program
+    */
+  def parse2(s: String): Syntax = {
+    Parser2.parse(s) match {
+      case Right(result) => result
+      case Left(err) => throw new ParserException(err)
+    }
+  }
+
+  /**
     * Parses a string into an expression.
     * @param s string representing an expression
     * @return parsed expression

@@ -177,9 +177,9 @@ def updateSyntax(prog:NotLin,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs
  prog match {
   case VarNotLin(v)=> {
     if (control==1) {
-        println("iteration:",iteration)
-        println("varsDifEqs:",varsDifEqs)
-        println("varsDifEqs(iteration-1).contains(v):",varsDifEqs(iteration-1).contains(v))
+//        println("iteration:",iteration)
+//        println("varsDifEqs:",varsDifEqs)
+//        println("varsDifEqs(iteration-1).contains(v):",varsDifEqs(iteration-1).contains(v))
         if (varsDifEqs(iteration-1).contains(v)) {
             return (VarNotLin(v),varsDcl,iteration)
         } else {
@@ -235,7 +235,7 @@ def updateSyntax(prog:Assign,varsDcl:Map[String,NotLin],iteration:Int,varsDifEqs
     //println("old:",varsDcl)
     var aux=updateSyntax(e,varsDcl,iteration,varsDifEqs,0)
     var newvarsDcl=aux._2+(v.v->aux._1)
-    println("new:",newvarsDcl)
+//    println("new:",newvarsDcl)
     return (Assign(v,aux._1),newvarsDcl,iteration)
   }
 }

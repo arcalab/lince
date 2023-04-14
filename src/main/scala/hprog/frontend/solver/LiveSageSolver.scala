@@ -135,13 +135,13 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   /// 
   def askSage(eqs: List[DiffEq]): Option[String] = {
     val instructions = genSage(eqs) // cria uma string das equações diferenciais para enviar para o Sage (ex: _t_=var('_t_'), function('...'))
-    println("eqs_withoutShow:",eqs)
-    println("eqs:",Show(eqs))
-    println("genSage:",instructions)
+//    println("eqs_withoutShow:",eqs)
+//    println("eqs:",Show(eqs))
+//    println("genSage:",instructions)
     //debug(()=>s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
    // println("olaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-    println("askSage:",rep)
+//    println("askSage:",rep)
    // println("rep.get.contains(g1634):",rep.get.contains("g1634"))
     if (rep.get.contains("g1634")) {
      // println("FIND ERROR")

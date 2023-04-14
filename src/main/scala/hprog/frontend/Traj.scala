@@ -329,9 +329,9 @@ object Traj {
     var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,valToPoint,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
     var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
     
-    println("AQUIIIIIIII")
+//    println("AQUIIIIIIII")
     val phi = solver.solveSymb(updateAtomic.de.eqs) // try to solve sybmolically
-    println("phi:",phi)
+//    println("phi:",phi)
     val phiBkp:Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
@@ -435,7 +435,7 @@ object Traj {
     var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,valToPoint,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
     var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
   
-    println("AQUIIIIIIII")
+//    println("AQUIIIIIIII")
     val phi = solver.solveSymb(updateAtomic.de.eqs) 
     //val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
     val phiBkp: Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
