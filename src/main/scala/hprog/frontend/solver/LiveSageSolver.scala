@@ -229,7 +229,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       askSage(expr) match {
         case Some(reply) => importExpr(expr,reply)
         case None =>
-          throw new TimeoutException(s"Timed out while reducing ${
+          throw new TimeoutException(s"There are expressions, coming from the differential equations calculated by Sage, which are too large to be simplified by it, causing timeout error.\n\nExpression in question: ${
             Show(expr)}.")
       }
     }
@@ -239,9 +239,8 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       askSage(cond,valua) match {
         case Some(reply) => importBool(cond, valua, reply)
         case None =>
-          throw new TimeoutException(s"Timed out while solving condition ${
-            Show(cond,valua)
-          }.")
+          throw new TimeoutException(s"Conditional structure with expressions too large to be simplified by Sage, causing timeout error.\n\nThe conditional structure referred to is: ${
+        Show(cond,valua)}.")
       }
     }
   }

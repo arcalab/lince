@@ -140,9 +140,9 @@ def apply(notlin: NotLin, vl: Valuation): String = notlin match {
 
     case MultNotLin(l1, l2) => s"${apply_paranteses(l1,vl)}*${apply_paranteses(l2,vl)}"
 
-    case DivNotLin(l1, l2) => s"${apply_paranteses(l1,vl)}/${apply_paranteses(l2,vl)}"
+    case DivNotLin(l1, l2) => s"${apply_paranteses(l1,vl)}/(${apply_paranteses(l2,vl)})"
     
-    case ResNotLin(l1, l2) => s"${apply_paranteses(l1,vl)}%${apply_paranteses(l2,vl)}"
+    case ResNotLin(l1, l2) => s"${apply_paranteses(l1,vl)}%(${apply_paranteses(l2,vl)})"
 
     case PowNotLin(l1,l2)=> s"pow(${apply_paranteses(l1,vl)},${apply_paranteses(l2,vl)})"
     
