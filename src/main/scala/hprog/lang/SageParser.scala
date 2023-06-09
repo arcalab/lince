@@ -87,10 +87,11 @@ object SageParser extends RegexParsers {
 
 
   lazy val prod: Parser[SyExprAll] =
-    expn ~ opt(("*"~prod)|("/"~prod)) ^^ {
+    expn ~ opt((("*"~prod)|("/"~prod))|("%"~prod)) ^^ {
       case e ~ None => e
       case e1 ~ Some("*"~e2) => SMult(e1,e2)
       case e1 ~ Some("/"~e2) => SDiv(e1,e2)
+      case e1 ~ Some("%"~e2) => SRes(e1,e2)
       case _ ~ Some(s~_) => throw new ParserException(s"Unknown operator $s")
     }
 

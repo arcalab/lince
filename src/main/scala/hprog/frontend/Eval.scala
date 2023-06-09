@@ -4,7 +4,7 @@ import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime, SyExprVar}
 import hprog.ast._
 import Syntax._
 import hprog.backend.Show
-import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, Valuation, Solution}
+import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, Valuation, Solution,ValuationNotLin}
 import hprog.frontend.solver.Solver
 import scala.math._
 import scala.sys.error
@@ -29,59 +29,78 @@ object Eval {
   /** Evaluation of a non-linear expression. */
   def apply(state:Point, notlin: NotLin): Double = {
     val res = notlin match {
-            case VarNotLin(v) => state(v)
-            case ValueNotLin(v) => v
-            case AddNotLin(l1, l2) => apply(state,l1) + apply(state,l2)
-            case MultNotLin(l1,l2)  => apply(state,l1)  * apply(state,l2)
-            case DivNotLin(l1,l2)  => apply(state,l1) / apply(state,l2)
-            case ResNotLin(l1,l2)  => apply(state,l1) % apply(state,l2)
-            case PowNotLin(l1,l2)  => pow(apply(state,l1),apply(state,l2))
-            case FuncNotLin(s,list) => (s,list) match {
+            case Var(v) => state(v)
+            case Value(v) => v
+            case Add(l1, l2) => apply(state,l1) + apply(state,l2)
+            case Mult(l1,l2)  => apply(state,l1)  * apply(state,l2)
+            case Div(l1,l2)  => {if (apply(state,l2)==0) {return throw new RuntimeException(s"Error: the divisor of the division '${Show.applyV(notlin)}' is zero.")}
+                                 else {return (apply(state,l1) / apply(state,l2))}
+                                }
+            case Res(l1,l2)  => {if (apply(state,l2)==0) {return throw new RuntimeException(s"Error: the divisor of the remainder '${Show.applyV(notlin)}' is zero.")}
+                                 else {return (apply(state,l1) % apply(state,l2))}
+                                }
+            //case Pow(l1,l2)  => pow(apply(state,l1),apply(state,l2))
+            case Func(s,list) => (s,list) match {
               case ("PI",Nil) => math.Pi
               case ("E",Nil) => math.E
               case ("max",v1::v2::Nil) => math.max(apply(state,v1), apply(state,v2))
               case ("min",v1::v2::Nil) => math.min(apply(state,v1), apply(state,v2))
+              case ("pow",v1::v2::Nil) => pow(apply(state,v1),apply(state,v2))
               case ("exp",v::Nil) => math.exp(apply(state,v))
               case ("sin",v::Nil) => math.sin(apply(state,v))
               case ("cos",v::Nil) => math.cos(apply(state,v))
               case ("tan",v::Nil) => math.tan(apply(state,v))
-              case ("arcsin",v::Nil) => math.asin(apply(state,v))
-              case ("arccos",v::Nil) => math.acos(apply(state,v))
+              case ("arcsin",v::Nil) => {
+                if ((math.asin(apply(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arcsin (-1<=x<=1).")
+                else math.asin(apply(state,v))
+              }
+              case ("arccos",v::Nil) => {
+                if ((math.acos(apply(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arccos (-1<=x<=1).")
+                else math.acos(apply(state,v))
+              }
               case ("arctan",v::Nil) => math.atan(apply(state,v))
               case ("sinh",v::Nil) => math.sinh(apply(state,v))
               case ("cosh",v::Nil) => math.cosh(apply(state,v))
               case ("tanh",v::Nil) => math.tanh(apply(state,v))
-              case ("sqrt",v::Nil) => math.sqrt(apply(state,v))
-              case ("log",v::Nil) => math.log(apply(state,v))
-              case ("log10",v::Nil) => math.log10(apply(state,v))
-              case (_,_) => throw new RuntimeException(s"Unknown function '${s}(${list.mkString(",")})', or the number of arguments are incorrect")
+              case ("sqrt",v::Nil) => {
+                if ((math.sqrt(apply(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of sqrt (x>=0).")
+                else math.sqrt(apply(state,v))
+              }
+              case ("log",v::Nil) =>  {
+                if (apply(state,v)<=0) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log (x>0).")
+                else math.log(apply(state,v))
+              }
+              case ("log10",v::Nil) =>  {
+                if (apply(state,v)<=0) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log10 (x>0).")
+                else math.log10(apply(state,v))
+              }
+               case (_,_) => throw new RuntimeException(s"Unknown function '${s}(${(list.map(Show.applyV).toList).mkString(",")})', or the number of arguments are incorrect")
 
             }
-    
-  }
-  println(s"Eval: notlin->${notlin} to ${res}")
+    }
+  //println(s"Eval: notlin->${notlin} to ${res}")
   res
 }
 
-  def updateNotlin(state:Point, notlin: NotLin,vars:List[String]): NotLin = {
+  def updateNotlin(state:ValuationNotLin, notlin: NotLin,vars:List[String]): NotLin = {
     val res = notlin match {
-            case VarNotLin(v) => {if (vars.contains(v)) {VarNotLin(v)} else {ValueNotLin(state(v))} }
-            case ValueNotLin(v) => ValueNotLin(v)
-            case AddNotLin(l1, l2) => AddNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case MultNotLin(l1,l2)  => MultNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case DivNotLin(l1,l2)  => DivNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case ResNotLin(l1,l2)  => ResNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case PowNotLin(l1,l2)  => PowNotLin(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case FuncNotLin(s,list) => FuncNotLin(s,list.map(l=>updateNotlin(state,l,vars)).toList)
+            case Var(v) => {if (vars.contains(v)) {Var(v)} else {state(v)}}
+            case Value(v) => Value(v)
+            case Add(l1, l2) => Add(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case Mult(l1,l2)  => Mult(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case Div(l1,l2)  => Div(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case Res(l1,l2)  => Res(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+           // case Pow(l1,l2)  => Pow(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case Func(s,list) => Func(s,list.map(l=>updateNotlin(state,l,vars)).toList)
 
             }
     res
 }
 
  // The purpose of this function is to replace the constant variables of a diff.eq. by their respective constant values 
-  def updateDiffEq(diffeq:DiffEq,point:Point,vars:List[String]):DiffEq = {
+  def updateDiffEq(diffeq:DiffEq,v:ValuationNotLin,vars:List[String]):DiffEq = {
      
-     var newNotLin= updateNotlin(point,diffeq.e,vars)
+     var newNotLin= updateNotlin(v,diffeq.e,vars)
      var newdiffeq= DiffEq(diffeq.v,newNotLin)
      return newdiffeq
   }
@@ -114,7 +133,7 @@ object Eval {
     case s:SVar if !x.contains(s.v) =>
       throw new RuntimeException(s"Evaluating $e but ${s.v} not found in [${Show(x)}].")
     case s:SVar => apply(x(s.v),t,x)
-    case SDiv(e1, e2) => apply(e1,t,x) / apply(e2,t,x)                  
+    case SDiv(e1, e2) =>(apply(e1,t,x) / apply(e2,t,x))                                     
     case SRes(e1, e2) => apply(e1,t,x) % apply(e2,t,x)
     case SMult(e1, e2) =>apply(e1,t,x) * apply(e2,t,x)
     case SPow(e1, e2) => math.pow(apply(e1,t,x),apply(e2,t,x))
@@ -126,6 +145,7 @@ object Eval {
       case ("E",Nil) => math.E
       case ("max",v1::v2::Nil) => math.max(apply(v1,t,x), apply(v2,t,x))
       case ("min",v1::v2::Nil) => math.min(apply(v1,t,x), apply(v2,t,x))
+      case ("pow",v1::v2::Nil) => math.pow(apply(v1,t,x), apply(v2,t,x))
       case ("exp",v::Nil) => math.exp(apply(v,t,x))
       case ("sin",v::Nil) => math.sin(apply(v,t,x))
       case ("cos",v::Nil) => math.cos(apply(v,t,x))
@@ -141,12 +161,11 @@ object Eval {
       case ("log10",v::Nil) => math.log10(apply(v,t,x))
       case (_,_) => throw new RuntimeException(
         s"Unknown function '${s.f}(${s.args.mkString(",")})',or the number of arguments are incorrect")
-
     }
   }
  /*
   {
-                          if (apply(e2,t,x)==0) {return throw new RuntimeException(s"Error: the denominator of the division '${Show.apply(e)}' is zero.")}
+                         { if (apply(e2,t,x)==0) {return throw new RuntimeException(s"Error: the denominator of the division '${Show.apply(e)}' is zero.")}
                           else {return (apply(e1,t,x) / apply(e2,t,x))}
                          }
                          */
@@ -239,19 +258,31 @@ object Eval {
   }
   */
 
-  
+
+// Convert SyExpr to NotLin
+def syExpr2notlin(l:SyExpr):NotLin= l match {
+  case SVal(v) => Value(v) 
+  //case SVar(v) => Var(v) 
+  case SFun(s,list)=> Func(s,list.map((l:SyExpr) => syExpr2notlin(l)))
+  case SDiv(e1, e2) => Div(syExpr2notlin(e1),syExpr2notlin(e2))
+  case SRes(e1, e2) => Res(syExpr2notlin(e1),syExpr2notlin(e2))
+  case SMult(e1, e2)=> Mult(syExpr2notlin(e1),syExpr2notlin(e2))
+  case SPow(e1, e2) => Func("pow",List(syExpr2notlin(e1),syExpr2notlin(e2)))
+  case SAdd(e1, e2) => Add(syExpr2notlin(e1),syExpr2notlin(e2))
+  case SSub(e1, e2) => Add(syExpr2notlin(e1),Mult(Value(-1),syExpr2notlin(e2)))
+}
 
 
  // New
   def notlin2sage(l:NotLin): SyExprVar = l match {
-    case VarNotLin(v) => SVar(v) //SFun(v,List(SVal(0))) //SVar(v)
-    case ValueNotLin(v) => SVal(v)
-    case AddNotLin(l1, l2) => SAdd(notlin2sage(l1),notlin2sage(l2))
-    case MultNotLin(l1, l2) => SMult(notlin2sage(l1),notlin2sage(l2))
-    case DivNotLin(l1, l2) => SDiv(notlin2sage(l1),notlin2sage(l2))
-    case PowNotLin(l1,l2) => SPow(notlin2sage(l1),notlin2sage(l2))
-    case FuncNotLin(s,list)=>SFun(s,list.map((l:NotLin) => notlin2sage(l)))
-    case ResNotLin(l1,l2) => SRes(notlin2sage(l1),notlin2sage(l2)) 
+    case Var(v) => SVar(v) //SFun(v,List(SVal(0))) //SVar(v)
+    case Value(v) => SVal(v)
+    case Add(l1, l2) => SAdd(notlin2sage(l1),notlin2sage(l2))
+    case Mult(l1, l2) => SMult(notlin2sage(l1),notlin2sage(l2))
+    case Div(l1, l2) => SDiv(notlin2sage(l1),notlin2sage(l2))
+    //case Pow(l1,l2) => SPow(notlin2sage(l1),notlin2sage(l2))
+    case Func(s,list)=>SFun(s,list.map((l:NotLin) => notlin2sage(l)))
+    case Res(l1,l2) => SRes(notlin2sage(l1),notlin2sage(l2)) 
 
   }
 

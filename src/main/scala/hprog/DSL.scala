@@ -15,15 +15,15 @@ import scala.language.implicitConversions
  * Created by jose on 17/07/18.
  */
 object DSL {
-  implicit def str2VarNotLin(s:String): VarNotLin = VarNotLin(s) //new
+  implicit def str2VarNotLin(s:String): Var = Var(s) //new
   implicit def bool2Cond(b:Boolean): BVal = BVal(b)
-  implicit def real2NotLin(n:Double): ValueNotLin = ValueNotLin(n)//new
-  implicit def int2NotLin(n:Int): ValueNotLin = ValueNotLin(n)//new
-  implicit def real2Dur(n:Double): Dur = For(ValueNotLin(n))
-  implicit def int2Dur(n:Int): Dur = For(ValueNotLin(n))
+  implicit def real2NotLin(n:Double): Value = Value(n)//new
+  implicit def int2NotLin(n:Int): Value = Value(n)//new
+  implicit def real2Dur(n:Double): Dur = For(Value(n))
+  implicit def int2Dur(n:Int): Dur = For(Value(n))
   implicit def cond2Dur(c:Cond): Dur = Until(c,None,None)
   implicit def dEq2dEqs(de:DiffEq): DiffEqs= DiffEqs(List(de),Forever)
-  implicit def assg2Atom(a:Assign): Atomic = Atomic(List(a),DiffEqs(Nil,For(ValueNotLin(0))))
+  implicit def assg2Atom(a:Assign): Atomic = Atomic(List(a),DiffEqs(Nil,For(Value(0))))
   implicit def dEqs2Atom(des:DiffEqs): Atomic = Atomic(Nil,des)
  
 
