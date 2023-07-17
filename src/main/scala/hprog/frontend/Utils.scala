@@ -708,6 +708,7 @@ def extractTotalVarsLinearExp(notlin:NotLin):Int = notlin match {
   case Var(v) => 1
   case Add(l1,l2) => math.max(extractTotalVarsLinearExp(l1),extractTotalVarsLinearExp(l2))
   
+<<<<<<< HEAD
   case Mult(l1,l2) =>  if (extractTotalVarsLinearExp(l1)==0){
                         if (calc_doubles(l1)==0) 0
                         else extractTotalVarsLinearExp(l2)
@@ -715,6 +716,9 @@ def extractTotalVarsLinearExp(notlin:NotLin):Int = notlin match {
                          if (calc_doubles(l2)==0) 0
                          else extractTotalVarsLinearExp(l1)
                      } else (extractTotalVarsLinearExp(l1) + extractTotalVarsLinearExp(l2))
+=======
+  case Mult(l1,l2) =>  (extractTotalVarsLinearExp(l1) + extractTotalVarsLinearExp(l2))
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
   case Div(l1,l2) => (extractTotalVarsLinearExp(l1) + 2*extractTotalVarsLinearExp(l2)) //Only linear in the dividend, in the divisor it is always non-linear 
 
   case Res(l1,l2) => (2*extractTotalVarsLinearExp(l1) + 2*extractTotalVarsLinearExp(l2)) // remainder never can be linear
@@ -730,12 +734,20 @@ def extractTotalVarsLinearExp(notlin:NotLin):Int = notlin match {
   case ("min",List(n1,n2)) => math.max(extractTotalVarsLinearExp(n1),extractTotalVarsLinearExp(n2))
   case ("pow",List(n1,n2)) => if (extractTotalVarsLinearExp(n2)==0) {
                                   if (calc_doubles(n2)==0) 0
+<<<<<<< HEAD
                                   else if (calc_doubles(n2)==1) extractTotalVarsLinearExp(n1) 
                                   else 2*extractTotalVarsLinearExp(n1)
                               } else if (extractTotalVarsLinearExp(n1)==0){
                                   if (calc_doubles(n1)==1 ) 0
                                   else 2
                               } else return 2
+=======
+                                  else {
+                                      if (calc_doubles(n2)==1) extractTotalVarsLinearExp(n1) 
+                                      else 2*extractTotalVarsLinearExp(n1)
+                                  }
+                              } else 2
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
   // Any variables found in the following functions make the expression non-linear 
   case ("exp",List(n)) => 2*extractTotalVarsLinearExp(n)
   case ("sin",List(n)) => 2*extractTotalVarsLinearExp(n)
@@ -793,6 +805,7 @@ def extractTotalVarsLinearExp(notlin:NotLin):Int = notlin match {
   case ("min",List(n1,n2)) => math.max(extractVarsLinearExp(n1,listOfVars),extractVarsLinearExp(n2,listOfVars))
   case ("pow",List(n1,n2)) => if (extractTotalVarsLinearExp(n2)==0) {
                                   if (calc_doubles(n2)==0) 0
+<<<<<<< HEAD
                                   else if (calc_doubles(n2)==1) extractVarsLinearExp(n1,listOfVars) 
                                   else 2*extractVarsLinearExp(n1,listOfVars)                                  
                               } else if (extractTotalVarsLinearExp(n1)==0){
@@ -800,6 +813,13 @@ def extractTotalVarsLinearExp(notlin:NotLin):Int = notlin match {
                                   else 2
                               } else return 2
                               
+=======
+                                  else {
+                                      if (calc_doubles(n2)==1) extractVarsLinearExp(n1,listOfVars) 
+                                      else 2*extractVarsLinearExp(n1,listOfVars)
+                                  }
+                              } else 2
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
   // Any variables found in the following functions make the expression non-linear 
   case ("exp",List(n)) => 2*extractVarsLinearExp(n,listOfVars)
   case ("sin",List(n)) => 2*extractVarsLinearExp(n,listOfVars)
@@ -828,6 +848,10 @@ def multOfPi(number: Double): Boolean = {
 def multOfPiOn2(number: Double): Boolean = {
   val eps = 1e-8 // Define a small value for tolerance
   val res = abs((number+math.Pi/2) % math.Pi) // Calculate the remainder
+<<<<<<< HEAD
+=======
+  println(res)
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
   // Check if the remainder is within the tolerance range
   return res < eps || abs(res - math.Pi) < eps
 }
@@ -872,7 +896,11 @@ def multOfPiOn2(number: Double): Boolean = {
 
 //New
 // This function verify if the linear expressions of the Eqs.Diffs are linears
+<<<<<<< HEAD
  def verifyLinearityEqsDiff(prog:Syntax):Option[DiffEq] =  {
+=======
+ def verifyLinearityEqsDiff(prog:Syntax):Option[List[DiffEq]] =  {
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
    var diffeqs=extractDifEqs(prog) //List of List of Diff.eqs
    var varsDifEqs=extractVarsDifEqs(prog) // extract de variables of the differential equations
    //println("eqs.vars:",varsDifEqs)
@@ -885,12 +913,17 @@ def multOfPiOn2(number: Double): Boolean = {
     for (eqDiff <- lsteqDiff){
      aux=extractVarsLinearExp(eqDiff.e,varsDifEqs(iteration)) // extract the number of variables in a linear expressions 
      //println("aux:"+aux)
+<<<<<<< HEAD
      if (aux > 1 ) return Some(eqDiff)
+=======
+     if (aux > 1 ) return Some(lsteqDiff)
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
      }
      iteration=iteration + 1
   }
   return None   
  }
+<<<<<<< HEAD
 
 
 
@@ -949,6 +982,8 @@ def verify_min_max(at:Atomic):Option[DiffEq]= {
 }
 
     
+=======
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
 
 ////// New /////// 
 //verify if the free varibles had already been declarated before being used.

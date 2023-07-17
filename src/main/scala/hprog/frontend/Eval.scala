@@ -54,11 +54,16 @@ def multOfPiOn2(number: Double): Boolean = {
             case Res(l1,l2)  => {if (apply(state,l2)==0) {return throw new RuntimeException(s"Error: the divisor of the remainder '${Show.applyV(notlin)}' is zero.")}
                                  else {return (apply(state,l1) % apply(state,l2))}
                                 }
+<<<<<<< HEAD
+=======
+            //case Pow(l1,l2)  => pow(apply(state,l1),apply(state,l2))
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
             case Func(s,list) => (s,list) match {
               case ("PI",Nil) => math.Pi
               case ("E",Nil) => math.E
               case ("max",v1::v2::Nil) => math.max(apply(state,v1), apply(state,v2))
               case ("min",v1::v2::Nil) => math.min(apply(state,v1), apply(state,v2))
+<<<<<<< HEAD
               case ("pow",v1::v2::Nil) => {if(apply(state,v1)==0 && apply(state,v2)<0) return throw new RuntimeException(s"Error: The power of zero is undefined for a negative exponent: '${Show.applyV(notlin)}'.")
                                            else pow(apply(state,v1),apply(state,v2))
               }
@@ -78,6 +83,13 @@ def multOfPiOn2(number: Double): Boolean = {
                                       else {return math.tan(apply(state,v))}
 
               }
+=======
+              case ("pow",v1::v2::Nil) => pow(apply(state,v1),apply(state,v2))
+              case ("exp",v::Nil) => math.exp(apply(state,v))
+              case ("sin",v::Nil) => math.sin(apply(state,v))
+              case ("cos",v::Nil) => math.cos(apply(state,v))
+              case ("tan",v::Nil) => math.tan(apply(state,v))
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
               case ("arcsin",v::Nil) => {
                 if ((math.asin(apply(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arcsin (-1<=x<=1).")
                 else math.asin(apply(state,v))
@@ -201,8 +213,13 @@ def multOfPiOn2(number: Double): Boolean = {
       case ("sqrt",v::Nil) => math.sqrt(apply(v,t,x))
       case ("log",v::Nil) => math.log(apply(v,t,x))
       case ("log10",v::Nil) => math.log10(apply(v,t,x))
+<<<<<<< HEAD
       //case (_,_) => throw new RuntimeException(s"")
       case (_,_) => throw new RuntimeException(s"Unknown function '${s.f}(${s.args.mkString(",")})',or the number of arguments are incorrect")
+=======
+      case (_,_) => throw new RuntimeException(
+        s"Unknown function '${s.f}(${s.args.mkString(",")})',or the number of arguments are incorrect")
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
     }
   }
  /*
@@ -369,6 +386,7 @@ def multOfPiOn2(number: Double): Boolean = {
   }
   */
 
+<<<<<<< HEAD
 def syExpr2notlin(l:SyExpr):NotLin= l match {
   case SVal(v) => Value(v) 
   //case SVar(v) => Var(v) 
@@ -381,6 +399,9 @@ def syExpr2notlin(l:SyExpr):NotLin= l match {
   case SSub(e1, e2) => Add(syExpr2notlin(e1),Mult(Value(-1),syExpr2notlin(e2)))
 }
 /**
+=======
+
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
 // Convert SyExpr to NotLin
 def syExpr2notlin(l:SyExpr):NotLin= l match {
   case SVal(v) => Value(v) 
@@ -393,7 +414,11 @@ def syExpr2notlin(l:SyExpr):NotLin= l match {
   case SAdd(e1, e2) => Add(syExpr2notlin(e1),syExpr2notlin(e2))
   case SSub(e1, e2) => Add(syExpr2notlin(e1),Mult(Value(-1),syExpr2notlin(e2)))
 }
+<<<<<<< HEAD
 */
+=======
+
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
 
  // New
   def notlin2sage(l:NotLin): SyExprVar = l match {

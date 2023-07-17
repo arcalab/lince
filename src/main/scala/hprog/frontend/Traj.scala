@@ -322,7 +322,11 @@ object Traj {
           case times:Times =>
             
             // Printing numerical errors          
+<<<<<<< HEAD
             (at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
+=======
+            var aux=(at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
         
             runAtomicWithTimes(times, at, d, x, Nil)
 
@@ -366,12 +370,17 @@ object Traj {
     var newNotLin:ValuationNotLin=updateValuate.view.mapValues(e=>Eval.syExpr2notlin(e)).toMap
     //println("NEWNOTLIN:",newNotLin)
     //var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
+<<<<<<< HEAD
     var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,newNotLin,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective expression
+=======
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,newNotLin,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
     var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
    // println("UPTDATEATOMIC:",updateAtomic)
     // verify linearity of the eqs.diff
     var linVerify=Utils.verifyLinearityEqsDiff(updateAtomic)
 
+<<<<<<< HEAD
     // verify if the max and min instructions have continuous variables
     var min_max_check= Utils.verify_min_max(updateAtomic)
     //println("min_max_check:",min_max_check)
@@ -380,6 +389,10 @@ object Traj {
     else if (linVerify.nonEmpty) return throw new ParserException(s"There is one differential equation that is not linear or the semantic analyser suspects that it is non-linear (try simplifying the differential equation): ${Show.apply(linVerify.get)}")
     else {
 
+=======
+    if (linVerify.nonEmpty) return throw new ParserException(s"There are differential equations that are not linear or the semantic analyser suspects that they are non-linear (try simplifying the differential equations): ${linVerify.get.map(Show.apply).mkString(", ")}")
+    else {
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
     //println("AQUIIIIIIII")
     val phi = solver.solveSymb(updateAtomic.de.eqs) // try to solve sybmolically
     //println("aquiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
@@ -492,6 +505,7 @@ object Traj {
 
    try{
     var extractVDE=Utils.extractVarsDifEqs(at) //Extracting the continuous variables from a diff.eq.
+<<<<<<< HEAD
     //println("vars_continuous:",extractVDE)
     var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x (simbolic value of each variable)
     //println("update_simb:",updateValuate)
@@ -519,6 +533,27 @@ object Traj {
     else if (linVerify.nonEmpty) return throw new ParserException(s"There is one differential equation that is not linear or the semantic analyser suspects that it is non-linear (try simplifying the differential equation): ${Show.apply(linVerify.get)}")
     else {
 
+=======
+    println("vars_continuous:",extractVDE)
+    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x (simbolic value of each variable)
+    println("update_simb:",updateValuate)
+    var newNotLin:ValuationNotLin=updateValuate.view.mapValues(e=>Eval.syExpr2notlin(e)).toMap
+    println("convertio_notlin:",newNotLin)
+    //println("NEWNOTLIN:",newNotLin)
+    //var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,newNotLin,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+    println("newEqsDiff:",newListDiffEq)
+    var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
+    println("newAtomic:",updateAtomic)
+   // println("UPTDATEATOMIC:",updateAtomic)
+    // verify linearity of the eqs.diff
+    var linVerify=Utils.verifyLinearityEqsDiff(updateAtomic)
+    println("nonlin_diffeqs_check:",linVerify)
+
+
+    if (linVerify.nonEmpty) return throw new ParserException(s"There are differential equations that are not linear or the semantic analyser suspects that they are non-linear (try simplifying the differential equations): ${linVerify.get.map(Show.apply).mkString(", ")}")
+    else {
+>>>>>>> 44bafb4c6dddf0bd489867f824528c771bea5703
     //println("AQUIIIIIIII")
     val phi = solver.solveSymb(updateAtomic.de.eqs)
     //println("aquiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
