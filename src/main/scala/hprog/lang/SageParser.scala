@@ -1,3 +1,4 @@
+
 package hprog.lang
 
 import hprog.ast.SymbolicExpr.{All, SyExprAll, SyExprTime}
@@ -86,13 +87,14 @@ object SageParser extends RegexParsers {
     }
 
 
-  lazy val prod: Parser[SyExprAll] =
-    expn ~ opt(("*"~prod)|("/"~prod)) ^^ {
-      case e ~ None => e
-      case e1 ~ Some("*"~e2) => SMult(e1,e2)
-      case e1 ~ Some("/"~e2) => SDiv(e1,e2)
-      case _ ~ Some(s~_) => throw new ParserException(s"Unknown operator $s")
-    }
+ lazy val prod: Parser[SyExprAll] =
+  expn ~ opt((("*"~prod)|("/"~prod))|("%"~prod)) ^^ {
+    case e ~ None => e
+    case e1 ~ Some("*"~e2) => SMult(e1,e2)
+    case e1 ~ Some("/"~e2) => SDiv(e1,e2)
+    case e1 ~ Some("%"~e2) => SRes(e1,e2)
+    case _ ~ Some(s~_) => throw new ParserException(s"Unknown operator $s")
+  }
 
   lazy val expn: Parser[SyExprAll] =
     opt("-") ~ "e" ~ "^" ~ lit ^^ {
@@ -120,17 +122,35 @@ object SageParser extends RegexParsers {
   lazy val float: Parser[SyExprAll] =
     """-?[0-9]+(\.([0-9]+))?(e-?([0-9]+))?""".r ^^ { s: String => SVal(s.toDouble) }
 
-  lazy val function: Parser[SyExprAll] =
-    identifier~opt("("~> eqExprs <~")") ^^ {
-      case name~Some(arg) =>
+ 
+ lazy val function: Parser[SyExprAll] =
+    "pi" ^^ {
+      case _ => SFun("PI",List()) 
+      }|
+    "e"  ^^ {
+      case _ => SFun("E",List()) 
+      }|
+    identifier~opt("("~> eqExprs <~")") ^^ { 
+      case name~Some(arg) => // variables and functions (without pi and e)
         SFun(name,arg)
       case name ~ None =>
-        SVar(name)
+        SVar(name) // pi and e
+    }|
+    identifier ~ "(" ~ ")" ^^ { //new
+      case name ~ _ ~ _ => SFun(name,List())
+    } 
+/**
+  lazy val function: Parser[SyExprAll] =
+    identifier~opt("("~> eqExprs <~")") ^^ { 
+      case name~Some(arg) => // variables and functions (without pi and e)
+        SFun(name,arg)
+      case name ~ None =>
+        SVar(name) // pi and e
     }|
     identifier ~ "(" ~ ")" ^^ { //new
       case name ~ _ ~ _ => SFun(name,List())
     }
-
+*/
   lazy val eqExprs: Parser[List[SyExprAll]] =
     eqExpr ~ opt(","~>eqExprs) ^^ {
       case e~None => List(e)

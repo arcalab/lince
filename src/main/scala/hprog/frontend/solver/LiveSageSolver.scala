@@ -135,8 +135,8 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   /// 
   def askSage(eqs: List[DiffEq]): Option[String] = {
     val instructions = genSage(eqs) // cria uma string das equações diferenciais para enviar para o Sage (ex: _t_=var('_t_'), function('...'))
-    println("eqs_withoutShow:",eqs)
-    println("eqs:",Show(eqs))
+    //println("eqs_withoutShow:",eqs)
+    //println("eqs:",Show(eqs))
     println("genSage:",instructions)
     //debug(()=>s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
@@ -159,8 +159,8 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     */
   private def genSage(eqs:List[DiffEq]): String = {
     var res = "_t_ = var('_t_'); "
-    val undefinedVars = (Utils.getUsedVarsTHEN(eqs)++Utils.getUsedVarsELSE(eqs)) -- Utils.getDefVars(eqs) //constant vars= Used vars - continuous vars
-    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(VarNotLin(v),ValueNotLin(0))).toList //NEW  Obliging not to vary in time
+    val undefinedVars = (Utils.getUsedVars(eqs)) -- Utils.getDefVars(eqs) //constant vars= Used vars - continuous vars
+    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(Var(v),Value(0))).toList //NEW  Obliging not to vary in time
 
     for (e <- eqs2)
       res += s"${e.v.v} = function('${e.v.v}')(_t_); "

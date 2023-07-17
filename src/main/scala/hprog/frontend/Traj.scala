@@ -4,9 +4,10 @@ import hprog.ast
 import hprog.ast.SymbolicExpr.{Pure, SyExpr}
 import hprog.ast._
 import Syntax._
+import hprog.common.{ParserException, TimeoutException}
 import hprog.backend.Show
 import hprog.common.TimeOutOfBoundsException
-import hprog.frontend.CommonTypes.{Point, SySolution, Valuation, Warnings, Solution}
+import hprog.frontend.CommonTypes.{Point, SySolution, Valuation, Warnings, Solution,ValuationNotLin}
 import hprog.frontend.Traj._
 import hprog.frontend.solver._
 
@@ -106,7 +107,7 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator, bounds:(Double,Int)) {
 
 
   lazy val getVars: Set[String] =
-    Utils.getFstDeclVarsTHEN(syntax) //new
+    Utils.getFstDeclVars(syntax) //new
 }
 
 
@@ -225,6 +226,9 @@ object Traj {
   private def runITE(r: RunTarget, ifS: Cond, p: Syntax, q: Syntax, x: Valuation)
                     (implicit solver: Solver, dev: Deviator, logger: Logger)
   : Run = {
+    // Printing numerical errors
+    Eval.apply(Eval.apply(x),ifS) // preprocess: checks if there are errors when evaluating Cond
+    
     val ifValue = solver.solveSymb(ifS, x)
 
     // adding warnings and notes (if bounded computations)
@@ -247,7 +251,9 @@ object Traj {
           case Counter(0) => run(r, pre, x)
           case Counter(i) => run(r,ast.Syntax.Seq(pre, While(q, Counter(i - 1), q)), x)
           // guards for traditional while loops
-          case Guard(c) =>
+          case Guard(c) =>{
+            Eval.apply(Eval.apply(x),c)  // preprocess: checks if there are errors when evaluating guard
+                
             runAtomicUntilEnd(r, preAtomic, x) match {
               case REnd(r2,x2,found2) =>
                 r2 match {
@@ -260,6 +266,8 @@ object Traj {
                 }
               case run => run
             }
+
+          }
         }
       case _ =>
         run(r, pre, x) match {
@@ -281,27 +289,52 @@ object Traj {
   : Run = {
     at.de.dur match {
       // special case: (0 duration - log 0-time event (if some valuation))
-      case For(ValueNotLin(0)) =>
+      case For(Value(0)) =>
         val delta = Utils.toValuation(at.as,x)
         val x2 = x++delta
-        if (delta.nonEmpty) logger.init(x2)
+        // Printing numerical errors
+          if (at.as.nonEmpty) {
+          Eval.apply(Eval.apply(x2),at.as(0).e) // preprocess: checks if there are errors when evaluating an assigment
+          }
+          
+        
+        if (delta.nonEmpty) {
+          //println("logger.init(x2):",logger.init(x2))
+          logger.init(x2)
+        }
         REnd(rb,x2,Nil)
       // Rule 2 or 3 with a fixed deadline
-      case For(d) =>
+      case For(d) =>{
+        // Printing numerical errors
+        Eval.apply(Eval.apply(x),d) // preprocess: checks if there are errors when evaluating an eq.diff
+        
         rb match {
           // Rule 1+2
-          case Time(time) =>
+          case Time(time) =>{
+
+            // Printing numerical errors        
+            (at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
+                    
             runAtomicWithTime(time,at,d,x,true) // set log=false if warnings are not important
+          }
 
           // variation of atomic-time rules
           case times:Times =>
+            
+            // Printing numerical errors          
+            (at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
+        
             runAtomicWithTimes(times, at, d, x, Nil)
 
           // variation of rule 3 (for time = inf, with bounded loops)
           case b:Bound =>
+            // Printing numerical errors
+            (at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
+        
+           
             runAtomicWithBounds(b,at,d,x)
         }
-
+      }
       // Rule 2 (specific case)
       case Forever =>
         RInf
@@ -309,29 +342,48 @@ object Traj {
       // Numerically estimate duration. Experimental - only works for very specific cases.
       case u:Until =>
         val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
+        // Printing numerical errors
+        Eval.apply(Eval.apply(x2),u.c)
+      
+
         val durEstimation = Solver.estimateDur(u, at.de.eqs, x2, solver) match {
           case Some((d,ws)) =>
             for (w<-ws) logger.warn(w,SVal(d))
-            For(ValueNotLin(d))
+            For(Value(d))
           case None => Forever
         }
         runAtomicUntilEnd(rb, Atomic(at.as, DiffEqs(at.de.eqs, durEstimation)), x)
     }
   }
 
-  //Calculate Atomic with time
+  //Calculate Atomic with time (used by simbolic evaluation)
   private def runAtomicWithTime(time: SyExpr, at:Atomic, dur:NotLin, x:Valuation,log:Boolean = false)
                                (implicit solver:Solver, logger: Logger): Run = {
-    
+    try{
+    //println("\n\nohhhhhhhh yeyyyyyyyyyyyyyyyyyyyyy\n\n")
     var extractVDE=Utils.extractVarsDifEqs(at) //Extracting the continuous variables from a diff.eq.
-    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x
-    var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
-    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,valToPoint,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x (simbolic value of each variable)
+    var newNotLin:ValuationNotLin=updateValuate.view.mapValues(e=>Eval.syExpr2notlin(e)).toMap
+    //println("NEWNOTLIN:",newNotLin)
+    //var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,newNotLin,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective expression
     var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
-    
-    println("AQUIIIIIIII")
+   // println("UPTDATEATOMIC:",updateAtomic)
+    // verify linearity of the eqs.diff
+    var linVerify=Utils.verifyLinearityEqsDiff(updateAtomic)
+
+    // verify if the max and min instructions have continuous variables
+    var min_max_check= Utils.verify_min_max(updateAtomic)
+    //println("min_max_check:",min_max_check)
+
+    if (min_max_check.nonEmpty) return throw new ParserException((s"It is not possible to apply the max or min instructions to expressions with continuous variables in differential equations:${Show.apply(min_max_check.get)}"))
+    else if (linVerify.nonEmpty) return throw new ParserException(s"There is one differential equation that is not linear or the semantic analyser suspects that it is non-linear (try simplifying the differential equation): ${Show.apply(linVerify.get)}")
+    else {
+
+    //println("AQUIIIIIIII")
     val phi = solver.solveSymb(updateAtomic.de.eqs) // try to solve sybmolically
-    println("phi:",phi)
+    //println("aquiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+    //println("phi:",phi)
     val phiBkp:Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
@@ -372,6 +424,15 @@ object Traj {
         REnd(Time(r2), x3, Nil)
       }
     }
+  }
+  }
+  catch {
+  case e: TimeoutException =>
+    def smaller(s:String): String =
+      if (s.size>=500) s.take(500)+"..." else s
+    throw new TimeoutException(s"At time ${logger.time}: "+smaller(e.getMessage))
+  case e: Throwable => throw e
+}
 
 
   }
@@ -424,23 +485,48 @@ object Traj {
   }
 
 
+ // Run until a determinate number of cycles or max time
   private def runAtomicWithBounds(b:Bound,at:Atomic,durLin:NotLin,x:Valuation)
                                  (implicit solver: Solver, logger: Logger): Run = {
     
 
-
+   try{
     var extractVDE=Utils.extractVarsDifEqs(at) //Extracting the continuous variables from a diff.eq.
-    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x
-    var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
-    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,valToPoint,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+    //println("vars_continuous:",extractVDE)
+    var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x (simbolic value of each variable)
+    //println("update_simb:",updateValuate)
+    var newNotLin:ValuationNotLin=updateValuate.view.mapValues(e=>Eval.syExpr2notlin(e)).toMap
+    //println("convertio_notlin:",newNotLin)
+    //println("NEWNOTLIN:",newNotLin)
+    //var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,newNotLin,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective expression
+    //println("newEqsDiff:",newListDiffEq)
     var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
-  
-    println("AQUIIIIIIII")
-    val phi = solver.solveSymb(updateAtomic.de.eqs) 
+    //println("newAtomic:",updateAtomic)
+   // println("UPTDATEATOMIC:",updateAtomic)
+
+    // verify linearity of the eqs.diff
+    var linVerify=Utils.verifyLinearityEqsDiff(updateAtomic)
+    //println("nonlin_diffeqs_check:",linVerify)
+
+
+    // verify if the max and min instructions have continuous variables
+    var min_max_check= Utils.verify_min_max(updateAtomic)
+    //println("min_max_check:",min_max_check)
+
+    
+    if (min_max_check.nonEmpty) return throw new ParserException((s"It is not possible to apply the max or min instructions to expressions with continuous variables in differential equations:${Show.apply(min_max_check.get)}"))
+    else if (linVerify.nonEmpty) return throw new ParserException(s"There is one differential equation that is not linear or the semantic analyser suspects that it is non-linear (try simplifying the differential equation): ${Show.apply(linVerify.get)}")
+    else {
+
+    //println("AQUIIIIIIII")
+    val phi = solver.solveSymb(updateAtomic.de.eqs)
+    //println("aquiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+    //println("phi:",phi)
     //val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
     val phiBkp: Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
-
+    //println("x2:",x2)
     logger.note(Show.pp(phi,x2))
 
     debug(()=>s"running $at bounded $b for $durLin on $x2.")
@@ -472,6 +558,15 @@ object Traj {
       logger.end(x3)
       REnd(Bound(b.n,newTimer),x3,Nil)
     }
+  }
+
+   } catch {
+  case e: TimeoutException =>
+    def smaller(s:String): String =
+      if (s.size>=500) s.take(500)+"..." else s
+    throw new TimeoutException(s"At time ${logger.time}: "+smaller(e.getMessage))
+  case e: Throwable => throw e
+}
 
   }
 
@@ -499,7 +594,7 @@ object Traj {
     }
   }
 
-  private val skip = Atomic(Nil, DiffEqs(Nil, For(ValueNotLin(0))))
+  private val skip = Atomic(Nil, DiffEqs(Nil, For(Value(0))))
 
   private def debug(str: () => String): Unit = {
   }
