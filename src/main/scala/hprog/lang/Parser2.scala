@@ -143,19 +143,19 @@ object Parser2 {
   def notlinP: P[NotLin] = P.recursive((linRec:P[NotLin]) => {
     def litnotlin: P[NotLin] = P.recursive((litRec:P[NotLin]) => {
       char('(') *> linRec.surroundedBy(sps) <* char(')') |
-      (char('-') ~ litRec).map(x => MultNotLin(ValueNotLin(-1), x._2)) |
-      realP.map(ValueNotLin.apply) |
-      varName.map(VarNotLin.apply)
+      (char('-') ~ litRec).map(x => Mult(Value(-1), x._2)) |
+      realP.map(Value.apply) |
+      varName.map(Var.apply)
     })
 
     def multnotlin: P[(NotLin, NotLin) => NotLin] =
       string("*").as((x:NotLin,y:NotLin) => (x,y) match {
-        case (l1,l2) => MultNotLin(l1,l2)
+        case (l1,l2) => Mult(l1,l2)
       })
 
     def plusminusnotlin: P[(NotLin, NotLin) => NotLin] =
-      string("+").as((x:NotLin,y:NotLin) => AddNotLin(x,y)) |
-      string("-").as((x:NotLin,y:NotLin) => AddNotLin(x, MultNotLin(ValueNotLin(-1), y)))
+      string("+").as((x:NotLin,y:NotLin) => Add(x,y)) |
+      string("-").as((x:NotLin,y:NotLin) => Add(x, Mult(Value(-1), y)))
 
     listSep(listSep(litnotlin, multnotlin), plusminusnotlin)
   })
@@ -284,14 +284,14 @@ object Parser2 {
 //      })
   })
 
-  val skipComm: Syntax = Atomic(Nil, DiffEqs(Nil, For(ValueNotLin(0))))
+  val skipComm: Syntax = Atomic(Nil, DiffEqs(Nil, For(Value(0))))
   def skip: P[Syntax] =
     string("skip").as(skipComm)
   def waitc: P[Syntax] =
     (string("wait")~sps *> notlinP).map(l => Atomic(Nil,DiffEqs(Nil,For(l))))
   def assign: P[Syntax] = //: P[Assign] =
     (varName ~ string(":=").surroundedBy(sps) ~ notlinP)
-      .map(x => Atomic(List(Assign(VarNotLin(x._1._1), x._2)),DiffEqs(Nil,For(ValueNotLin(0)))))
+      .map(x => Atomic(List(Assign(Var(x._1._1), x._2)),DiffEqs(Nil,For(Value(0)))))
 
   def diffEqsP: P[Syntax] =
     (diffEqsCoreP ~ sps ~ durP.?)
@@ -304,7 +304,7 @@ object Parser2 {
 
   def diffEqP: P[DiffEq] =
     (varName ~ char('\'') ~ char('=').surroundedBy(sps) ~ notlinP) //New
-      .map(x => VarNotLin(x._1._1._1) ^= x._2) //New
+      .map(x => Var(x._1._1._1) ^= x._2) //New
 //
 //
 //  ////// auxiliary ////

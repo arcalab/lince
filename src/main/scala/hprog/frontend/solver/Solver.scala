@@ -59,14 +59,14 @@ object Solver {
 
 //New
   private def getVars(e:NotLin,base:String): List[String] = e match {
-    case VarNotLin(v) => List(v)
-    case ValueNotLin(v) => List()
-    case AddNotLin(l1, l2) => getVars(l1,base) ::: getVars(l2,base)
-    case MultNotLin(l1, l2) => getVars(l1,base) ::: getVars(l2,base)
-    case DivNotLin(l1,l2) => getVars(l1,base) ::: getVars(l2,base)
-    case ResNotLin(l1,l2) => getVars(l1,base) ::: getVars(l2,base)
-    case PowNotLin(l1,l2) => getVars(l1,base) ::: getVars(l2,base)
-    case FuncNotLin(s,list) => getVarsAux(list,base)
+    case Var(v) => List(v)
+    case Value(v) => List()
+    case Add(l1, l2) => getVars(l1,base) ::: getVars(l2,base)
+    case Mult(l1, l2) => getVars(l1,base) ::: getVars(l2,base)
+    case Div(l1,l2) => getVars(l1,base) ::: getVars(l2,base)
+    case Res(l1,l2) => getVars(l1,base) ::: getVars(l2,base)
+    //case Pow(l1,l2) => getVars(l1,base) ::: getVars(l2,base)
+    case Func(s,list) => getVarsAux(list,base)
   }
 
 //new
@@ -75,32 +75,45 @@ object Solver {
     case n::List() => getVars(n,base)
     case n::ns => getVars(n,base) ::: getVarsAux(ns,base)
   }  
-  def getVars_Numerical(eqs:List[DiffEq]): List[String] =
-    eqs.flatMap(getVars_Numerical).distinct
+  def getVars_Numerical(eqs:List[DiffEq]): List[String] ={
+    //println("eqs.flatMap(getVars_Numerical).distinct:",eqs.flatMap(getVars_Numerical).distinct)
+    return eqs.flatMap(getVars_Numerical).distinct
+  }
 
-  private def getVars_Numerical(eq:DiffEq): List[String] =
-    eq.v.v :: getVars_Numerical(eq.e,eq.v.v)
+  private def getVars_Numerical(eq:DiffEq): List[String] ={
+    //println("eq.v.v :: getVars_Numerical(eq.e,eq.v.v):",eq.v.v :: getVars_Numerical(eq.e,eq.v.v))
+   return  eq.v.v :: getVars_Numerical(eq.e,eq.v.v)
+ }
 
   private def getVars_Numerical(e:NotLin,base:String): List[String] = e match {
-    case VarNotLin(v) => List(v)
-    case ValueNotLin(v) => List("_"+base)
-    case AddNotLin(l1, l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
-    case MultNotLin(l1, l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
-    case DivNotLin(l1,l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
-    case ResNotLin(l1,l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
-    case PowNotLin(l1,l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
-    case FuncNotLin(s,list) => getVarsAux_Numerical(list,base)
+    case Var(v) => List(v)
+    case Value(v) => List("_"+base)
+    case Add(l1, l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
+    case Mult(l1, l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
+    case Div(l1,l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
+    case Res(l1,l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
+    //case Pow(l1,l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
+    case Func(s,list) => getVarsAux_Numerical(list,base,s)
   }
 //new
-  def getVarsAux_Numerical(list:List[NotLin],base:String): List[String] = list match {
+  def getVarsAux_Numerical(list:List[NotLin],base:String,s:String): List[String] = {
+  var res:List[String]=List()
+  if (s=="PI" || s=="E") {
+   res = List("_"+base)
+  } else {
+  res= list match {
     case List() => List()
     case n::List() => getVars_Numerical(n,base)
-    case n::ns => getVars_Numerical(n,base) ::: getVarsAux_Numerical(ns,base)
+    case n::ns => getVars_Numerical(n,base) ::: getVarsAux_Numerical(ns,base,s)
+    }
+   }
+   return res
   }  
 
   def getMatrix(eqs:List[DiffEq]): (List[String],List[List[Double]]) = {
-    val vars = getVars_Numerical(eqs)
+    val vars = getVars_Numerical(eqs) //List[String]
     println("vars_getmatrix:",vars)
+    // rows= String->List[Double]
     val rows = eqs.map((x:DiffEq) => x.v.v -> getRow(vars,x.v.v,x.e)).toMap
     println("row_getmatrix:",rows)
     (  vars
@@ -109,6 +122,7 @@ object Solver {
 
 
   private def getRow(vars:List[String],base:String,e:NotLin): List[Double] = {
+    // m=Map[String,Double]
     val m = getRowValues(e,base)
     println("m_getrow:",m)
     println("vars.map(x => m.getOrElse[Double](x,0)):",vars.map(x => m.getOrElse[Double](x,0)))
@@ -123,17 +137,17 @@ object Solver {
 
   private def getRowValues(e:NotLin,base:String): Map[String,Double] = {
     var res:Map[String,Double]=e match {
-            case VarNotLin(v) => Map(v->1)
-            case ValueNotLin(v) => Map(("_"+base)->v) //New 
-            case AddNotLin(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
-            case MultNotLin(l1, l2) => multjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
-            case DivNotLin(l1,l2) => divjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
-            case ResNotLin(l1,l2) => resjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
-            case PowNotLin(l1,l2) => powjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
-            case FuncNotLin(s,list) => funcjoin(s,list.map((l:NotLin) => getRowValues(l,base)),base) //new
+            case Var(v) => Map(v->1)
+            case Value(v) => Map(("_"+base)->v) //New 
+            case Add(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
+            case Mult(l1, l2) => multjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
+            case Div(l1,l2) => divjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
+            case Res(l1,l2) => resjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
+            //case Pow(l1,l2) => powjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
+            case Func(s,list) => funcjoin(s,list.map((l:NotLin) => getRowValues(l,base)),base) //new
              
           }
-      println(s"getRowValues: notlin->${e} to ${res}")
+      //println(s"getRowValues: notlin->${e} to ${res}")
       res
     }
 
@@ -180,7 +194,7 @@ object Solver {
     res
   }
 
-
+/**
 //New
   private def powjoin(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
     var res = m2
@@ -190,6 +204,7 @@ object Solver {
     }
     res
   }
+  */
 
 
 //New
@@ -225,6 +240,13 @@ object Solver {
           s match {
             case ("max") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.max((list(0))(x),v) else v))
             case ("min") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.min((list(0))(x),v) else v))
+            //case ("pow") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.pow((list(0))(x),v) else v))
+            case ("pow") => {   var res = list(1)
+                                for ((k, v1) <- list(0)) list(1).get(k) match {
+                                                              case Some(v2) => val v = math.pow(v1,v2); res += k -> v
+                                                              case None => res += k->v1
+                                                                      }
+                            res}
             case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
           }  
         }
@@ -358,7 +380,7 @@ object Solver {
     */
   def solveTaylorManual(a:List[List[Double]],precision:Double = 0.0000001, maxSteps:Int=100): (List[Double],Double) => List[Double] = {
     val size = a.size // square matrix
-
+    println("size:",size)
     type Row=List[Double]
     type Matrix=List[Row]
 

@@ -196,11 +196,11 @@ class StaticSageSolver extends Solver {
   
   //NEW 
   def returnVars (eqs:List[DiffEq]): List[String] ={
-    println("eqs:",eqs)
+    //println("eqs:",eqs)
     var vars= Solver.getVars(eqs)
-    println ("Vars:",vars)
+    //println ("Vars:",vars)
     var filterVars=vars.filter(_.startsWith("_"))
-    println("filterVars:",filterVars)
+    //println("filterVars:",filterVars)
     var reducefilterVars=filterVars.toSet.toList
     return reducefilterVars
   }
@@ -218,9 +218,9 @@ class StaticSageSolver extends Solver {
   }
 
   def replyToDiffCache(vars:List[String], sageReply:String): DiffCache = {
-    println("vars:",vars)
-    println("sageReply:",sageReply)
-    println("SageParser:",SageParser.parseSol(sageReply))
+    //println("vars:",vars)
+    //println("sageReply:",sageReply)
+    //println("SageParser:",SageParser.parseSol(sageReply))
 
     if (sageReply.nonEmpty) {
       val resParsed = SageParser.parseSol(sageReply) match {
@@ -228,8 +228,8 @@ class StaticSageSolver extends Solver {
         case SageParser.Success(sol, _) if sol.keySet == Set("") =>
           vars match {
             case List(variable) => {
-              println("sol():",sol(""))
-              println(" Map(variable -> Utils.fixVars(sol())):", Map(variable -> Utils.fixVars(sol(""))))
+              //println("sol():",sol(""))
+              //println(" Map(variable -> Utils.fixVars(sol())):", Map(variable -> Utils.fixVars(sol(""))))
               Map(variable -> Utils.fixVars(sol("")))
             }
             case _ => throw new ParserException(s"Failed to parse $sageReply - " +

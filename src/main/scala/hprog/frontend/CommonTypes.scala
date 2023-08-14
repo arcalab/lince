@@ -1,4 +1,6 @@
 package hprog.frontend
+import hprog.ast._
+import Syntax._
 
 import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime, SyExprVar}
 
@@ -11,6 +13,7 @@ object CommonTypes {
 
   // symbolic level
   type Valuation      = Map[String,SyExpr] // note: SageExpr without variables nor argument
+  type ValuationNotLin= Map[String,NotLin]
   /** Maps variables to the symbolic expression (function) of its semantics */
   type SySolution     = Map[String,SyExprAll]
   type SySolutionTime = Map[String,SyExprTime]

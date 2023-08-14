@@ -135,8 +135,8 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
   /// 
   def askSage(eqs: List[DiffEq]): Option[String] = {
     val instructions = genSage(eqs) // cria uma string das equações diferenciais para enviar para o Sage (ex: _t_=var('_t_'), function('...'))
-    println("eqs_withoutShow:",eqs)
-    println("eqs:",Show(eqs))
+    //println("eqs_withoutShow:",eqs)
+    //println("eqs:",Show(eqs))
     println("genSage:",instructions)
     //debug(()=>s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
@@ -159,8 +159,8 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     */
   private def genSage(eqs:List[DiffEq]): String = {
     var res = "_t_ = var('_t_'); "
-    val undefinedVars = (Utils.getUsedVarsTHEN(eqs)++Utils.getUsedVarsELSE(eqs)) -- Utils.getDefVars(eqs) //constant vars= Used vars - continuous vars
-    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(VarNotLin(v),ValueNotLin(0))).toList //NEW  Obliging not to vary in time
+    val undefinedVars = (Utils.getUsedVars(eqs)) -- Utils.getDefVars(eqs) //constant vars= Used vars - continuous vars
+    val eqs2 = eqs ::: undefinedVars.map(v => DiffEq(Var(v),Value(0))).toList //NEW  Obliging not to vary in time
 
     for (e <- eqs2)
       res += s"${e.v.v} = function('${e.v.v}')(_t_); "
@@ -187,7 +187,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
 
   def askSage(c:Cond,vl:Valuation): Option[String] = {
     val instructions =
-      "bool(" + Show(c,vl) + "); \"ok\""
+      "bool(" + Show.apply_withbool(c,vl) + "); \"ok\""
     debug(()=>s"expression to solve: '$instructions'")
     val rep = askSage(instructions)
     debug(()=>s"reply: '$rep'")
@@ -229,7 +229,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       askSage(expr) match {
         case Some(reply) => importExpr(expr,reply)
         case None =>
-          throw new TimeoutException(s"There are expressions, coming from the differential equations calculated by Sage, which are too large to be simplified by it, causing timeout error.\n\nExpression in question: ${
+          throw new TimeoutException(s"SageMath was unable to handle the following expression:${
             Show(expr)}.")
       }
     }
@@ -239,7 +239,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       askSage(cond,valua) match {
         case Some(reply) => importBool(cond, valua, reply)
         case None =>
-          throw new TimeoutException(s"Conditional structure with expressions too large to be simplified by Sage, causing timeout error.\n\nThe conditional structure referred to is: ${
+          throw new TimeoutException(s" SageMath failed to handle the following conditional structure:${
         Show(cond,valua)}.")
       }
     }
