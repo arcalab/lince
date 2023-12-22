@@ -47,12 +47,9 @@ class SimpleSolver(windows_size:Double) extends Solver {
   type DValuation = Map[String,Double]
   override def evalFun(eqs: List[DiffEq]): Solution = {
     val vars = Solver.getVars(eqs).filter(_.startsWith("_")) // NEW
-    println("vars_SimpleSolver:",vars)
     val res= vars.map(v=> v -> ( (t:Double) => (init:Point ) =>
       runge_kutta_func(init,eqs,t,v)
       )).toMap
-
-   //print("outputttttttttttttttttttttttttttttttttttttttttttttEvalFun:",res)
     return res
   }
 
@@ -62,31 +59,27 @@ class SimpleSolver(windows_size:Double) extends Solver {
 
 def runge_kutta_func(input:DValuation , eqs:List[DiffEq],time:Double, key_V:String): Double   = {
        
- val initial_values = scala.collection.mutable.Map.empty[String, Double]
- initial_values ++= input //Map with initial values
- var h:Double=time/75 //step size
- //var h: Double=time/(4000/windows_size)
- var numSteps:Int=(time/h).toInt //number of steps until the 'time' 
- var iteration_values:scala.collection.mutable.Map[String,Double]=initial_values.clone() //Map to perform the formulation of runge-kutta 
+ val init = scala.collection.mutable.Map.empty[String, Double]
+ init ++= input //Map with initial values
+ var N:Int = 75 // number of steps until the 'time' 
+ var h:Double=time/N //step size 
+ var acum:scala.collection.mutable.Map[String,Double]=init.clone() //Map to perform the formulation of runge-kutta 
  //Map to perform the k1,k2,k3 and k4 of the formule of runge-kutta
- var list_k1:scala.collection.mutable.Map[String,Double] = initial_values.clone().map{case (key,value) => key -> 0}
- var list_k2:scala.collection.mutable.Map[String,Double] = initial_values.clone().map{case (key,value) => key -> 0}
- var list_k3:scala.collection.mutable.Map[String,Double] = initial_values.clone().map{case (key,value) => key -> 0}
- var list_k4:scala.collection.mutable.Map[String,Double] = initial_values.clone().map{case (key,value) => key -> 0}
+ var k1:scala.collection.mutable.Map[String,Double] = init.clone().map{case (key,value) => key -> 0}
+ var k2:scala.collection.mutable.Map[String,Double] = init.clone().map{case (key,value) => key -> 0}
+ var k3:scala.collection.mutable.Map[String,Double] = init.clone().map{case (key,value) => key -> 0}
+ var k4:scala.collection.mutable.Map[String,Double] = init.clone().map{case (key,value) => key -> 0}
  
     
- for (i <- 0 until numSteps){
+ for (i <- 0 until N){
   
   // Determination of k1 for all differential equations
-  //println("i:",i)
-
-
-  for ((key, value) <- iteration_values) {
+  for ((key, value) <- acum) {
   
-  iteration_values(key) = initial_values(key)
+  acum(key) = init(key)
   }
   for (deq <- eqs){
-    list_k1(deq.v.v)=h*(Eval.applyAux(iteration_values,deq.e))
+    k1(deq.v.v)=h*(Eval.applyAux(acum,deq.e))
   }
 
 
@@ -96,22 +89,22 @@ def runge_kutta_func(input:DValuation , eqs:List[DiffEq],time:Double, key_V:Stri
 
 
  // Determination of k2 for all differential equations
- for ((key, value) <- iteration_values) {
-  iteration_values(key) = initial_values(key)+list_k1(key)/2
+ for ((key, value) <- acum) {
+  acum(key) = init(key)+k1(key)/2
   }
   for (deq <- eqs){
-    list_k2(deq.v.v)=h*(Eval.applyAux(iteration_values,deq.e))
+    k2(deq.v.v)=h*(Eval.applyAux(acum,deq.e))
   }
  
 
 
 
   // Determination  k3 for all differential equations
-  for ((key, value) <- iteration_values) {
-  iteration_values(key) = initial_values(key)+list_k2(key)/2
+  for ((key, value) <- acum) {
+  acum(key) = init(key)+k2(key)/2
   }
   for (deq <- eqs){
-    list_k3(deq.v.v)=h*(Eval.applyAux(iteration_values,deq.e))
+    k3(deq.v.v)=h*(Eval.applyAux(acum,deq.e))
   }
 
 
@@ -123,26 +116,26 @@ def runge_kutta_func(input:DValuation , eqs:List[DiffEq],time:Double, key_V:Stri
 
 
   // Determination of k4 for all differential equations
-  for ((key, value) <- iteration_values) {
-  iteration_values(key) = initial_values(key)+list_k3(key)
+  for ((key, value) <- acum) {
+  acum(key) = init(key)+k3(key)
   }
   for (deq <- eqs){
-    list_k4(deq.v.v)=h*(Eval.applyAux(iteration_values,deq.e))
+    k4(deq.v.v)=h*(Eval.applyAux(acum,deq.e))
   }
  
 
   
-  //Update initial_values
-  for ((key, value) <- initial_values) {
-  initial_values(key) = value + (list_k1(key) + 2*list_k2(key) + 2*list_k3(key) + list_k4(key))/6
+  //Update init
+  for ((key, value) <- init) {
+  init(key) = value + (k1(key) + 2*k2(key) + 2*k3(key) + k4(key))/6
   }
  }
  
  
- //val (key,value)=initial_values.head
+ //val (key,value)=init.head
  //return store_old_values
  //return sol
- return initial_values(key_V)
+ return init(key_V)
 
    }
 

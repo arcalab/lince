@@ -376,7 +376,7 @@ object Traj {
     var min_max_check= Utils.verify_min_max(updateAtomic)
     //println("min_max_check:",min_max_check)
 
-    if (min_max_check.nonEmpty) return throw new ParserException((s"It is not possible to apply the max or min instructions to expressions with continuous variables in differential equations:${Show.apply(min_max_check.get)}"))
+    if (min_max_check.nonEmpty) return throw new ParserException((s"It is not possible to apply the max or min functions to expressions with dynamic variables in differential equations:${Show.apply(min_max_check.get)}"))
     else if (linVerify.nonEmpty) return throw new ParserException(s"There is one differential equation that is not linear or the semantic analyser suspects that it is non-linear (try simplifying the differential equation): ${Show.apply(linVerify.get)}")
     else {
 
@@ -515,7 +515,7 @@ object Traj {
     //println("min_max_check:",min_max_check)
 
     
-    if (min_max_check.nonEmpty) return throw new ParserException((s"It is not possible to apply the max or min instructions to expressions with continuous variables in differential equations:${Show.apply(min_max_check.get)}"))
+    if (min_max_check.nonEmpty) return throw new ParserException((s"It is not possible to apply the max or min functions to expressions with dynamic variables in differential equations:${Show.apply(min_max_check.get)}"))
     else if (linVerify.nonEmpty) return throw new ParserException(s"There is one differential equation that is not linear or the semantic analyser suspects that it is non-linear (try simplifying the differential equation): ${Show.apply(linVerify.get)}")
     else {
 

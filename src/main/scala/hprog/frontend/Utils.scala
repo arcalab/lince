@@ -1178,11 +1178,11 @@ def verifyUnsupFuncDur(prog:Dur):List[String]= prog match {
     
     //println("linear?:"+varsEqDiffVerify)
 
-
+    
     if (asVerify.nonEmpty) //Verify if exist free variables that not had been declareted before, if exist i print it.
-      Left(s"Initial declaration has free variables that were not declared: ${asVerify.mkString(", ")}")
+      Left(s"Initial assignments have variables on the right hand side that were not assigned: ${asVerify.mkString(", ")}")
     else if (!usedVars.forall(declVar))
-      Left(s"Variable(s) not declared: ${((usedVars-- declVar)).mkString(", ")}")
+      Left(s"Variable(s) not assigned: ${((usedVars-- declVar)).mkString(", ")}")
    // else if (!usedVarsELSE.forall(declVarELSE))
      //  Left(s"Variable(s) not declared: ${((usedVarsTHEN -- declVarTHEN)++(usedVarsELSE-- declVarELSE)).mkString(", ")}")
    // else if (unsupportedFunc.nonEmpty){
