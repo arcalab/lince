@@ -114,10 +114,8 @@ object TrajToJSV2 {
     // Build the JavaScript code to generate graph
     /////
     var js = "var colors = Plotly.d3.scale.category10();\n"
-
     val (js2, graph_name, dict_Graph) = buildTraces(traces,colorIDs, variables_List)  
 
-    println(dict_Graph.keys.toList)
     js += js2
     js += buildBoundaries(boundaries,colorIDs, variables_List, dict_Graph)
     js += buildWarnings(traj,inScope,colorIDs, dict_Graph)
@@ -164,13 +162,13 @@ object TrajToJSV2 {
     var dict_Graph: Map[Double, (String, String)] = Map()    
 
     for ((variable, values) <- traces) {
-      if (variable == variables_List(0)) {        
+      if(variable == s"""_${variables_List(0)}""") {        
         graph_name ++= variable
         val tr = values.toList.sortWith(_._1 <= _._1).flatMap(expandPoint)
         val (xt, x) = tr.unzip
         xtTmp = xt
         xTmp = x
-      } else if (variable == variables_List(1)) {
+      } else if(variable == s"""_${variables_List(1)}"""){
         val tr = values.toList.sortWith(_._1 <= _._1).flatMap(expandPoint)
         val (yt, y) = tr.unzip
         ytTmp = yt
@@ -179,8 +177,6 @@ object TrajToJSV2 {
     }
 
     dict_Graph = xtTmp.zip(xTmp.zip(yTmp)).toMap
-    //colors(${colorIDs.getOrElse(graph_name.toString, 0)})
-
 
     if (xTmp.nonEmpty && yTmp.nonEmpty) {
       js +=
@@ -188,7 +184,7 @@ object TrajToJSV2 {
           |   x: ${xTmp.mkString("[", ",", "]")},
           |   y: ${yTmp.mkString("[", ",", "]")},
           |   mode: 'lines',
-          |   line: {color: ${xtTmp.mkString("[", ",", "]")}},
+          |   line: {color: colors(${colorIDs.getOrElse(graph_name,0)})},
           |   legendgroup: 'g_${remove_variable(graph_name.toString)}',
           |   name: '${remove_variable(graph_name.toString)}'
           |};
@@ -201,7 +197,7 @@ object TrajToJSV2 {
     var js = ""
     for ((variable, values) <- boundaries) {
       val (outs,ins) = values.toList.partition(pair=>pair._1.isLeft)
-      if(variable == variables_List(0) || variable == variables_List(1)){
+      if(variable == s"""_${variables_List(0)}""" || variable == s"""_${variables_List(1)}"""){
         js += mkMarkers(variable,"out",outs,
           s"""{color: 'rgb(255, 255, 255)',
             | size: 10,
