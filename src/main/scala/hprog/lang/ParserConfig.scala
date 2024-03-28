@@ -28,7 +28,7 @@ object ParserConfig extends RegexParsers {
 
   override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
   val variable: Parser[String] = """"[a-zA-Z][a-zA-Z0-9_]*"""".r
-  
+
   /** Parser for a real number */
   lazy val realP: Parser[Double] =
     """-?[0-9]+(\.([0-9]+))?""".r ^^ { s: String => s.toDouble }
@@ -36,23 +36,29 @@ object ParserConfig extends RegexParsers {
   /** Parser for an integer number */
   lazy val intP: Parser[Int] =
     """[0-9]+""".r ^^ { s: String => s.toInt }
- 
+
   // Parser for a program that checks if the program is closed before returning
   lazy val config: Parser[SyntaxConfig] =
-    opt(axisList) ~ opt(maxTime) ~ opt(maxIterations) ^^ {
-      case Some(axis) ~ Some(mt) ~ Some(mi) => SyntaxConfig(axis, mt, mi)
-      case Some(axis) ~ Some(mt) ~ None => SyntaxConfig(axis, mt, Value(100.0))
-      case Some(axis) ~ None ~ Some(mi) => SyntaxConfig(axis, Value(20.0), mi)
-      case Some(axis) ~ None ~ None => SyntaxConfig(axis, Value(20.0), Value(100.0))
-      case None ~ Some(mt) ~ Some(mi) => SyntaxConfig(AxisList(List()), mt, mi)
-      case None ~ Some(mt) ~ None => SyntaxConfig(AxisList(List()), mt, Value(100.0))
-      case None ~ None ~ Some(mi) => SyntaxConfig(AxisList(List()), Value(20.0), mi)
-      case None ~ None ~ None => SyntaxConfig(AxisList(List()), Value(20.0), Value(100.0))
+    rep(axis | maxTime | maxIterations) ^^ { results =>
+      var axisListOpt: Option[AxisList] = None
+      var maxTimeOpt: Option[Value] = None
+      var maxIterationsOpt: Option[Value] = None
+
+      results.foreach {
+        case axisList @ AxisList(vars) => axisListOpt = Some(axisList)
+        case v: Value if maxTimeOpt.isEmpty => maxTimeOpt = Some(v)
+        case v: Value if maxIterationsOpt.isEmpty => maxIterationsOpt = Some(v)
+        case _ => throw new ParserException("Invalid configuration format")
+      }
+
+      SyntaxConfig(axisListOpt.getOrElse(AxisList(List())),
+                   maxTimeOpt.getOrElse(Value(20.0)),
+                   maxIterationsOpt.getOrElse(Value(100.0)))
     }
 
   // Parser for axis variables list
-  lazy val axisList: Parser[AxisList] =
-    "Axis Variables:[" ~> repsep(variable, ",") <~ "]" ^^ { vars =>
+  lazy val axis: Parser[AxisList] =
+    "Axis:[" ~> repsep(variable, ",") <~ "]" ^^ { vars =>
       if (vars.length < 2)
         throw new ParserException("At least two variables are required in axis declaration")
       else
@@ -67,4 +73,3 @@ object ParserConfig extends RegexParsers {
   lazy val maxIterations: Parser[Value] =
     "maxIterations:" ~> intP ^^ { s => Value(s) }
 }
-
