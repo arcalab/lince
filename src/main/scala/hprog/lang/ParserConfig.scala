@@ -39,15 +39,23 @@ object ParserConfig extends RegexParsers {
 
   // Parser for a program that checks if the program is closed before returning
   lazy val config: Parser[SyntaxConfig] =
-    rep(axis | maxTime | maxIterations) ^^ { results =>
+    repsep(axis | maxTime | maxIterations, ",") ^^ { results =>
       var axisListOpt: Option[AxisList] = None
       var maxTimeOpt: Option[Value] = None
       var maxIterationsOpt: Option[Value] = None
 
       results.foreach {
-        case axisList @ AxisList(vars) => axisListOpt = Some(axisList)
-        case v: Value if maxTimeOpt.isEmpty => maxTimeOpt = Some(v)
-        case v: Value if maxIterationsOpt.isEmpty => maxIterationsOpt = Some(v)
+        case axisList @ AxisList(vars) => 
+          if (axisListOpt.isDefined) 
+            throw new ParserException("Duplicate AxisList declaration")
+          axisListOpt = Some(axisList)
+          
+        case v: Value => 
+          if (maxTimeOpt.isDefined && maxIterationsOpt.isDefined) 
+            throw new ParserException("Duplicate Value declaration")
+          if (maxTimeOpt.isEmpty) maxTimeOpt = Some(v)
+          else maxIterationsOpt = Some(v)
+          
         case _ => throw new ParserException("Invalid configuration format")
       }
 
