@@ -114,20 +114,16 @@ object TrajToJSV2 {
     // Build the JavaScript code to generate graph
     /////
     var js = "var colors = Plotly.d3.scale.category10();\n"
-    val (js2, graph_name, dict_Graph) = buildTraces(traces,colorIDs, variables_List)  
+
+    var varList = if (variables_List.isEmpty) traces.keys.toList.take(2) else variables_List
+
+    val (js2, graph_name, dict_Graph) = buildTraces(traces,colorIDs, varList)  
 
     js += js2
-    js += buildBoundaries(boundaries,colorIDs, variables_List, dict_Graph)
+    js += buildBoundaries(boundaries,colorIDs, varList, dict_Graph)
     js += buildWarnings(traj,inScope,colorIDs, dict_Graph)
 
-
-    //val traceNames = traces.keys.map("t_"+_).toList //++
-                     //boundaries.keys.map("b_out_"+_).toList ++
-                     //boundaries.keys.map("b_in_"+_).toList ++
-                     //boundaries.keys.map("w_"+_).toList
-    
-    //val traceNames = List("t_"+graph_name) ++ boundaries.keys.map("b_out_"+_).toList ++ boundaries.keys.map("b_in_"+_).toList ++ boundaries.keys.map("w_"+_).toList
-    val traceNames = List("t_" + graph_name) ++   boundaries.keys.filter(variables_List.contains).flatMap 
+    val traceNames = List("t_" + graph_name) ++   boundaries.keys.filter(varList.contains).flatMap 
                       { key => List("b_out_" + key, "b_in_" + key, "w_" + key)}.toList
 
     js += s"var data = ${traceNames.mkString("[",",","]")};" +
@@ -148,77 +144,98 @@ object TrajToJSV2 {
   *
   * @param traces         Map containing traces for different variables.
   * @param colorIDs       Map associating variable names with color IDs.
-  * @param variables_List List of variable names to consider.
+  * @param varList List of variable names to consider.
   * @return               A tuple containing the JavaScript blocks, graph name, and dictionary of graph values.
   */
 
-  private def buildTraces(traces: Traces, colorIDs: Map[String, Int], variables_List: List[String]): (String, String, Map[Double, (String, String)])  = {
+  private def buildTraces(traces: Traces, colorIDs: Map[String, Int], varList: List[String]): (String, String, Map[Double, (String, String)])  = {
     var js = ""    
-    var graph_name = ""
-    var xtTmp: List[Double] = List.empty
-    var xTmp: List[String] = List.empty
-    var ytTmp: List[Double] = List.empty
-    var yTmp: List[String] = List.empty
-    var dict_Graph: Map[Double, (String, String)] = Map()    
+    var graph_name = ""    
+    var dict_Graph: Map[Double, (String, String)] = Map()      
 
-    for ((variable, values) <- traces) {
-      if(variable == s"""_${variables_List(0)}""") {        
-        graph_name ++= variable
-        val tr = values.toList.sortWith(_._1 <= _._1).flatMap(expandPoint)
-        val (xt, x) = tr.unzip
-        xtTmp = xt
-        xTmp = x
-      } else if(variable == s"""_${variables_List(1)}"""){
-        val tr = values.toList.sortWith(_._1 <= _._1).flatMap(expandPoint)
-        val (yt, y) = tr.unzip
-        ytTmp = yt
-        yTmp = y
+    if(varList.length == 2){
+
+      var t: List[Double] = List.empty
+      var x_axis: List[String] = List.empty
+      var y_axis: List[String] = List.empty
+
+      for ((variable, values) <- traces) {
+        if(variable == varList(0)) {        
+          graph_name ++= variable
+          val (time, x) = processValues(values.toList)   
+          t = time
+          x_axis = x     
+        } 
+        else if(variable == varList(1)){
+          val (time, y) = processValues(values.toList)           
+          y_axis = y
+        }
+      }
+      dict_Graph = t.zip(x_axis.zip(y_axis)).toMap
+
+      if (x_axis.nonEmpty && y_axis.nonEmpty) {
+        js +=
+          s"""var t_${graph_name.toString} = {
+            |   x: ${x_axis.mkString("[", ",", "]")},
+            |   y: ${y_axis.mkString("[", ",", "]")},
+            |   mode: 'lines',
+            |   line: {color: colors(${colorIDs.getOrElse(graph_name,0)})},
+            |   legendgroup: 'g_${remove_variable(graph_name.toString)}',
+            |   name: '${remove_variable(graph_name.toString)}'
+            |};
+            """.stripMargin
       }
     }
-
-    dict_Graph = xtTmp.zip(xTmp.zip(yTmp)).toMap
-
-    if (xTmp.nonEmpty && yTmp.nonEmpty) {
-      js +=
-        s"""var t_${graph_name.toString} = {
-          |   x: ${xTmp.mkString("[", ",", "]")},
-          |   y: ${yTmp.mkString("[", ",", "]")},
-          |   mode: 'lines',
-          |   line: {color: colors(${colorIDs.getOrElse(graph_name,0)})},
-          |   legendgroup: 'g_${remove_variable(graph_name.toString)}',
-          |   name: '${remove_variable(graph_name.toString)}'
-          |};
-          """.stripMargin
+    else if(varList.length == 3) {
+      var t: List[Double] = List.empty
+      var x_axis: List[String] = List.empty
+      var y_axis: List[String] = List.empty
+      var z_axis: List[String] = List.empty
     }
+    
     (js, graph_name, dict_Graph)
   }
+
+  /**
+  * Processes the values of a trace to extract and separate the time values (xt) and variable values (x).
+  *
+  * @param values List of time-value pairs, where the time can be either a Double or a Double.
+  * @return       A tuple containing the list of time values (xt) and the list of variable values (x).
+  */
+  def processValues(values: List[(Double, Either[Double,(Double, Double)])]): (List[Double], List[String]) = {
+    val tr = values.sortWith(_._1 <= _._1).flatMap(expandPoint)
+    val (xt, x) = tr.unzip
+    (xt, x)
+  }
+
 
   /**
   * Constructs JavaScript blocks for boundaries based on the specified boundaries, color IDs, variable list, and dictionary of graph values.
   *
   * @param boundaries     Map containing boundaries for different variables.
   * @param colorIDs       Map associating variable names with color IDs.
-  * @param variables_List List of variable names to consider.
+  * @param varList List of variable names to consider.
   * @param dict_Graph     Dictionary that have the values of the graph.
   * @return               JavaScript blocks representing the specified boundaries.
   */
-  private def buildBoundaries(boundaries: Boundaries, colorIDs: Map[String, Int], variables_List: List[String], dict_Graph: Map[Double, (String, String)]): String = {
+  private def buildBoundaries(boundaries: Boundaries, colorIDs: Map[String, Int], varList: List[String], dict_Graph: Map[Double, (String, String)]): String = {
     var js = ""
+
     for ((variable, values) <- boundaries) {
       val (outs,ins) = values.toList.partition(pair=>pair._1.isLeft)
-      if(variable == s"""_${variables_List(0)}""" || variable == s"""_${variables_List(1)}"""){
+      if(variable == varList(0) || variable == varList(1)){
         js += mkMarkers(variable,"out",outs,
           s"""{color: 'rgb(255, 255, 255)',
             | size: 10,
             | line: {
             |   color: colors(${colorIDs.getOrElse(variable, 0)}),
-            |   width: 2}}""".stripMargin, variables_List, dict_Graph)
+            |   width: 2}}""".stripMargin, varList, dict_Graph)
         js += mkMarkers(variable,"in",ins,
           s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
             | size: 10,
             | line: {
             |   color: colors(${colorIDs.getOrElse(variable, 0)}),
-            |   width: 2}}""".stripMargin, variables_List, dict_Graph)
+            |   width: 2}}""".stripMargin, varList, dict_Graph)
       }
     }
     js
@@ -247,7 +264,6 @@ object TrajToJSV2 {
   }
 
  def remove_variable(variable:String):String = {
-  //var aux=variable.substring(0,variable.length-1)
   var aux=variable.substring(1,variable.length)
   return aux
  }
