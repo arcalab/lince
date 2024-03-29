@@ -40,29 +40,31 @@ object ParserConfig extends RegexParsers {
   // Parser for a program that checks if the program is closed before returning
   lazy val config: Parser[SyntaxConfig] =
     repsep(axis | maxTime | maxIterations, ",") ^^ { results =>
-      var axisListOpt: Option[AxisList] = None
-      var maxTimeOpt: Option[Value] = None
-      var maxIterationsOpt: Option[Value] = None
+      var axisOpt: Option[AxisList] = None
+      var maxTimeOpt: Option[MaxTime] = None
+      var maxIterationsOpt: Option[MaxIterations] = None
 
       results.foreach {
         case axisList @ AxisList(vars) => 
-          if (axisListOpt.isDefined) 
-            throw new ParserException("Duplicate AxisList declaration")
-          axisListOpt = Some(axisList)
+          if (axisOpt.isDefined) 
+            throw new ParserException("Duplicate Axis List declaration")
+          axisOpt = Some(axisList)
           
-        case v: Value => 
-          if (maxTimeOpt.isDefined && maxIterationsOpt.isDefined) 
-            throw new ParserException("Duplicate Value declaration")
-          if (maxTimeOpt.isEmpty) maxTimeOpt = Some(v)
-          else maxIterationsOpt = Some(v)
+        case v: MaxTime => 
+          if (maxTimeOpt.isDefined) 
+            throw new ParserException("Duplicate Max Time declaration")
+          maxTimeOpt = Some(v)
+        
+        case v: MaxIterations => 
+          if (maxIterationsOpt.isDefined) 
+            throw new ParserException("Duplicate max Iterations declaration")
+          maxIterationsOpt = Some(v)
           
         case _ => throw new ParserException("Invalid configuration format")
       }
 
-      SyntaxConfig(axisListOpt.getOrElse(AxisList(List())),
-                   maxTimeOpt.getOrElse(Value(20.0)),
-                   maxIterationsOpt.getOrElse(Value(100.0)))
-    }
+      SyntaxConfig(axisOpt, maxTimeOpt, maxIterationsOpt)
+    } 
 
   // Parser for axis variables list
   lazy val axis: Parser[AxisList] =
@@ -74,10 +76,11 @@ object ParserConfig extends RegexParsers {
     }
 
   // Parser for maxTime
-  lazy val maxTime: Parser[Value] =
-    "maxTime:" ~> realP ^^ { s => Value(s) }
+  lazy val maxTime: Parser[MaxTime] =
+    "maxTime:" ~> realP ^^ { s => MaxTime(s) }
 
   // Parser for maxIterations
-  lazy val maxIterations: Parser[Value] =
-    "maxIterations:" ~> intP ^^ { s => Value(s) }
+  lazy val maxIterations: Parser[MaxIterations] =
+    "maxIterations:" ~> intP ^^ { s => MaxIterations(s) }
+    
 }

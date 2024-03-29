@@ -143,13 +143,13 @@ object TrajToJSV2 {
   ///////
 
 /**
-  * Builds a JavaScript trace block based on specified traces, colorIDs, and variable list.
+  * Constructs JavaScript blocks for traces based on the specified traces, color IDs, and variable list.
+  * Also builds a dictionary to store the values of the graph.
   *
   * @param traces         Map containing traces for different variables.
   * @param colorIDs       Map associating variable names with color IDs.
   * @param variables_List List of variable names to consider.
-  * @param dict_Graph     Dictionary to store the the values of the graph
-  * @return               JavaScript block representing the specified traces.
+  * @return               A tuple containing the JavaScript blocks, graph name, and dictionary of graph values.
   */
 
   private def buildTraces(traces: Traces, colorIDs: Map[String, Int], variables_List: List[String]): (String, String, Map[Double, (String, String)])  = {
@@ -193,6 +193,15 @@ object TrajToJSV2 {
     (js, graph_name, dict_Graph)
   }
 
+  /**
+  * Constructs JavaScript blocks for boundaries based on the specified boundaries, color IDs, variable list, and dictionary of graph values.
+  *
+  * @param boundaries     Map containing boundaries for different variables.
+  * @param colorIDs       Map associating variable names with color IDs.
+  * @param variables_List List of variable names to consider.
+  * @param dict_Graph     Dictionary that have the values of the graph.
+  * @return               JavaScript blocks representing the specified boundaries.
+  */
   private def buildBoundaries(boundaries: Boundaries, colorIDs: Map[String, Int], variables_List: List[String], dict_Graph: Map[Double, (String, String)]): String = {
     var js = ""
     for ((variable, values) <- boundaries) {
@@ -215,6 +224,15 @@ object TrajToJSV2 {
     js
   }
 
+  /**
+  * Constructs JavaScript blocks for warnings based on the specified trajectory, scope, color IDs, and dictionary of graph values.
+  *
+  * @param traj         The trajectory containing warnings.
+  * @param inScope      Function to check if a value is within scope.
+  * @param colorIDs     Map associating variable names with color IDs.
+  * @param dict_Graph   Dictionary that have the values of the graph.
+  * @return             JavaScript blocks representing the specified warnings.
+  */
   private def buildWarnings(traj: Traj, inScope:Double=>Boolean, colorIDs: Map[String, Int], dict_Graph: Map[Double, (String, String)]): String = {
     var js = ""
     for (variable <- traj.getVars) {
@@ -253,6 +271,17 @@ object TrajToJSV2 {
     })
   }
 
+  /**
+  * Constructs a JavaScript block for markers based on the specified variable, direction, data, style, and dictionary of graph values.
+  *
+  * @param variable       The name of the variable.
+  * @param inout          Specifies the direction of the marker (either "in" or "out").
+  * @param data           List of data points to be plotted.
+  * @param style          Style of the marker.
+  * @param variables_List List of variable names to consider.
+  * @param dict_Graph     Dictionary the have the values of the graph.
+  * @return               JavaScript block representing the specified markers.
+  */
   private def mkMarkers(variable:String, inout:String, data:List[(Either[Double,Double],(Double,String))],style: String, variables_List: List[String], dict_Graph: Map[Double, (String, String)]): String = {
 
     var time_values = data.map(_._1.fold(x=>x,x=>x))
@@ -272,9 +301,16 @@ object TrajToJSV2 {
   
   }
 
-  
-//  marker: {color: colors(${colorID.getOrElse(variable, 0)})},
-
+  /**
+  * Constructs a JavaScript block for warnings based on the specified variable, trajectory, scope, style, and dictionary of graph values.
+  *
+  * @param variable     The name of the variable.
+  * @param traj         The trajectory containing warnings.
+  * @param inScope      Function to check if a value is within scope.
+  * @param style        Style of the warning marker.
+  * @param dict_Graph   Dictionary that have the values of the graph.
+  * @return             JavaScript block representing the specified warnings.
+  */
   private def mkWarnings(variable: String, traj: Traj
                        , inScope: Double=>Boolean
                        , style:String
