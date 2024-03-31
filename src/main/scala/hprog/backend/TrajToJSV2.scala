@@ -23,7 +23,6 @@ object TrajToJSV2 {
     // trick to avoid many sampling when already lots of boundaries exist
     val nbrSamples = 0.max(100 - traj.getInits.getOrElse(Map()).size)
 
-
     val max: Double = Eval(dur.getOrElse(SVal(10)),0)
 
     val colorIDs: Map[String,Int] =
@@ -56,9 +55,7 @@ object TrajToJSV2 {
     // checks if a time value is within the scope
     def inScope(t:Double): Boolean = t>=start && t<=end
 
-
     val sampleValues = traj.evalBatch(SVal(start),SVal(end), SDiv(SSub(SVal(end),SVal(start)),SVal(nbrSamples))) //(samples)
-
 
     for ((t,x) <- sampleValues; (variable,value) <- x)
       traces += variable -> (traces(variable) + (Eval(t)->Left(Eval(value))))
@@ -121,8 +118,11 @@ object TrajToJSV2 {
 
     var js = "var colors = Plotly.d3.scale.category10();\n"
     println(variables_List)
+
+    //If no variables are received, use the first 2
     var varList = if (variables_List.isEmpty) traces.keys.toList.take(2) else variables_List
 
+    //Build the 2D or 3D graph
     if (variables_List.length == 2){
       val (js2, g_name, dict_Graph) = buildTraces2D(traces,colorIDs, varList)
       jsOutput = js2
@@ -135,11 +135,13 @@ object TrajToJSV2 {
       dict_Graph3D = dict_Graph
       graph_name = g_name
     } 
-
     js += jsOutput
+
+    //Add the boundaries to graph
     val jsBoundaries = if (variables_List.length == 2) buildBoundaries2D(boundaries,colorIDs, varList, dict_Graph2D, graph_name) else buildBoundaries3D(boundaries,colorIDs, varList, dict_Graph3D, graph_name)
     js += jsBoundaries
 
+    //Add the warnings to graph
     val jsWarnings = if (variables_List.length == 2) buildWarnings2D(traj,inScope,colorIDs, dict_Graph2D, graph_name) else buildWarnings3D(traj,inScope,colorIDs, dict_Graph3D, graph_name)
     js += jsWarnings
 
@@ -147,7 +149,7 @@ object TrajToJSV2 {
                       { key => List("b_out_" + key, "b_in_" + key, "w_" + key)}.toList
 
     js += s"var data = ${traceNames.mkString("[",",","]")};"
-
+    
     if (variables_List.length == 2) {
       js += s"\nvar layout = {hovermode:'closest'};" 
     }
@@ -207,6 +209,7 @@ object TrajToJSV2 {
       }
     }
     dict_Graph = t.zip(x_axis.zip(y_axis)).toMap
+    // |   line: {color: colors(${colorIDs.getOrElse(graph_name,0)})},
 
     if (x_axis.nonEmpty && y_axis.nonEmpty) {
       js +=

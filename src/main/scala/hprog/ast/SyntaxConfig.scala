@@ -5,28 +5,40 @@ sealed abstract class SyntaxConfig
 
 object SyntaxConfig {
 
-  /* A config is a list of variables, a double representing the max time and a int representing max iterations */
-  case class SyntaxConfig(axis:Option[AxisList] = None, maxTime:Option[MaxTime] = None, maxIterations:Option[MaxIterations] = None) {
+  sealed trait ConfigVal
+  case class StrValue(v: String) extends ConfigVal
+  case class MaxIterationsValue(v: Double) extends ConfigVal  
+  case class MaxTimeValue(v: Double) extends ConfigVal
+  case class SeqValue(v: List[ConfigVal]) extends ConfigVal
+
+  case class SyntaxConfig(options: Map[String, ConfigVal]) {
     
-    def getAxis: AxisList = axis.getOrElse(defaultAxis)
-    def getMaxTime: MaxTime = maxTime.getOrElse(defaultMaxTime)
-    def getMaxIterations: MaxIterations = maxIterations.getOrElse(defaultMaxIterations)
+    def getAxis: AxisList = options.get("Axis").collect { 
+      case SeqValue(values) => 
+        AxisList(values.collect { 
+          case StrValue(v) => Var(v) 
+        })
+    }.getOrElse(defaultAxis)
+
+    def getMaxTime: MaxTime = options.get("MaxTimeValue").collect { 
+      case MaxTimeValue(v) => 
+        MaxTime(v)
+    }.getOrElse(defaultMaxTime)
+
+    def getMaxIterations: MaxIterations = options.get("MaxIterationsValue").collect { 
+      case MaxIterationsValue(v) => 
+        MaxIterations(v.toInt)
+    }.getOrElse(defaultMaxIterations)
     
     private val defaultAxis = AxisList(List())
     private val defaultMaxTime = MaxTime(20.0)
     private val defaultMaxIterations = MaxIterations(100)
   }
-
-  /* AxisList is a list of strings that represents an axis' variables in a Lince Program */
-  case class AxisList(v:List[Var]) 
-
-  /* Var is a string that represents a variable in a Lince Program */
-  case class Var(v:String) 
-
-  /* Value is a double that represents the max time or max iterations that a lince program can run */
-  case class MaxTime(v:Double) 
-
-  /* Value is a double that represents the max time or max iterations that a lince program can run */
-  case class MaxIterations(v:Int) 
+  
+  case class AxisList(v: List[Var]) 
+  case class Var(v: String) 
+  case class MaxTime(v: Double) 
+  case class MaxIterations(v: Int) 
 
 }
+
