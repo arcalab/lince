@@ -5,7 +5,7 @@ sealed abstract class SyntaxConfig
 
 object SyntaxConfig {
 
-  /** An atomic program is a list of variables, a int representing the max time and a int representing max iterations //COnfig */
+  /* A config is a list of variables, a double representing the max time and a int representing max iterations */
   case class SyntaxConfig(axis:Option[AxisList] = None, maxTime:Option[MaxTime] = None, maxIterations:Option[MaxIterations] = None) {
     
     def getAxis: AxisList = axis.getOrElse(defaultAxis)
