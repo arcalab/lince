@@ -164,14 +164,14 @@ object Distance {
 
 //New
   def notlin2point(notlin: NotLin): Point = notlin match {
-    case VarNotLin(v) => Map(v->1.0)
-    case ValueNotLin(v) => Map("" -> v)
-    case AddNotLin(l1, l2) => add(notlin2point(l1),notlin2point(l2))
-    case MultNotLin(l1, l2) => mul(notlin2point(l1),notlin2point(l2))
-    case DivNotLin(l1, l2) => div(notlin2point(l1),notlin2point(l2))
-    case ResNotLin(l1, l2) => res(notlin2point(l1),notlin2point(l2))
-    case PowNotLin(l1, l2) => powdef(notlin2point(l1),notlin2point(l2))
-    case FuncNotLin(s,list) => funcdef(s,list.map((l:NotLin) => notlin2point(l)))
+    case Var(v) => Map(v->1.0)
+    case Value(v) => Map("" -> v)
+    case Add(l1, l2) => add(notlin2point(l1),notlin2point(l2))
+    case Mult(l1, l2) => mul(notlin2point(l1),notlin2point(l2))
+    case Div(l1, l2) => div(notlin2point(l1),notlin2point(l2))
+    case Res(l1, l2) => res(notlin2point(l1),notlin2point(l2))
+    //case Pow(l1, l2) => powdef(notlin2point(l1),notlin2point(l2))
+    case Func(s,list) => funcdef(s,list.map((l:NotLin) => notlin2point(l)))
    
 
     }
@@ -207,10 +207,10 @@ object Distance {
   def tangente(p1:Map[String,Double]): Map[String,Double]=
     p1.map(v => v._1 -> tan(v._2))
 
-
+/**
   def powdef(p1:Map[String,Double],p2:Map[String,Double]): Map[String,Double]=
    p1 ++ (for ((x,v) <- p2) yield x -> (if (p1.contains(x))  pow(p1(x),v) else v))
-
+*/
   
   def funcdef(s:String,list:List[Point]):Point ={
     if(list.length == 0 || list.length>2){
@@ -244,6 +244,7 @@ object Distance {
         s match {
           case ("max") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.max((list(0))(x),v) else v))
           case ("min") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.min((list(0))(x),v) else v))
+          case ("pow") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  pow(list(0)(x),v) else v))
           case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
         }  
       }
@@ -299,14 +300,14 @@ object Distance {
 
   //New
   def shiftNotLin(notlin: NotLin, delta:Point): NotLin = notlin match {
-    case VarNotLin(v) => if (delta(v)!=0) AddNotLin(notlin,ValueNotLin(-delta(v))) else notlin // Porquê o menos ??
-    case ValueNotLin(_) => notlin
-    case AddNotLin(l1, l2) => AddNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
-    case MultNotLin(l1, l2) => MultNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
-    case DivNotLin(l1,l2) => DivNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
-    case ResNotLin(l1,l2) => ResNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
-    case PowNotLin(l1,l2) => PowNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
-    case FuncNotLin(s,list)=> FuncNotLin(s,list.map((l:NotLin) => shiftNotLin(l,delta)))
+    case Var(v) => if (delta(v)!=0) Add(notlin,Value(-delta(v))) else notlin // Porquê o menos ??
+    case Value(_) => notlin
+    case Add(l1, l2) => Add(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case Mult(l1, l2) => Mult(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case Div(l1,l2) => Div(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case Res(l1,l2) => Res(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    //case Pow(l1,l2) => PowNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
+    case Func(s,list)=> Func(s,list.map((l:NotLin) => shiftNotLin(l,delta)))
 
      
   }

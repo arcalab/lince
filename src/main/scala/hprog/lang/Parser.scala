@@ -44,7 +44,7 @@ object Parser extends RegexParsers {
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
-  val skip = Atomic(Nil, DiffEqs(Nil, For(ValueNotLin(0))))
+  val skip = Atomic(Nil, DiffEqs(Nil, For(Value(0))))
 
   //   ///////////////
   //   /// Program ///
@@ -54,7 +54,7 @@ object Parser extends RegexParsers {
 
 
   lazy val progP: Parser[Syntax] =
-    seqP ^^ { stx =>
+    declr ^^ { stx =>
       Utils.isClosed(stx) match {
         case Left(msg) => throw new ParserException(msg)
         case Right(_) => {
@@ -73,16 +73,16 @@ object Parser extends RegexParsers {
 
 
   // Parser to obligate program to have a atomic/s (declarations of variables) followed by instructions
-  lazy val seqP: Parser[Syntax] =
-    atomP ~ opt(nextInstructions) ^^ {
+  lazy val declr: Parser[Syntax] =
+    atomP ~ opt(seqP) ^^ {
       case a ~ Some(n) => a ~ n
       case a ~ None => a
     }
 
 
   // instructions or sequence of instructions
-  lazy val nextInstructions: Parser[Syntax] =
-    basicProg ~ opt(nextInstructions) ^^ {
+  lazy val seqP: Parser[Syntax] =
+    basicProg ~ opt(seqP) ^^ {
       case p1 ~ Some(p2) => p1 ~ p2
       case p ~ None => p
     }
@@ -91,12 +91,12 @@ object Parser extends RegexParsers {
   lazy val basicProg: Parser[Syntax] =
     "skip" ~> opt("for" ~> realP) <~ ";" ^^ {
       case None => skip
-      case Some(real) => Atomic(Nil, DiffEqs(Nil, For(ValueNotLin(real))))
+      case Some(real) => Atomic(Nil, DiffEqs(Nil, For(Value(real))))
     } |
-      "while" ~> whileGuard ~ "do" ~ "{" ~ nextInstructions ~ "}" ^^ {
+      "while" ~> whileGuard ~ "do" ~ "{" ~ seqP ~ "}" ^^ {
         case c ~ _ ~ _ ~ p ~ _ => While(skip, c, p)
       } |
-      "repeat" ~> intPP ~ "{" ~ nextInstructions ~ "}" ^^ {
+      "repeat" ~> intPP ~ "{" ~ seqP ~ "}" ^^ {
         case c ~ _ ~ p ~ _ => While(skip, Counter(c), p)
 
       } |
@@ -111,7 +111,7 @@ object Parser extends RegexParsers {
 
   /** parser of a program wrapped with curly brackets or a basic program */
   lazy val blockP: Parser[Syntax] =
-    "{" ~> nextInstructions <~ "}" |
+    "{" ~> seqP <~ "}" |
       basicProg
 
   /** Parser for the guard of a while loop (a condition of an integer) */
@@ -120,24 +120,25 @@ object Parser extends RegexParsers {
       intPP ^^ Counter
   }
 
+
   /** Parser for an atomic program: an assignment or a set of diff equations. */
   lazy val atomP: Parser[Atomic] =
     (identifier ~ ":=" ~ notlinP) <~ ";" ^^ {
-      case v ~ _ ~ l => Atomic(List(Assign(VarNotLin("_" + v), l)), DiffEqs(Nil, For(ValueNotLin(0))))
+      case v ~ _ ~ l => Atomic(List(Assign(Var("_" + v), l)), DiffEqs(Nil, For(Value(0))))
     } |
       (diffEqsP ~ opt(durP)) <~ ";" ^^ {
         case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
-      } |
+      } /**|
       durP <~ ";" ^^ {
         case d => Atomic(Nil, DiffEqs(Nil, d)) // upgrate
-      }
+      }*/
 
 
   /** Parser for  differential equations */
   lazy val diffEqsP: Parser[DiffEqs] =
     identifier ~ "'" ~ "=" ~ notlinP ~ opt("," ~> diffEqsP) ^^ {
-      case v ~ _ ~ _ ~ l ~ Some(eqs) => DiffEqs(List(VarNotLin("_" + v) ^= l), Forever) & eqs
-      case v ~ _ ~ _ ~ l ~ None => DiffEqs(List(VarNotLin("_" + v) ^= l), Forever)
+      case v ~ _ ~ _ ~ l ~ Some(eqs) => DiffEqs(List(Var("_" + v) ^= l), Forever) & eqs
+      case v ~ _ ~ _ ~ l ~ None => DiffEqs(List(Var("_" + v) ^= l), Forever)
     }
 
   /** Parser for the duration part ("until" or "for") after the differential equations */
@@ -181,14 +182,14 @@ object Parser extends RegexParsers {
 
   lazy val notlinMultP: Parser[NotLin] =
     notlinDivP ~ opt("*" ~> notlinMultP) ^^ {
-      case l1 ~ Some(l2) => MultNotLin(l1, l2)
+      case l1 ~ Some(l2) => Mult(l1, l2)
       case l1 ~ None => l1
 
     }
 
   lazy val notlinDivP: Parser[NotLin] =
     notlinResP ~ opt("/" ~> notlinDivP) ^^ {
-      case l1 ~ Some(l2) => DivNotLin(l1, l2)
+      case l1 ~ Some(l2) => Div(l1, l2)
       case l1 ~ None => l1
 
     }
@@ -196,7 +197,7 @@ object Parser extends RegexParsers {
 
   lazy val notlinResP: Parser[NotLin] =
     notlinAtP ~ opt("%" ~> notlinResP) ^^ {
-      case l1 ~ Some(l2) => ResNotLin(l1, l2)
+      case l1 ~ Some(l2) => Res(l1, l2)
       case l1 ~ None => l1
 
     }
@@ -236,29 +237,32 @@ object Parser extends RegexParsers {
 
   lazy val notlinAtP: Parser[NotLin] =
     notlinOthers ~ "^" ~ notlinOthers ^^ {
-      case l1 ~ _ ~ l2 => PowNotLin(l1, l2)
+      case l1 ~ _ ~ l2 => Func("pow",List(l1, l2))
     } |
       notlinOthers
 
 
   lazy val notlinOthers: Parser[NotLin] =
     "pi" ~ "(" ~ ")" ~ opt("^" ~> notlinOthers) ^^ {
-      case _ ~ _ ~ _ ~ None => PowNotLin(FuncNotLin("PI", List()), ValueNotLin(1)) //mitigate numetical errors
-      case _ ~ _ ~ _ ~ Some(l1) => PowNotLin(FuncNotLin("PI", List()), l1)
+      case _ ~ _ ~ _ ~ None => Func("PI", List()) //mitigate numetical errors
+      case _ ~ _ ~ _ ~ Some(l1) => Func("pow",List(Func("PI", List()), l1))
     } |
       "e" ~ "(" ~ ")" ~ opt("^" ~> notlinOthers) ^^ {
-        case _ ~ _ ~ _ ~ None => PowNotLin(FuncNotLin("E", List()), ValueNotLin(1)) //mitigate numetical errors
-        case _ ~ _ ~ _ ~ Some(l1) => FuncNotLin("exp", List(l1))
+        case _ ~ _ ~ _ ~ None =>Func("E", List()) //mitigate numetical errors
+        case _ ~ _ ~ _ ~ Some(l1) => Func("exp", List(l1))
       } |
       "pow" ~ "(" ~ notlinP ~ "," ~ notlinP ~ ")" ^^ {
-        case _ ~ _ ~ l1 ~ _ ~ l2 ~ _ => PowNotLin(l1, l2)
+        case _ ~ _ ~ l1 ~ _ ~ l2 ~ _ => Func("pow",List(l1, l2))
       } |
       realP ^^ {
-        ValueNotLin
+        Value
       } |
+       identifier ~ "("~")" ^^ {
+        case s ~ _ ~ _  => Func(s, List())
+      } |   
       identifier ~ opt("(" ~> argsFunction <~ ")") ^^ {
-        case s ~ Some(arguments) => FuncNotLin(s, arguments)
-        case s ~ _ => VarNotLin("_" + s)
+        case s ~ Some(arguments) => Func(s, arguments)
+        case s ~ _ => Var("_" + s)
       } |
       "(" ~> notlinP <~ ")" ^^ {
         case l => l
@@ -538,14 +542,14 @@ lazy val reallinMultP: Parser[Double] =
 
   /** Auxiliary: function that negates a (non linear) integer expression */
   private def invertNotLin(lin: NotLin): NotLin = lin match {
-    case VarNotLin(v) => MultNotLin(ValueNotLin(-1), VarNotLin(v))
-    case ValueNotLin(v) => ValueNotLin(-v)
-    case AddNotLin(l1, l2) => AddNotLin(invertNotLin(l1), invertNotLin(l2))
-    case MultNotLin(l1, l2) => MultNotLin(invertNotLin(l1), l2)
-    case DivNotLin(l1, l2) => DivNotLin(invertNotLin(l1), l2)
-    case ResNotLin(l1, l2) => ResNotLin(invertNotLin(l1), l2)
-    case PowNotLin(l1, l2) => MultNotLin(ValueNotLin(-1), PowNotLin(l1, l2))
-    case FuncNotLin(s, ns) => MultNotLin(ValueNotLin(-1), FuncNotLin(s, ns))
+    case Var(v) => Mult(Value(-1), Var(v))
+    case Value(v) => Value(-v)
+    case Add(l1, l2) => Add(invertNotLin(l1), invertNotLin(l2))
+    case Mult(l1, l2) => Mult(invertNotLin(l1), l2)
+    case Div(l1, l2) => Div(invertNotLin(l1), l2)
+    case Res(l1, l2) => Res(invertNotLin(l1), l2)
+    //case Pow(l1, l2) => MultNotLin(ValueNotLin(-1), PowNotLin(l1, l2))
+    case Func(s, ns) => Mult(Value(-1), Func(s, ns))
   }
 
 

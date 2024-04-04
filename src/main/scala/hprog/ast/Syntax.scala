@@ -45,7 +45,7 @@ object Syntax {
 
   
   /** An assignment is a member of the Atomic programs, between a variable and a non linear expression */
-  case class Assign(v:VarNotLin,e:NotLin) 
+  case class Assign(v:Var,e:NotLin) 
 
   case class DiffEqs(eqs:List[DiffEq],dur:Dur) {
     def &(dur:Dur): DiffEqs = DiffEqs(eqs,dur) // override dur
@@ -54,7 +54,7 @@ object Syntax {
   }
 
   // DiffEq
-  case class DiffEq(v:VarNotLin,e:NotLin)
+  case class DiffEq(v:Var,e:NotLin)
 
   // duration
   sealed abstract class Dur
@@ -69,9 +69,9 @@ object Syntax {
 
   // non linear expression
   sealed abstract class NotLin {
-    def +(other:NotLin): NotLin = AddNotLin(this,other)
+    def +(other:NotLin): NotLin = Add(this,other)
   }
-  case class VarNotLin(v:String)       extends NotLin {
+  case class Var(v:String)       extends NotLin {
     def ^=(l: NotLin): DiffEq = DiffEq(this,l) //New
     def :=(l: NotLin): Assign = Assign(this,l)
     def >(l: NotLin):  Cond = GT(this,l)
@@ -80,22 +80,42 @@ object Syntax {
     def <=(l: NotLin): Cond = LE(this,l)
     def ===(l: NotLin):Cond = EQ(this,l)
   }
-  case class ValueNotLin(v:Double)     extends NotLin { 
-    def *(l: NotLin): NotLin = MultNotLin(this,l) 
+  case class Value(v:Double)     extends NotLin { 
+    def *(l: NotLin): NotLin = Mult(this,l) 
   }
-  case class AddNotLin(l1:NotLin,l2:NotLin)  extends NotLin 
+  case class Add(l1:NotLin,l2:NotLin)  extends NotLin 
 
-  case class MultNotLin(l1:NotLin,l2:NotLin) extends NotLin 
+  case class Mult(l1:NotLin,l2:NotLin) extends NotLin 
   
-  case class DivNotLin(l1:NotLin,l2:NotLin) extends NotLin 
+  case class Div(l1:NotLin,l2:NotLin) extends NotLin 
 
-  case class ResNotLin(l1:NotLin,l2:NotLin) extends NotLin 
+  case class Res(l1:NotLin,l2:NotLin) extends NotLin
 
-  case class FuncNotLin(s:String, arg:List[NotLin]) extends NotLin
+  //case class Pow(l1:NotLin,l2:NotLin) extends NotLin  
 
-  case class PowNotLin(l1:NotLin,l2:NotLin) extends NotLin 
+  case class Func(s:String, arg:List[NotLin]) extends NotLin
 
 
+/**
+sealed abstract class Lin {
+  def +(other: Lin):Lin = Add(this,other)
+}
+case class Var(v: String)    extends Lin {
+  def :=(l: Lin): Assign = Assign(this,l)
+  def ^=(l: Lin): DiffEq = DiffEq(this,l)
+  def >(l: Lin): Cond = GT(this,l)
+  def <(l: Lin): Cond = LT(this,l)
+  def >=(l: Lin): Cond = GE(this,l)
+  def <=(l: Lin): Cond = LE(this,l)
+  def ===(l: Lin): Cond = EQ(this,l)
+}
+case class Value(v: Double)   extends Lin {
+  def *(l: Lin): Lin = Mult(this,l)
+}
+case class Add(l1: Lin,l2: Lin)    extends Lin
+
+case class Mult(v: Value,l: Lin)    extends Lin
+*/
 /*
   // linear expression
   sealed abstract class Lin {
