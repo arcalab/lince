@@ -138,10 +138,9 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
 
     //println("eqs_withoutShow:",eqs)
     //println("eqs:",Show(eqs))
-   // println("genSage:",instructions)
+    //println("genSage:",instructions)
     //debug(()=>s"solving: ${Show(eqs)}")
     val rep = askSage(instructions)
-
    // println("askSage:",rep)
    // println("rep.get.contains(g1634):",rep.get.contains("g1634"))
     if (rep.get.contains("g1634")) {
@@ -188,7 +187,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
 
   def askSage(c:Cond,vl:Valuation): Option[String] = {
     val instructions =
-      "bool(" + Show(c,vl) + "); \"ok\""
+      "bool(" + Show.apply_withbool(c,vl) + "); \"ok\""
     debug(()=>s"expression to solve: '$instructions'")
     val rep = askSage(instructions)
     debug(()=>s"reply: '$rep'")
@@ -230,7 +229,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       askSage(expr) match {
         case Some(reply) => importExpr(expr,reply)
         case None =>
-          throw new TimeoutException(s"There are expressions, coming from the differential equations calculated by Sage, which are too large to be simplified by it, causing timeout error.\n\nExpression in question: ${
+          throw new TimeoutException(s"SageMath was unable to handle the following expression:${
             Show(expr)}.")
       }
     }
@@ -240,7 +239,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       askSage(cond,valua) match {
         case Some(reply) => importBool(cond, valua, reply)
         case None =>
-          throw new TimeoutException(s"Conditional structure with expressions too large to be simplified by Sage, causing timeout error.\n\nThe conditional structure referred to is: ${
+          throw new TimeoutException(s" SageMath failed to handle the following conditional structure:${
         Show(cond,valua)}.")
       }
     }

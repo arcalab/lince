@@ -322,7 +322,7 @@ object Traj {
           case times:Times =>
             
             // Printing numerical errors          
-            var aux=(at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
+            (at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
         
             runAtomicWithTimes(times, at, d, x, Nil)
 
@@ -364,16 +364,21 @@ object Traj {
     var updateValuate= x ++ Utils.toValuation(at.as,x) // Update x (simbolic value of each variable)
     var newNotLin:ValuationNotLin=updateValuate.view.mapValues(e=>Eval.syExpr2notlin(e)).toMap
     //var valToPoint=Eval.apply(updateValuate) // Convert x to Point type
-    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,newNotLin,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective double
+    var newListDiffEq=(at.de.eqs).map(e=>Eval.updateDiffEq(e,newNotLin,extractVDE)).toList //Change the differential equations of the atomic so that the constant variables become the respective expression
     var updateAtomic:Atomic=Atomic(at.as,DiffEqs(newListDiffEq,at.de.dur)) // Create the new Atomic
     // verify linearity of the eqs.diff
     var linVerify=Utils.verifyLinearityEqsDiff(updateAtomic)
 
-    if (linVerify.nonEmpty) return throw new ParserException(s"There are differential equations that are not linear or the semantic analyser suspects that they are non-linear (try simplifying the differential equations): ${linVerify.get.map(Show.apply).mkString(", ")}")
+    // verify if the max and min instructions have continuous variables
+    var min_max_check= Utils.verify_min_max(updateAtomic)
+    //println("min_max_check:",min_max_check)
+
+    if (min_max_check.nonEmpty) return throw new ParserException((s"It is not possible to apply the max or min functions to expressions with dynamic variables in differential equations:${Show.apply(min_max_check.get)}"))
+    else if (linVerify.nonEmpty) return throw new ParserException(s"There is one differential equation that is not linear or the semantic analyser suspects that it is non-linear (try simplifying the differential equation): ${Show.apply(linVerify.get)}")
     else {
     val phi = solver.solveSymb(updateAtomic.de.eqs) // try to solve sybmolically
     //println("phi:",phi)
-    val phiBkp:Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
+    val phiBkp:Solution = if (phi.isEmpty) solver.evalFun(updateAtomic.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
 
     debug(()=>s"running $at @ ${Eval(time)} (${Show(time)}) for $dur on $x2.")
@@ -496,12 +501,18 @@ object Traj {
     // println("nonlin_diffeqs_check:",linVerify)
 
 
-    if (linVerify.nonEmpty) return throw new ParserException(s"There are differential equations that are not linear or the semantic analyser suspects that they are non-linear (try simplifying the differential equations): ${linVerify.get.map(Show.apply).mkString(", ")}")
+    // verify if the max and min instructions have continuous variables
+    var min_max_check= Utils.verify_min_max(updateAtomic)
+    //println("min_max_check:",min_max_check)
+
+    
+    if (min_max_check.nonEmpty) return throw new ParserException((s"It is not possible to apply the max or min functions to expressions with dynamic variables in differential equations:${Show.apply(min_max_check.get)}"))
+    else if (linVerify.nonEmpty) return throw new ParserException(s"There is one differential equation that is not linear or the semantic analyser suspects that it is non-linear (try simplifying the differential equation): ${Show.apply(linVerify.get)}")
     else {
     val phi = solver.solveSymb(updateAtomic.de.eqs)
     //println("phi:",phi)
     //val phi = solver.solveSymb(at.de.eqs) // try to solve sybmolically
-    val phiBkp: Solution = if (phi.isEmpty) solver.evalFun(at.de.eqs) else Map() // evaluate numerically if symbolic solver fails
+    val phiBkp: Solution = if (phi.isEmpty) solver.evalFun(updateAtomic.de.eqs) else Map() // evaluate numerically if symbolic solver fails
     val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
     //println("x2:",x2)
     logger.note(Show.pp(phi,x2))
@@ -559,15 +570,15 @@ object Traj {
             logger.warn(s"Perturbation by ${
               Distance.dist(x, p2)
             }</br>when testing ${
-              Show(ifS)
+              Show.ppBool(ifS)
             }</br>with:</br>${
-              p2.map(kv => s"${kv._1}:${kv._2}").mkString("</br>")
+              p2.map(kv => s"${kv._1.drop(1)}:${kv._2}").mkString("</br>")
             }")
           else
-            logger.warn(s"Perturbation found by any small delta</br>when testing ${Show(ifS)}.")
+            logger.warn(s"Perturbation found by any small delta</br>when testing ${Show.ppBool(ifS)}.")
         case None =>
       }
-      logger.note(s"${Show(ifS)}? $b")
+      logger.note(s"${Show.ppBool(ifS)}? $b")
     }
   }
 

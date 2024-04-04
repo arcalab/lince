@@ -111,19 +111,21 @@ object Solver {
   }  
 
   def getMatrix(eqs:List[DiffEq]): (List[String],List[List[Double]]) = {
-    val vars = getVars_Numerical(eqs)
-    //println("vars_getmatrix:",vars)
+    val vars = getVars_Numerical(eqs) //List[String]
+    println("vars_getmatrix:",vars)
+    // rows= String->List[Double]
     val rows = eqs.map((x:DiffEq) => x.v.v -> getRow(vars,x.v.v,x.e)).toMap
-    //println("row_getmatrix:",rows)
+    println("row_getmatrix:",rows)
     (  vars
       ,for (v<-vars) yield rows.getOrElse(v,vars.map(_ => 0.0))) // Note: set to 0 when unknown variable
   }
 
 
   private def getRow(vars:List[String],base:String,e:NotLin): List[Double] = {
+    // m=Map[String,Double]
     val m = getRowValues(e,base)
-    //println("m_getrow:",m)
-    //println("vars.map(x => m.getOrElse[Double](x,0)):",vars.map(x => m.getOrElse[Double](x,0)))
+    println("m_getrow:",m)
+    println("vars.map(x => m.getOrElse[Double](x,0)):",vars.map(x => m.getOrElse[Double](x,0)))
     return vars.map(x => m.getOrElse[Double](x,0))
   }
 
@@ -378,7 +380,7 @@ object Solver {
     */
   def solveTaylorManual(a:List[List[Double]],precision:Double = 0.0000001, maxSteps:Int=100): (List[Double],Double) => List[Double] = {
     val size = a.size // square matrix
-
+    println("size:",size)
     type Row=List[Double]
     type Matrix=List[Row]
 

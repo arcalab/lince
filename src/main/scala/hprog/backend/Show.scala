@@ -129,8 +129,8 @@ object Show {
 */
 
 
-// Showing non-linear expressions with the name of variables instead of their value 
-def applyV(notlin: NotLin):String= notlin match {
+  // Showing non-linear expressions with the name of variables instead of their value
+  def applyV(notlin: NotLin):String= notlin match {
     case v:Var => v.v
     // If Value is an integer it will print without the zero, otherwise it prints with decimals 
     case Value(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
@@ -147,11 +147,10 @@ def applyV(notlin: NotLin):String= notlin match {
     case Func("E",Nil)=>s"e"
     case Func("log10",list)=> s"log(${stringListV(list)})/log(10)"
     case Func(s,list)=>s"${s}(${stringListV(list)})"
-
   }
 
 
-def apply_parantesesV(notlin:NotLin):String= notlin match {
+  def apply_parantesesV(notlin:NotLin):String= notlin match {
     case v:Var => v.v
     case Value(v) => floatToFraction(v)
     case Func("PI",Nil)=>s"pi"
@@ -161,7 +160,7 @@ def apply_parantesesV(notlin:NotLin):String= notlin match {
     case _ => s"(${applyV(notlin)})"
   }
 
-def stringListV(list:List[NotLin]): String = list match{
+  def stringListV(list:List[NotLin]): String = list match{
     case List() => s""
     case n::List() => s"${applyV(n)}"
     case n::ns => s"${applyV(n)},${stringListV(ns)}"
@@ -169,7 +168,7 @@ def stringListV(list:List[NotLin]): String = list match{
 
 
 
-def apply(notlin: NotLin, vl: Valuation): String = notlin match {
+  def apply(notlin: NotLin, vl: Valuation): String = notlin match {
     case v:Var => showVar(v,vl,apply[Pure])
     // If Value is an integer it will print without the zero, otherwise it prints with decimals 
     case Value(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
@@ -202,7 +201,7 @@ def apply(notlin: NotLin, vl: Valuation): String = notlin match {
     case _ => s"(${apply(notlin,vl)})"
   }
 
-def stringList(list:List[NotLin],vl:Valuation): String = list match{
+  def stringList(list:List[NotLin],vl:Valuation): String = list match{
     case List() => s""
     case n::List() => s"${apply(n,vl)}"
     case n::ns => s"${apply(n,vl)},${stringList(ns,vl)}"
@@ -223,12 +222,71 @@ def stringList(list:List[NotLin],vl:Valuation): String = list match{
     case GE(l1, l2)    => s"${apply(l1,vl)}>=${apply(l2,vl)}"
     case LE(l1, l2)    => s"${apply(l1,vl)}<=${apply(l2,vl)}"
   }
+
+  /** Pretty print a condition, to be used to log expressions (dropping initial "_") */
+  def ppBool(cond:Cond): String = cond match {
+    case BVal(b)     => b.toString
+    case And(And(e1,e2),e3) => ppBool(And(e1,And(e2,e3)))
+    case And(e1,e2:And)     => s"${ppBoolP(e1)} & ${ppBoolP(e2)}"
+    case And(e1, e2) => s"${ppBoolP(e1)} & ${ppBoolP(e2)}"
+    case Or(e1, e2)  => s"${ppBoolP(e1)} | ${ppBoolP(e2)}"
+    case Not(EQ(l1,l2)) => s"${ppExp(l1)}!=${ppExp(l2)}"
+    case Not(e1)     => s"!(${ppBoolP(e1)})"
+    case EQ(l1, l2)    => s"${ppExp(l1)}==${ppExp(l2)}"
+    case GT(l1, l2)    => s"${ppExp(l1)}>${ppExp(l2)}"
+    case LT(l1, l2)    => s"${ppExp(l1)}<${ppExp(l2)}"
+    case GE(l1, l2)    => s"${ppExp(l1)}>=${ppExp(l2)}"
+    case LE(l1, l2)    => s"${ppExp(l1)}<=${ppExp(l2)}"
+  }
+  private def ppBoolP(exp:Cond):String = exp match {
+    case BVal(b) => b.toString
+    case _ => s"(${ppBool(exp)})"
+  }
+  def ppExp(exp: NotLin): String = exp match {
+    case Var(v) => v.drop(1)
+    case Value(v) => v.toString
+    case Add(l1, l2) => s"${ppExpP(l1)} + ${ppExpP(l2)}"
+    case Mult(l1, l2) => s"${ppExpP(l1)}*${ppExpP(l2)}"
+    case Div(l1, l2) => s"${ppExpP(l1)}/${ppExpP(l2)}"
+    case Res(l1, l2) => s"${ppExpP(l1)}%${ppExpP(l2)}"
+    case Func("PI", Nil) => s"pi"
+    case Func("E", Nil) => s"e"
+    case Func("log10", list) => s"log(${list.map(ppExp).mkString(",")})/log(10)"
+    case Func(s, list) => s"${s}(${list.map(ppExp).mkString(",")})"
+  }
+
+  def ppExpP(exp:NotLin):String= exp match {
+    case _:Var | _:Value | _:Func => ppExp(exp)
+    case _ => s"(${ppExp(exp)})"
+  }
+
+
+    // show a condition parseable by Sage
+  def apply_withbool(cond: Cond, vl:Valuation = Map()): String = cond match {
+    case BVal(b)     => s"bool(${b.toString})"
+    case And(And(e1,e2),e3) => apply_withbool(And(e1,And(e2,e3)),vl) 
+    case And(e1,e2:And)     => s"${showPP(e1,vl)} & ${showPP(e2,vl)}" 
+    case And(e1, e2) => s"${showPP(e1,vl)} & ${showPP(e2,vl)}"
+    case Or(e1, e2)  => s"${showPP(e1,vl)} | ${showPP(e2,vl)}"
+    case Not(EQ(l1,l2)) => s"bool(${apply(l1,vl)}!=${apply(l2,vl)})"
+    case Not(e1)     => s"bool(!(${showPP(e1,vl)}))"
+    case EQ(l1, l2)    => s"bool(${apply(l1,vl)}==${apply(l2,vl)})"
+    case GT(l1, l2)    => s"bool(${apply(l1,vl)}>${apply(l2,vl)})"
+    case LT(l1, l2)    => s"bool(${apply(l1,vl)}<${apply(l2,vl)})"
+    case GE(l1, l2)    => s"bool(${apply(l1,vl)}>=${apply(l2,vl)})"
+    case LE(l1, l2)    => s"bool(${apply(l1,vl)}<=${apply(l2,vl)})"
+  }
+
   
   private def showP(exp:Cond, vl:Valuation):String = exp match {
     case BVal(b) => b.toString
     case _ => s"(${apply(exp,vl)})"
   }
 
+  private def showPP(exp:Cond, vl:Valuation):String = exp match {
+    case BVal(b) => b.toString
+    case _ => s"(${apply_withbool(exp,vl)})"
+  }
 
   private def showVar(v: Var, valuation: Valuation,cont:SyExpr => String): String = {
     valuation.get(v.v) match {
@@ -320,10 +378,10 @@ def stringList(list:List[NotLin],vl:Valuation): String = list match{
 
 
   def apply(sol:SySolution): String =
-    sol.map(kv => s"${kv._1}(t) = ${apply(kv._2)}").mkString("</br>")
+    sol.map(kv => s"${kv._1.drop(1)}(t) = ${apply(kv._2)}").mkString("</br>") // drop 1 to skip the "_"
 
   def pp(sol:SySolution): String =
-    sol.map(kv => s"${kv._1}(t) = ${pp(kv._2)}").mkString("</br>")
+    sol.map(kv => s"${kv._1.drop(1)}(t) = ${pp(kv._2)}").mkString("</br>") // drop 1 to skip the "_"
 
   def pp(sol:SySolution, v:Valuation): String = {
     pp(sol.view.mapValues(Eval.updInputFun(_,v)).toMap)
