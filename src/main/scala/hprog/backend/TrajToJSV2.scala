@@ -16,7 +16,7 @@ object TrajToJSV2 {
   type JSString = String // 
 
 
-  def apply(traj:Traj,divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true, variables_List: List[String]): JSString = {
+  def apply(traj:Traj,divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true, variables_List: List[(String, String, Option[String])], graphType: String): JSString = {
     
     val dur = traj.getDur    
 
@@ -112,63 +112,88 @@ object TrajToJSV2 {
     /////
 
     var dict_Graph2D: Map[Double, (String, String)] = Map() 
-    var dict_Graph3D: Map[Double, (String, String, String)] = Map()
-    var jsOutput = ""    
-    var graph_name = "" 
+    var dict_Graph3D: Map[Double, (String, String, String)] = Map()    
+    var graph_name: String = "" 
+    var graph_color:String = ""
+    var varList: List[String] = List()
+    var graphsNamesList: List[String] = List()
+    var warningsBoundariesList: List[String] = List()
+    var counter: Int = 0
 
     var js = "var colors = Plotly.d3.scale.category10();\n"
-    println(variables_List)
+  
+    var variables_List2D: List[(String, String)] = List.empty
+    var variables_List3D: List[(String, String, String)] = List.empty
 
-    //If no variables are received, use the first 2
-    var varList = if (variables_List.isEmpty) traces.keys.toList.take(2) else variables_List
+    var varList_Temp = if (variables_List.isEmpty) List((traces.keys.toList(0), traces.keys.toList(1), None)) else variables_List
 
-    //Build the 2D or 3D graph
-    if (variables_List.length == 2){
-      val (js2, g_name, dict_Graph) = buildTraces2D(traces,colorIDs, varList)
-      jsOutput = js2
-      dict_Graph2D = dict_Graph
-      graph_name = g_name
-    }  
-    else{
-      val (js2, g_name, dict_Graph) = buildTraces3D(traces,colorIDs, varList) 
-      jsOutput = js2
-      dict_Graph3D = dict_Graph
-      graph_name = g_name
-    } 
-    js += jsOutput
+    varList_Temp.foreach {
+      case (x, y, None) => variables_List2D = variables_List2D ::: List((x, y))
+      case (x, y, Some(z)) => variables_List3D = variables_List3D ::: List((x, y, z))       
+    }
 
-    //Add the boundaries to graph
-    val jsBoundaries = if (variables_List.length == 2) buildBoundaries2D(boundaries,colorIDs, varList, dict_Graph2D, graph_name) else buildBoundaries3D(boundaries,colorIDs, varList, dict_Graph3D, graph_name)
-    js += jsBoundaries
+    if(variables_List2D.nonEmpty && variables_List3D.nonEmpty){
+      println("Problems in the axis definition")
+    }
+    else if(variables_List2D.nonEmpty){
+      for ((xValue, yValue) <- variables_List2D) {
+        varList = List(xValue,yValue) 
 
-    //Add the warnings to graph
-    val jsWarnings = if (variables_List.length == 2) buildWarnings2D(traj,inScope,colorIDs, dict_Graph2D, graph_name) else buildWarnings3D(traj,inScope,colorIDs, dict_Graph3D, graph_name)
-    js += jsWarnings
+        val (jsGraphs, g_name, g_color, dict_Graph) = buildTraces2D(traces,colorIDs, varList, counter, graphType)
+        dict_Graph2D = dict_Graph
+        graph_name = g_name
+        graph_color = g_color
+        
+        graphsNamesList = graphsNamesList ++ List("t_" + graph_name)      
+        warningsBoundariesList = if (xValue == "t") warningsBoundariesList ++ List("b_out_" + yValue + counter.toString, "b_in_" + yValue + counter.toString, "w_" + yValue + counter.toString) 
+        else warningsBoundariesList ++ List("b_out_" + xValue + counter.toString, "b_in_" + xValue + counter.toString, "w_" + xValue + counter.toString, "b_out_" + yValue + counter.toString, "b_in_" + yValue + counter.toString, "w_" + yValue + counter.toString) 
+      
+        val jsBoundaries = buildBoundaries2D(boundaries,colorIDs, varList, dict_Graph2D, graph_name, graph_color, counter, graphType)
+        val jsWarnings = buildWarnings2D(traj,inScope,colorIDs, dict_Graph2D, graph_name, graph_color, counter, graphType)
 
-    val traceNames = List("t_" + graph_name) ++   boundaries.keys.filter(varList.contains).flatMap 
-                      { key => List("b_out_" + key, "b_in_" + key, "w_" + key)}.toList
+        js += jsGraphs
+        js += jsBoundaries
+        js += jsWarnings
 
-    js += s"var data = ${traceNames.mkString("[",",","]")};"
-    
-    if (variables_List.length == 2) {
+        counter = counter + 1
+      }
+      val traceNames = graphsNamesList ++ warningsBoundariesList
+
+      js += s"var data = ${traceNames.mkString("[",",","]")};"   
+      js += s"\nvar layout = {hovermode:'closest'};"         
+      js += s"\nPlotly.newPlot('$divName', data, layout, {showSendToCloud: true});"    
+    }
+    else if (variables_List3D.nonEmpty){
+      for ((xValue, yValue, zValue) <- variables_List3D) {
+        varList = List(xValue,yValue,zValue) 
+
+        val (jsGraphs, g_name, g_color, dict_Graph) = buildTraces3D(traces,colorIDs, varList, counter, graphType)
+        dict_Graph3D = dict_Graph
+        graph_name = g_name
+        graph_color = g_color
+        
+        graphsNamesList = graphsNamesList ++ List("t_" + graph_name)      
+        warningsBoundariesList = if (xValue == "t") warningsBoundariesList ++ List("b_out_" + yValue + counter.toString, "b_in_" + yValue + counter.toString, "w_" + yValue + counter.toString) ++ List("b_out_" + zValue + counter.toString, "b_in_" + zValue + counter.toString, "w_" + zValue + counter.toString) 
+        else warningsBoundariesList ++ List("b_out_" + xValue + counter.toString, "b_in_" + xValue + counter.toString, "w_" + xValue + counter.toString, "b_out_" + yValue + counter.toString, "b_in_" + yValue + counter.toString, "w_" + yValue + counter.toString) ++ List("b_out_" + zValue + counter.toString, "b_in_" + zValue + counter.toString, "w_" + zValue + counter.toString) 
+      
+        val jsBoundaries = buildBoundaries3D(boundaries,colorIDs, varList, dict_Graph3D, graph_name, graph_color, counter, graphType)
+        val jsWarnings = buildWarnings3D(traj,inScope,colorIDs, dict_Graph3D, graph_name, graph_color, counter, graphType)
+
+        js += jsGraphs
+        js += jsBoundaries
+        js += jsWarnings
+
+        counter = counter + 1
+      }
+
+      val traceNames = graphsNamesList ++ warningsBoundariesList
+
+      js += s"var data = ${traceNames.mkString("[",",","]")};"  
       js += s"\nvar layout = {hovermode:'closest'};" 
-    }
-    else {js += s"""
-      var layout = {
-          hovermode: 'closest',
-          scene: {
-              xaxis: {title: '${variables_List(0).replaceAll("_", "")}'},
-              yaxis: {title: '${variables_List(1).replaceAll("_", "")}'},
-              zaxis: {title: '${variables_List(2).replaceAll("_", "")}'}
-          }
-      };
-      """
-    }
-    
-    js += s"\nPlotly.newPlot('$divName', data, layout, {showSendToCloud: true});"
-    
-    println(js)
+      js += s"\nPlotly.newPlot('$divName', data, layout, {showSendToCloud: true});"
+    }  
 
+    println(js)
     js    
   }
 
@@ -187,29 +212,44 @@ object TrajToJSV2 {
   * @return               A tuple containing the JavaScript blocks, graph name, and dictionary of graph values.
   */
 
-  private def buildTraces2D(traces: Traces, colorIDs: Map[String, Int], varList: List[String]): (String, String, Map[Double, (String, String)])  = {
+  private def buildTraces2D(traces: Traces
+                          , colorIDs: Map[String, Int]
+                          , varList: List[String]
+                          , counter: Int
+                          , graphType: String): (String, String, String, Map[Double, (String, String)])  = {
     var js = ""    
-    var graph_name = ""    
+    var graph_name = varList(0) + varList(1) + counter.toString
+    var graph_color = ""      
     var dict_Graph: Map[Double, (String, String)] = Map()      
 
     var t: List[Double] = List.empty
+    var time_axis: List[String] = List.empty
     var x_axis: List[String] = List.empty
     var y_axis: List[String] = List.empty
 
     for ((variable, values) <- traces) {
-      if(variable == varList(0)) {        
-        graph_name ++= variable
+      if(variable == varList(0)) {  
         val (time, x) = processValues(values.toList)   
         t = time
-        x_axis = x     
+        x_axis = x  
+        time_axis = time.map(_.toString)  
       } 
       else if(variable == varList(1)){
+        graph_color ++= variable
         val (time, y) = processValues(values.toList)           
         y_axis = y
+        t = time
+        time_axis = time.map(_.toString)
       }
-    }
-    dict_Graph = t.zip(x_axis.zip(y_axis)).toMap
-    // |   line: {color: colors(${colorIDs.getOrElse(graph_name,0)})},
+    }   
+
+    if(varList(0) == "t") {  
+      dict_Graph = t.zip(time_axis.zip(y_axis)).toMap
+      x_axis = time_axis
+     }
+     else {
+      dict_Graph = t.zip(x_axis.zip(y_axis)).toMap
+     }
 
     if (x_axis.nonEmpty && y_axis.nonEmpty) {
       js +=
@@ -217,14 +257,15 @@ object TrajToJSV2 {
           |   x: ${x_axis.mkString("[", ",", "]")},
           |   y: ${y_axis.mkString("[", ",", "]")},
           |   mode: 'lines',
-          |   line: {color: colors(${colorIDs.getOrElse(graph_name,0)})},
-          |   legendgroup: 'g_${remove_variable(graph_name.toString)}',
-          |   name: '${remove_variable(graph_name.toString)}'
+          |   line: {color: colors(${colorIDs.getOrElse(graph_color,0)})},
+          |   legendgroup: 'g_${graph_name.toString}',
+          |   type: '${graphType}',
+          |   name: '${varList(0) + varList(1)}'
           |};
           """.stripMargin
     }   
     
-    (js, graph_name, dict_Graph)
+    (js, graph_name, graph_color, dict_Graph)
   }
 
   /**
@@ -240,7 +281,10 @@ object TrajToJSV2 {
                               , colorIDs: Map[String, Int]
                               , varList: List[String]
                               , dict_Graph: Map[Double, (String, String)]
-                              , graph_name: String): String = {
+                              , graph_name: String
+                              , graph_color: String
+                              , counter: Int
+                              , graphType: String): String = {
     var js = ""
 
     for ((variable, values) <- boundaries) {
@@ -250,14 +294,14 @@ object TrajToJSV2 {
           s"""{color: 'rgb(255, 255, 255)',
             | size: 10,
             | line: {
-            |   color: colors(${colorIDs.getOrElse(variable, 0)}),
-            |   width: 2}}""".stripMargin, varList, dict_Graph, graph_name)
+            |   color: colors(${colorIDs.getOrElse(graph_color, 0)}),
+            |   width: 2}}""".stripMargin, varList, dict_Graph, graph_name, counter, graphType)
         js += mkMarkers2D(variable,"in",ins,
-          s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
+          s"""{color: colors(${colorIDs.getOrElse(graph_color, 0)}),
             | size: 10,
             | line: {
-            |   color: colors(${colorIDs.getOrElse(variable, 0)}),
-            |   width: 2}}""".stripMargin, varList, dict_Graph, graph_name)
+            |   color: colors(${colorIDs.getOrElse(graph_color, 0)}),
+            |   width: 2}}""".stripMargin, varList, dict_Graph, graph_name, counter, graphType)
       }
     }
     js
@@ -275,15 +319,18 @@ object TrajToJSV2 {
   private def buildWarnings2D(traj: Traj, inScope:Double=>Boolean
                             , colorIDs: Map[String, Int]
                             , dict_Graph: Map[Double, (String, String)]
-                            , graph_name: String): String = {
+                            , graph_name: String
+                            , graph_color: String
+                            , counter: Int
+                            , graphType: String): String = {
     var js = ""
     for (variable <- traj.getVars) {
       js += mkWarnings2D(variable,traj,inScope,
-        s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
+        s"""{color: colors(${colorIDs.getOrElse(graph_color, 0)}),
            | size: 15,
            | line: {
            |   color: 'rgb(0,0,0)',
-           |   width: 2}}""".stripMargin, dict_Graph, graph_name)
+           |   width: 2}}""".stripMargin, dict_Graph, graph_name, counter, graphType)
     }
     js
   } 
@@ -303,20 +350,22 @@ object TrajToJSV2 {
                         , data:List[(Either[Double,Double],(Double,String))]
                         ,style: String, variables_List: List[String]
                         , dict_Graph: Map[Double, (String, String)]
-                        , graph_name: String): String = {
+                        , graph_name: String
+                        , counter: Int
+                        , graphType: String): String = {
 
-    var time_values = data.map(_._1.fold(x=>x,x=>x))
+    var time_values = data.map(_._1.fold(x=>x,x=>x))    
     val (xValue, yValue) = dict_Graph.getOrElse(time_values.headOption.getOrElse(0.0), ("", ""))
     
-    s"""var b_${inout}_$variable = {
+    s"""var b_${inout}_${variable + counter.toString} = {
        |   x: [${xValue}],
        |   y: [${yValue}],
        |   text: ${data.map(s=>"'" + fixStr(s._2._2) + "'").mkString("[",",","]")},
        |   mode: 'markers',
        |   marker: $style,
-       |   type: 'scatter',
-       |   legendgroup: 'g_${remove_variable(graph_name)}',
-       |   name: 'boundary of ${remove_variable(variable)}',
+       |   type: '${graphType}',
+       |   legendgroup: 'g_${graph_name}',
+       |   name: 'boundary of ${remove_variable({variable})}',
        |   showlegend: false,
        |};""".stripMargin
   
@@ -332,11 +381,14 @@ object TrajToJSV2 {
   * @param dict_Graph   Dictionary that have the values of the graph.
   * @return             JavaScript block representing the specified warnings.
   */
-  private def mkWarnings2D(variable: String, traj: Traj
-                       , inScope: Double=>Boolean
-                       , style:String
-                       , dict_Graph: Map[Double, (String, String)]
-                       , graph_name: String): String = {                        
+  private def mkWarnings2D(variable: String
+                        , traj: Traj
+                        , inScope: Double=>Boolean
+                        , style: String
+                        , dict_Graph: Map[Double, (String, String)]
+                        , graph_name: String
+                        , counter: Int
+                        , graphType: String): String = {                        
 
     (traj.getWarnings,traj.getInits,traj.getEnds) match {
       case (Some(warns),Some(inits),Some(ends)) =>
@@ -354,14 +406,14 @@ object TrajToJSV2 {
         
         val (x_axis, y_axis) = x.map(dict_Graph.getOrElse(_, ("", ""))).unzip
 
-        s"""var w_$variable = {
+        s"""var w_${variable + counter.toString} = {
            |   x: ${x_axis.mkString("[",",","]")},
            |   y: ${y_axis.mkString("[",",","]")},
            |   text: ${msg.mkString("[",",","]")},
            |   mode: 'markers',
            |   marker: $style,
-           |   type: 'scatter',
-           |   legendgroup: 'g_${remove_variable(graph_name)}',
+           |   type: '${graphType}',
+           |   legendgroup: 'g_${graph_name}',
            |   name: 'Warning',
            |   showlegend: false
            |};""".stripMargin
@@ -375,63 +427,68 @@ object TrajToJSV2 {
     //////    Functions to build a 3D Graph    ////// 
     /////////////////////////////////////////////////
 
-/**
-  * Constructs JavaScript blocks for traces 2D based on the specified traces, color IDs, and variable list.
-  * Also builds a dictionary to store the values of the graph.
-  *
-  * @param traces         Map containing traces for different variables.
-  * @param colorIDs       Map associating variable names with color IDs.
-  * @param varList        List of variable names to consider.
-  * @return               A tuple containing the JavaScript blocks, graph name, and dictionary of graph values.
-  */
-
-  private def buildTraces3D(traces: Traces, colorIDs: Map[String, Int], varList: List[String]): (String, String, Map[Double, (String, String, String)])  = {
+  private def buildTraces3D(traces: Traces
+                          , colorIDs: Map[String, Int]
+                          , varList: List[String]
+                          , counter: Int
+                          , graphType: String): (String, String, String, Map[Double, (String, String, String)])  = {
     var js = ""    
-    var graph_name = ""    
+    var graph_name = varList(0) + varList(1) + varList(2) + counter.toString
+    var graph_color = ""      
     var dict_Graph: Map[Double, (String, String, String)] = Map()      
 
     var t: List[Double] = List.empty
+    var time_axis: List[String] = List.empty
     var x_axis: List[String] = List.empty
     var y_axis: List[String] = List.empty
     var z_axis: List[String] = List.empty
 
     for ((variable, values) <- traces) {
-      if(variable == varList(0)) {        
-        graph_name ++= variable
+      if(variable == varList(0)) {  
         val (time, x) = processValues(values.toList)   
         t = time
-        x_axis = x     
+        x_axis = x  
+        time_axis = time.map(_.toString)  
       } 
       else if(variable == varList(1)){
+        graph_color ++= variable
         val (time, y) = processValues(values.toList)           
         y_axis = y
+        t = time
+        time_axis = time.map(_.toString)
       }
       else if(variable == varList(2)){
         val (time, z) = processValues(values.toList)           
         z_axis = z
+        t = time
+        time_axis = time.map(_.toString) 
       }
+    }   
+
+    if (varList(0) == "t") {
+      dict_Graph = t.zip(time_axis.zip(y_axis.zip(z_axis))).map { case (t, (x, (y, z))) => (t, (x, y, z)) }.toMap
+      x_axis = time_axis
+    } else {
+      dict_Graph = t.zip(x_axis.zip(y_axis.zip(z_axis))).map { case (t, (x, (y, z))) => (t, (x, y, z))}.toMap
     }
 
-    dict_Graph = t.zip(x_axis.zip(y_axis.zip(z_axis))).map { 
-      case (time, (x, (y, z))) => (time, (x, y, z))
-    }.toMap
 
     if (x_axis.nonEmpty && y_axis.nonEmpty && z_axis.nonEmpty) {
       js +=
         s"""var t_${graph_name.toString} = {
-          |   x: ${x_axis.mkString("[", ",", "]")},
-          |   y: ${y_axis.mkString("[", ",", "]")},
-          |   z: ${z_axis.mkString("[", ",", "]")},
+          |   x:${x_axis.mkString("[", ",", "]")},
+          |   y:${y_axis.mkString("[", ",", "]")},
+          |   z:${z_axis.mkString("[", ",", "]")},
           |   mode: 'lines',
-          |   line: {color: colors(${colorIDs.getOrElse(graph_name,0)})},
-          |   legendgroup: 'g_${remove_variable(graph_name.toString)}',
-          |   name: '${remove_variable(graph_name.toString)}',
-          |   type: 'scatter3d'
+          |   line: {color: colors(${colorIDs.getOrElse(graph_color,0)})},
+          |   legendgroup: 'g_${graph_name.toString}',
+          |   name: '${varList(0) + varList(1) + varList(2)}',
+          |   type: '${graphType}'
           |};
           """.stripMargin
     }   
     
-    (js, graph_name, dict_Graph)
+    (js, graph_name, graph_color, dict_Graph)
   }
 
   /**
@@ -447,7 +504,10 @@ object TrajToJSV2 {
                               , colorIDs: Map[String, Int]
                               , varList: List[String]
                               , dict_Graph: Map[Double, (String, String, String)]
-                              , graph_name: String): String = {
+                              , graph_name: String
+                              , graph_color: String
+                              , counter: Int
+                              , graphType: String): String = {
     var js = ""
 
     for ((variable, values) <- boundaries) {
@@ -457,14 +517,14 @@ object TrajToJSV2 {
           s"""{color: 'rgb(255, 255, 255)',
             | size: 10,
             | line: {
-            |   color: colors(${colorIDs.getOrElse(variable, 0)}),
-            |   width: 2}}""".stripMargin, varList, dict_Graph, graph_name)
+            |   color: colors(${colorIDs.getOrElse(graph_color, 0)}),
+            |   width: 2}}""".stripMargin, varList, dict_Graph, counter, graph_name, graphType)
         js += mkMarkers3D(variable,"in",ins,
-          s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
+          s"""{color: colors(${colorIDs.getOrElse(graph_color, 0)}),
             | size: 10,
             | line: {
-            |   color: colors(${colorIDs.getOrElse(variable, 0)}),
-            |   width: 2}}""".stripMargin, varList, dict_Graph, graph_name)
+            |   color: colors(${colorIDs.getOrElse(graph_color, 0)}),
+            |   width: 2}}""".stripMargin, varList, dict_Graph, counter, graph_name, graphType)
       }
     }
     js
@@ -479,21 +539,25 @@ object TrajToJSV2 {
   * @param dict_Graph   Dictionary that have the values of the graph.
   * @return             JavaScript blocks representing the specified warnings.
   */
-  private def buildWarnings3D(traj: Traj, inScope:Double=>Boolean
+  private def buildWarnings3D(traj: Traj
+                            , inScope: Double=>Boolean
                             , colorIDs: Map[String, Int]
                             , dict_Graph: Map[Double, (String, String, String)]
-                            , graph_name: String): String = {
+                            , graph_name: String
+                            , graph_color: String
+                            , counter: Int
+                            , graphType: String): String = {
     var js = ""
     for (variable <- traj.getVars) {
       js += mkWarnings3D(variable,traj,inScope,
-        s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
+        s"""{color: colors(${colorIDs.getOrElse(graph_color, 0)}),
            | size: 15,
            | line: {
            |   color: 'rgb(0,0,0)',
-           |   width: 2}}""".stripMargin, dict_Graph, graph_name)
+           |   width: 2}}""".stripMargin, dict_Graph, graph_name, counter, graphType)
     }
     js
-  } 
+  }  
 
   /**
   * Constructs a JavaScript block for markers based on the specified variable, direction, data, style, and dictionary of graph values.
@@ -506,27 +570,30 @@ object TrajToJSV2 {
   * @param dict_Graph     Dictionary the have the values of the graph.
   * @return               JavaScript block representing the specified markers.
   */
-  private def mkMarkers3D(variable:String, inout:String
-                        , data:List[(Either[Double,Double],(Double,String))]
-                        , style: String, variables_List: List[String]
+  private def mkMarkers3D(variable: String
+                        , inout: String
+                        , data: List[(Either[Double,Double],(Double,String))]
+                        , style: String
+                        , variables_List: List[String]
                         , dict_Graph: Map[Double, (String, String, String)]
-                        , graph_name: String): String = {
+                        , counter: Int
+                        , graph_name: String
+                        , graphType: String): String = {
 
     var time_values = data.map(_._1.fold(x=>x,x=>x))
     val (xValue, yValue, zValue) = dict_Graph.getOrElse(time_values.headOption.getOrElse(0.0), ("", ""))
     
-    s"""var b_${inout}_$variable = {
+    s"""var b_${inout}_${variable + counter.toString} = {
        |   x: [${xValue}],
        |   y: [${yValue}],
        |   z: [${zValue}],
        |   text: ${data.map(s=>"'" + fixStr(s._2._2) + "'").mkString("[",",","]")},
        |   mode: 'markers',
        |   marker: $style,
-       |   type: 'scatter',
-       |   legendgroup: 'g_${remove_variable(graph_name)}',
+       |   legendgroup: 'g_${graph_name}',
        |   name: 'boundary of ${remove_variable(variable)}',
        |   showlegend: false,
-       |   type: 'scatter3d'
+       |   type: '${graphType}'
        |};""".stripMargin
   
   }
@@ -541,11 +608,14 @@ object TrajToJSV2 {
   * @param dict_Graph   Dictionary that have the values of the graph.
   * @return             JavaScript block representing the specified warnings.
   */
-  private def mkWarnings3D(variable: String, traj: Traj
-                       , inScope: Double=>Boolean
-                       , style:String
-                       , dict_Graph: Map[Double, (String, String, String)]
-                       , graph_name: String): String = {                        
+  private def mkWarnings3D(variable: String
+                        , traj: Traj
+                        , inScope: Double=>Boolean
+                        , style: String
+                        , dict_Graph: Map[Double, (String, String, String)]
+                        , graph_name: String
+                        , counter: Int
+                        , graphType: String): String = {                        
 
     (traj.getWarnings,traj.getInits,traj.getEnds) match {
       case (Some(warns),Some(inits),Some(ends)) =>
@@ -563,18 +633,17 @@ object TrajToJSV2 {
         
         val (x_axis, y_axis, z_axis) = x.map(dict_Graph.getOrElse(_, ("", "", ""))).unzip3
 
-        s"""var w_$variable = {
+        s"""var w_${variable + counter.toString} = {
            |   x: ${x_axis.mkString("[",",","]")},
            |   y: ${y_axis.mkString("[",",","]")},
            |   z: ${z_axis.mkString("[",",","]")},
            |   text: ${msg.mkString("[",",","]")},
            |   mode: 'markers',
            |   marker: $style,
-           |   type: 'scatter',
-           |   legendgroup: 'g_${remove_variable(graph_name)}',
+           |   legendgroup: 'g_${graph_name}',
            |   name: 'Warning',
            |   showlegend: false,
-           |   type: 'scatter3d'
+           |   type: '${graphType}'
            |};""".stripMargin
 
 
@@ -586,6 +655,16 @@ object TrajToJSV2 {
     ///////////////////////////////////////
     //////    Auxiliar Functions     ////// 
     ///////////////////////////////////////
+       
+  def generateColors(t: List[Double]): List[String] = {
+    val minValue = t.min
+    val maxValue = t.max
+    t.map { value =>
+      val normalizedValue = (value - minValue) / (maxValue - minValue)
+      val hue = (normalizedValue * 60).toInt
+      s"hsl($hue, 100%, 50%)"
+    }
+  }
 
   /**
   * Processes the values of a trace to extract and separate the time values (xt) and variable values (x).

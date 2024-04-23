@@ -1,7 +1,7 @@
 package hprog.lang
 
 import hprog.ast.SyntaxConfig._
-import hprog.ast.SyntaxConfig.{ConfigVal, StrValue, MaxTimeValue, MaxIterationsValue, SeqValue}
+import hprog.ast.SyntaxConfig.{ConfigVal, StrValue, MaxTimeValue, MaxIterationsValue, AxisListValue, VarList, GraphTypeValue}
 import hprog.ast.SymbolicExpr.SyExprVar
 import hprog.common.ParserException
 import hprog.frontend.Utils
@@ -20,7 +20,7 @@ object ParserConfig extends RegexParsers {
   override def skipWhitespace = true
 
   override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
-  val variable: Parser[String] = """"[a-zA-Z][a-zA-Z0-9_]*"""".r
+  val variable: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
 
   lazy val realP: Parser[Double] =
     """-?[0-9]+(\.([0-9]+))?""".r ^^ { s: String => s.toDouble }
@@ -34,21 +34,33 @@ object ParserConfig extends RegexParsers {
     }
 
   lazy val configOption: Parser[(String, ConfigVal)] =
-    axis | maxTime | maxIterations
+    axis | maxTime | maxIterations | graphType
 
   lazy val axis: Parser[(String, ConfigVal)] =
-    "Axis:[" ~> repsep(variable, ",") <~ "]" ^^ { vars =>
-      if (vars.length < 2)
-        throw new ParserException("At least two variables are required in axis declaration")
-      else
-        "Axis" -> SeqValue(vars.map(StrValue))
+    "Axis:[" ~> repsep(tripleVarVariable | pairVariable | singleVariable, ",") <~ "]" ^^ { vars =>
+      "Axis" -> AxisListValue(vars)
     }
+
+  lazy val tripleVarVariable: Parser[ConfigVal] =
+    "(" ~> variable ~ ("," ~> variable) ~ ("," ~> variable <~ ")") ^^ {
+    case v1 ~ v2 ~ v3 => VarList(List(StrValue(v1), StrValue(v2), StrValue(v3)))
+  }
+
+  lazy val pairVariable: Parser[ConfigVal] =
+    "(" ~> variable ~ ("," ~> variable <~ ")") ^^ {
+      case v1 ~ v2 => VarList(List(StrValue(v1), StrValue(v2)))
+    }
+
+  lazy val singleVariable: Parser[ConfigVal] =
+    variable ^^ { v => StrValue(v) }
 
   lazy val maxTime: Parser[(String, ConfigVal)] =
     "maxTime:" ~> realP ^^ { s => "MaxTimeValue" -> MaxTimeValue(s) }
 
   lazy val maxIterations: Parser[(String, ConfigVal)] =
     "maxIterations:" ~> intP ^^ { s => "MaxIterationsValue" -> MaxIterationsValue(s) }
-    
+
+   lazy val graphType: Parser[(String, ConfigVal)] =
+    "graphType:" ~> variable ^^ { t => "GraphTypeValue" -> GraphTypeValue(t) }
 }
 
