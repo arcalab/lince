@@ -41,8 +41,8 @@ object SyntaxConfig {
     
     private val defaultAxis = AxisList(List())
     private val defaultMaxTime = MaxTime(20.0)
-    private val defaultMaxIterations = MaxIterations(100)
-    private val defaultGraphType = GraphType("Scatter")
+    private val defaultMaxIterations = MaxIterations(1000)
+    private val defaultGraphType = GraphType("scatter")
   }
   
   sealed trait VarType

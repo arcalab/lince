@@ -109,7 +109,8 @@ object TrajToJS {
 
     /////
     // Build the JavaScript code to generate graph
-    /////
+    /////    
+
     var js = "var colors = Plotly.d3.scale.category10();\n"
 
 
@@ -162,9 +163,7 @@ object TrajToJS {
            | size: 10,
            | line: {
            |   color: colors(${colorIDs.getOrElse(variable, 0)}),
-           |   width: 2}}""".stripMargin)
-      println(js)
-      println("---------------------------------")
+           |   width: 2}}""".stripMargin)      
       js += mkMarkers(variable,"in",ins,
         s"""{color: colors(${colorIDs.getOrElse(variable, 0)}),
            | size: 10,
@@ -172,8 +171,6 @@ object TrajToJS {
            |   color: colors(${colorIDs.getOrElse(variable, 0)}),
            |   width: 2}}""".stripMargin)
     }
-    println(js)
-    println("_---------------------------------------------------")
     js
   }
 
