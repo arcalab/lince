@@ -301,13 +301,13 @@ object TrajToJSV2 {
 
     if(varList(0) == "t") { 
       dict_Graph = t.zip(time_axis.zip(tuple2)).toMap    
-      val(x_temp, y_temp) = buildAxes2D(time_axis,tuple2)
+      val(x_temp, y_temp) = buildAxes2D(t,time_axis,tuple2)
       x_axis = x_temp
       y_axis = y_temp
     }
      else {
       dict_Graph = t.zip(tuple1.zip(tuple2)).toMap
-      val(x_temp, y_temp) = buildAxes2D(tuple1,tuple2)
+      val(x_temp, y_temp) = buildAxes2D(t,tuple1,tuple2)
       x_axis = x_temp
       y_axis = y_temp
      }      
@@ -432,7 +432,7 @@ object TrajToJSV2 {
 
     var time_values = data.map(_._1.fold(x=>x,x=>x))   
     val (x_values, y_values) = time_values.flatMap(dict_Graph.get).unzip        
-    val (x_axis, y_axis) = buildAxes2DforBoundaries(x_values,y_values, inout)  
+    val (x_axis, y_axis) = buildAxes2DforBoundaries(time_values, x_values,y_values, inout)  
     
     s"""var b_${inout}_${variable + counter.toString} = {
        |   x: ${x_axis},
@@ -580,13 +580,13 @@ object TrajToJSV2 {
 
     if (varList(0) == "t") {
       dict_Graph = t.zip(time_axis.zip(tuple2.zip(tuple3))).map { case (t, (x, (y, z))) => (t, (x, y, z)) }.toMap
-      val(x_temp, y_temp, z_temp) = buildAxes3D(time_axis,tuple2, tuple3)
+      val(x_temp, y_temp, z_temp) = buildAxes3D(t,time_axis,tuple2, tuple3)
       x_axis = x_temp
       y_axis = y_temp
       z_axis = z_temp
     } else {
       dict_Graph = t.zip(tuple1.zip(tuple2.zip(tuple3))).map { case (t, (x, (y, z))) => (t, (x, y, z))}.toMap
-      val(x_temp, y_temp, z_temp) = buildAxes3D(tuple1,tuple2, tuple3)
+      val(x_temp, y_temp, z_temp) = buildAxes3D(t,tuple1,tuple2, tuple3)
       x_axis = x_temp
       y_axis = y_temp
       z_axis = z_temp
@@ -716,7 +716,7 @@ object TrajToJSV2 {
     
     var time_values = data.map(_._1.fold(x=>x,x=>x))
     val (xValues, yValues, zValues) = time_values.flatMap(dict_Graph.get).unzip3 
-    val (x_axis, y_axis,z_axis) = buildAxes3DforBoundaries(xValues,yValues,zValues,inout)
+    val (x_axis, y_axis,z_axis) = buildAxes3DforBoundaries(time_values,xValues,yValues,zValues,inout)
     
     s"""var b_${inout}_${variable + counter.toString} = {
        |   x: ${x_axis},
@@ -875,7 +875,7 @@ object TrajToJSV2 {
       val zAxisLabel = uniqueZ.mkString("/")
       (xAxisLabel, yAxisLabel, zAxisLabel)
     }
-    
+
     /**
     * Builds the strings for the X and Y axes based on provided data.
     *
@@ -883,26 +883,23 @@ object TrajToJSV2 {
     * @param secondAxe List of values for the second axis.
     * @return          A tuple containing the strings for the X and Y axes.
     */
-    def buildAxes2D(firstAxe: List[Either[Double,(Double, Double)]], secondAxe: List[Either[Double,(Double, Double)]]): (String, String) = {
-      var combined = List.empty[(Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
-      var sortedCombined = List.empty[(Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
+    def buildAxes2D(time: List[Double], firstAxe: List[Either[Double,(Double, Double)]], secondAxe: List[Either[Double,(Double, Double)]]): (String, String) = {
+      var combined = List.empty[(Double, Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
+      var sortedCombined = List.empty[(Double, Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
 
-      combined = (firstAxe, secondAxe).zipped.toList
-      
-      sortedCombined = combined.sortBy {
-        case (Left(a), _) => a
-        case (Right((a, _)), _) => a
-      }
-      
-      val (firstPart, secondPart) = sortedCombined.map {
-        case (Left(a), Left(b)) => (List(a.toString), List(b.toString))
-        case (Left(a), Right((b, c))) => (List(a.toString, a.toString, a.toString), List(b.toString, "null", c.toString))
-        case (Right((a, c)), Left(b)) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", b.toString))
-        case (Right((a, c)), Right((b, d))) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", d.toString))
-      }.unzip
-      
+      combined = (time, firstAxe, secondAxe).zipped.toList
+
+      sortedCombined = combined.sortBy(_._1)
+
+      val (t, firstPart, secondPart) = sortedCombined.map {
+        case (t, Left(a), Left(b)) => (List(t.toString), List(a.toString), List(b.toString))
+        case (t, Left(a), Right((b, c))) => (List(t.toString), List(a.toString, a.toString, a.toString), List(b.toString, "null", c.toString))
+        case (t, Right((a, c)), Left(b)) => (List(t.toString), List(a.toString, a.toString, c.toString), List(b.toString, "null", b.toString))
+        case (t, Right((a, c)), Right((b, d))) => (List(t.toString), List(a.toString, a.toString, c.toString), List(b.toString, "null", d.toString))
+      }.unzip3
+
       (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"))
-    } 
+    }
 
     /**
     * Builds the strings for the X and Y axes for boundary conditions.
@@ -912,42 +909,36 @@ object TrajToJSV2 {
     * @param inout     Specifies whether the points are for input or output boundaries.
     * @return          A tuple containing the strings for the X and Y axes.
     */
-    def buildAxes2DforBoundaries(firstAxe: List[Either[Double,(Double, Double)]]
+    def buildAxes2DforBoundaries(time: List[Double]
+                                , firstAxe: List[Either[Double,(Double, Double)]]
                                 , secondAxe: List[Either[Double,(Double, Double)]]
                                 , inout:String): (String, String) = {
 
-      var combined = List.empty[(Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
-      var sortedCombined = List.empty[(Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
-
-      combined = (firstAxe, secondAxe).zipped.toList
-      
-      sortedCombined = combined.sortBy {
-        case (Left(a), _) => a
-        case (Right((a, _)), _) => a
-      }
+      val combined = (time, firstAxe, secondAxe).zipped.toList      
+      val sortedCombined = combined.sortBy(_._1)
       
       if(inout == "in") {      
-        val (firstPart, secondPart) = sortedCombined.map {
-          case (Left(a), Left(b)) => (List(a.toString), List(b.toString))
-          case (Left(a), Right((b, c))) => (List(a.toString, a.toString), List(c.toString, "null"))
-          case (Right((a, c)), Left(b)) => (List(c.toString, c.toString), List(b.toString, "null"))
-          case (Right((a, c)), Right((b, d))) => (List(c.toString, c.toString), List(d.toString, "null"))
-        }.unzip
+        val (t, firstPart, secondPart) = sortedCombined.map {
+          case (t, Left(a), Left(b)) => (List(t.toString),List(a.toString), List(b.toString))
+          case (t, Left(a), Right((b, c))) => (List(t.toString),List(a.toString, a.toString), List(c.toString, "null"))
+          case (t, Right((a, c)), Left(b)) => (List(t.toString),List(c.toString, c.toString), List(b.toString, "null"))
+          case (t, Right((a, c)), Right((b, d))) => (List(t.toString),List(c.toString, c.toString), List(d.toString, "null"))
+        }.unzip3
         
         (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"))
 
       } else {
-        val (firstPart, secondPart) = sortedCombined.map {
-          case (Left(a), Left(b)) => (List(a.toString), List(b.toString))
-          case (Left(a), Right((b, c))) => (List(a.toString, a.toString), List(b.toString,"null"))
-          case (Right((a, c)), Left(b)) => (List(a.toString, a.toString), List(b.toString, "null"))
-          case (Right((a, c)), Right((b, d))) => (List(a.toString, a.toString), List(b.toString,"null"))
-        }.unzip
+        val (t, firstPart, secondPart) = sortedCombined.map {
+          case (t, Left(a), Left(b)) => (List(t.toString),List(a.toString), List(b.toString))
+          case (t, Left(a), Right((b, c))) => (List(t.toString),List(a.toString, a.toString), List(b.toString,"null"))
+          case (t, Right((a, c)), Left(b)) => (List(t.toString),List(a.toString, a.toString), List(b.toString, "null"))
+          case (t, Right((a, c)), Right((b, d))) => (List(t.toString),List(a.toString, a.toString), List(b.toString,"null"))
+        }.unzip3
         
         (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"))
       }      
-    } 
-
+    }
+    
     /**
     * Builds the strings for the X, Y, and Z axes based on provided data.
     *
@@ -1035,7 +1026,7 @@ object TrajToJSV2 {
         
         (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"), thirdPart.flatten.mkString("[", ",", "]"))
       }      
-    } 
+    }  
 
     /**
     * Converts a list of Double values to a list of Either[Double, (Double, Double)].

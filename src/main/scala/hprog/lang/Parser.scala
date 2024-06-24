@@ -125,7 +125,7 @@ object Parser extends RegexParsers {
 
   
   /** Parser for an atomic program: an assignment or a set of diff equations. */
-  lazy val atomP: Parser[Atomic] =
+  /*lazy val atomP: Parser[Atomic] =
     (identifier ~ ":=" ~ notlinP) <~ ";" ^^ {
       case v ~ _ ~ l => Atomic(List(Assign(Var("_" + v), l)), DiffEqs(Nil, For(Value(0))))
     } |
@@ -134,10 +134,10 @@ object Parser extends RegexParsers {
       } /**|
       durP <~ ";" ^^ {
         case d => Atomic(Nil, DiffEqs(Nil, d)) // upgrate
-      }*/
+      }*/*/
 
   // Parser for array values
-  /*lazy val arrayP: Parser[List[Double]] = "[" ~> repsep(realP, ",") <~ "]"
+  lazy val arrayP: Parser[List[Double]] = "[" ~> repsep(realP, ",") <~ "]"
 
   lazy val atomP: Parser[Atomic] =
     (identifier ~ ":=" ~ (notlinP | arrayP)) <~ ";" ^^ {
@@ -153,7 +153,7 @@ object Parser extends RegexParsers {
     (diffEqsP ~ opt(durP)) <~ ";" ^^ {
       case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
     }
-  */
+  
 
 
   /** Parser for  differential equations */
