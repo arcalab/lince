@@ -44,7 +44,8 @@ object Parser extends RegexParsers {
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
-  val skip = Atomic(Nil, DiffEqs(Nil, For(Value(0))))
+  val skip = Atomic(Nil, DiffEqs(Nil, For(Value(0))))  
+  var initialValues: Map[String, List[Double]] = Map()
 
   //   ///////////////
   //   /// Program ///
@@ -58,6 +59,8 @@ object Parser extends RegexParsers {
       Utils.isClosed(stx) match {
         case Left(msg) => throw new ParserException(msg)
         case Right(_) => {
+          Syntax.GetSyntax.addParsedSyntax(stx)
+          Syntax.GetSyntax.getInitialValues(initialValues)
           //var aux:Map[String,NotLin]=Map()
           //var x=Utils.updateSyntax(stx,aux,0,Utils.extractVarsDifEqs(stx),0)
           //x._1
@@ -120,7 +123,7 @@ object Parser extends RegexParsers {
       intPP ^^ Counter
   }
 
-
+  
   /** Parser for an atomic program: an assignment or a set of diff equations. */
   lazy val atomP: Parser[Atomic] =
     (identifier ~ ":=" ~ notlinP) <~ ";" ^^ {
@@ -132,6 +135,25 @@ object Parser extends RegexParsers {
       durP <~ ";" ^^ {
         case d => Atomic(Nil, DiffEqs(Nil, d)) // upgrate
       }*/
+
+  // Parser for array values
+  /*lazy val arrayP: Parser[List[Double]] = "[" ~> repsep(realP, ",") <~ "]"
+
+  lazy val atomP: Parser[Atomic] =
+    (identifier ~ ":=" ~ (notlinP | arrayP)) <~ ";" ^^ {
+      case v ~ _ ~ l => l match {
+        case list: List[_] =>
+          val listValues = list.asInstanceOf[List[Double]]
+          initialValues += ("_" + v -> listValues)
+          Atomic(List(Assign(Var("_" + v), Value(listValues.head))), DiffEqs(Nil, For(Value(0))))
+        case expr: NotLin =>
+          Atomic(List(Assign(Var("_" + v), expr)), DiffEqs(Nil, For(Value(0))))
+      }
+    } |
+    (diffEqsP ~ opt(durP)) <~ ";" ^^ {
+      case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
+    }
+  */
 
 
   /** Parser for  differential equations */

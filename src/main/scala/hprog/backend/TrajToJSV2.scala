@@ -300,17 +300,17 @@ object TrajToJSV2 {
     } 
 
     if(varList(0) == "t") { 
-      dict_Graph = t.zip(time_axis.zip(tuple2)).toMap
+      dict_Graph = t.zip(time_axis.zip(tuple2)).toMap    
       val(x_temp, y_temp) = buildAxes2D(time_axis,tuple2)
       x_axis = x_temp
       y_axis = y_temp
-     }
+    }
      else {
       dict_Graph = t.zip(tuple1.zip(tuple2)).toMap
       val(x_temp, y_temp) = buildAxes2D(tuple1,tuple2)
       x_axis = x_temp
       y_axis = y_temp
-     }    
+     }      
     if (x_axis.nonEmpty && y_axis.nonEmpty) {
       js +=
         s"""var t_${graph_name.toString} = {
@@ -430,9 +430,9 @@ object TrajToJSV2 {
                         , counter: Int
                         , graphType: String): String = {    
 
-    var time_values = data.map(_._1.fold(x=>x,x=>x))     
-    val (x_values, y_values) = time_values.flatMap(dict_Graph.get).unzip     
-    val (x_axis, y_axis) = buildAxes2DforBoundaries(x_values,y_values, inout)
+    var time_values = data.map(_._1.fold(x=>x,x=>x))   
+    val (x_values, y_values) = time_values.flatMap(dict_Graph.get).unzip        
+    val (x_axis, y_axis) = buildAxes2DforBoundaries(x_values,y_values, inout)  
     
     s"""var b_${inout}_${variable + counter.toString} = {
        |   x: ${x_axis},
@@ -471,7 +471,14 @@ object TrajToJSV2 {
                         , graph_name: String
                         , counter: Int
                         , graphType: String): String = {   
-    
+
+    var xvalues: List[Either[Double, (Double, Double)]] = List()
+    var yvalues: List[Either[Double, (Double, Double)]] = List()
+    var x_axis: String = ""
+    var y_axis: String = ""
+    var xValuesToProcess: List[(Double, Either[Double, (Double, Double)])] = List()
+    var yValuesToProcess: List[(Double, Either[Double, (Double, Double)])] =  List()
+
     (traj.getWarnings,traj.getInits,traj.getEnds) match {
       case (Some(warns),Some(inits),Some(ends)) =>
         val values = (ends ++ inits).map(kv => Eval(kv._1) -> kv._2)       
@@ -486,8 +493,18 @@ object TrajToJSV2 {
             ), warn._2))
           .unzip3
 
-        val (xvalues, yvalues) = x.map(key => dict_Graph(key)).unzip
-        val (x_axis, y_axis) = buildAxes2D(xvalues,yvalues)
+        val (x_values, y_values) = x.map(key => dict_Graph(key)).unzip
+        xvalues = x_values
+        yvalues = y_values
+
+        xValuesToProcess = dict_Graph.keys.toList.zip(xvalues)
+        yValuesToProcess = dict_Graph.keys.toList.zip(yvalues)         
+
+        val (time, xaxis) = processValues(xValuesToProcess) 
+        x_axis = xaxis.mkString("[",",","]")
+
+        val (t, yaxis) = processValues(yValuesToProcess) 
+        y_axis = yaxis.mkString("[",",","]")
         
         s"""var w_${variable + counter.toString} = {
           |   x: ${x_axis},
@@ -696,7 +713,7 @@ object TrajToJSV2 {
                         , counter: Int
                         , graph_name: String
                         , graphType: String): String = {
-
+    
     var time_values = data.map(_._1.fold(x=>x,x=>x))
     val (xValues, yValues, zValues) = time_values.flatMap(dict_Graph.get).unzip3 
     val (x_axis, y_axis,z_axis) = buildAxes3DforBoundaries(xValues,yValues,zValues,inout)
@@ -738,7 +755,17 @@ object TrajToJSV2 {
                         , dict_Graph: Map[Double, (Either[Double,(Double,Double)], Either[Double,(Double,Double)], Either[Double,(Double,Double)])]
                         , graph_name: String
                         , counter: Int
-                        , graphType: String): String = {                        
+                        , graphType: String): String = {   
+
+    var xvalues: List[Either[Double, (Double, Double)]] = List()
+    var yvalues: List[Either[Double, (Double, Double)]] = List()
+    var zvalues: List[Either[Double, (Double, Double)]] = List()
+    var x_axis: String = ""
+    var y_axis: String = ""
+    var z_axis: String = ""
+    var xValuesToProcess: List[(Double, Either[Double, (Double, Double)])] = List()
+    var yValuesToProcess: List[(Double, Either[Double, (Double, Double)])] =  List()
+    var zValuesToProcess: List[(Double, Either[Double, (Double, Double)])] =  List()
 
     (traj.getWarnings,traj.getInits,traj.getEnds) match {
       case (Some(warns),Some(inits),Some(ends)) =>
@@ -754,8 +781,24 @@ object TrajToJSV2 {
             ), warn._2))
           .unzip3
         
-        val (xvalues, yvalues, zvalues) = x.flatMap(dict_Graph.get).unzip3
-        val (x_axis, y_axis, z_axis) = buildAxes3D(xvalues,yvalues,zvalues)
+        val (x_values, y_values, z_values) = x.flatMap(dict_Graph.get).unzip3
+        
+        xvalues = x_values
+        yvalues = y_values
+        zvalues = z_values
+
+        xValuesToProcess = dict_Graph.keys.toList.zip(xvalues)
+        yValuesToProcess = dict_Graph.keys.toList.zip(yvalues)        
+        zValuesToProcess = dict_Graph.keys.toList.zip(yvalues)         
+
+        val (time, xaxis) = processValues(xValuesToProcess) 
+        x_axis = xaxis.mkString("[",",","]")
+
+        val (t, yaxis) = processValues(yValuesToProcess) 
+        y_axis = yaxis.mkString("[",",","]")
+
+        val (ti, zaxis) = processValues(yValuesToProcess) 
+        z_axis = zaxis.mkString("[",",","]")
       
         s"""var w_${variable + counter.toString} = {
           |   x: ${x_axis},

@@ -93,9 +93,8 @@ object Syntax {
 
   //case class Pow(l1:NotLin,l2:NotLin) extends NotLin  
 
-  case class Func(s:String, arg:List[NotLin]) extends NotLin
-
-
+  case class Func(s:String, arg:List[NotLin]) extends NotLin  
+  
 /**
 sealed abstract class Lin {
   def +(other: Lin):Lin = Add(this,other)
@@ -132,7 +131,7 @@ case class Mult(v: Value,l: Lin)    extends Lin
   case class Mult(l1:Lin,l2:Lin) extends Lin
 
 */
-
+  
   // Conditions
   sealed abstract class Cond {
     def &&(that:Cond): Cond  = (this,that) match {
@@ -163,7 +162,82 @@ case class Mult(v: Value,l: Lin)    extends Lin
   case class GE(l1:NotLin,l2:NotLin)    extends Cond
   case class LE(l1:NotLin,l2:NotLin)    extends Cond
   
+  object GetSyntax {
+    private var parsedSyntax: Syntax = null
+    private var initialValues: Map[String, List[Double]] = Map()
+
+    def getInitialValues(values: Map[String, List[Double]]): Unit = {
+      initialValues = values
+    }
+
+    def addParsedSyntax(syntax: Syntax): Unit = {
+      parsedSyntax = syntax
+    }
+
+    def allSyntax: List[Syntax] = {
+      val sintaxes = getAllSyntax(initialValues)      
+      sintaxes
+    }
+
+    def getAllSyntax(newVarValues: Map[String, List[Double]]): List[Syntax] = {
+    if (newVarValues.isEmpty) {
+      List(parsedSyntax)     
+    } else {
+      val balancedVarValues = balanceVarValues(newVarValues)
+      
+      val numCombinations = balancedVarValues.head._2.length  
+      
+      val combinations = (0 until numCombinations).map { i =>
+        balancedVarValues.map { case (key, values) =>
+          key -> values(i)
+        }.toMap
+      }.toList    
+      
+      val syntaxes = combinations.map(changeAssignValues(parsedSyntax, _))
+      
+      syntaxes
+    }
+  }
+
+    def changeAssignValues(syntax: Syntax, newVarValues: Map[String, Double]): Syntax = {
+      syntax match {
+        case Atomic(assigns, diffs) =>
+          val newAssigns = assigns.map {
+            case Assign(Var(v), Value(value)) =>
+              newVarValues.get(v) match {
+                case Some(newValue) => 
+                  Assign(Var(v), Value(newValue))
+                case None =>
+                  Assign(Var(v), Value(value))
+              }
+            case other => other
+          }
+          Atomic(newAssigns, diffs)
+
+        case Seq(p, q) =>
+          Seq(changeAssignValues(p, newVarValues), changeAssignValues(q, newVarValues))
+
+        case ITE(cond, thenP, elseP) =>
+          ITE(cond, changeAssignValues(thenP, newVarValues), changeAssignValues(elseP, newVarValues))
+
+        case While(pre, guard, doP) =>
+          While(changeAssignValues(pre, newVarValues), guard, changeAssignValues(doP, newVarValues))
+
+        case _ => syntax
+      }
+    }
 
 
-
+    def balanceVarValues(newVarValues: Map[String, List[Double]]): Map[String, List[Double]] = {
+      val maxLength = newVarValues.values.map(_.length).max
+      newVarValues.map { case (key, values) =>
+        val balancedValues = if (values.length < maxLength) {
+          values ++ List.fill(maxLength - values.length)(values.head)
+        } else {
+          values
+        }
+        key -> balancedValues
+      }
+    }
+  }  
 }
