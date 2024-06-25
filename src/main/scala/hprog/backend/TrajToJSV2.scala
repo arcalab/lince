@@ -716,7 +716,7 @@ object TrajToJSV2 {
     
     var time_values = data.map(_._1.fold(x=>x,x=>x))
     val (xValues, yValues, zValues) = time_values.flatMap(dict_Graph.get).unzip3 
-    val (x_axis, y_axis,z_axis) = buildAxes3DforBoundaries(time_values,xValues,yValues,zValues,inout)
+    val (x_axis, y_axis,z_axis) = buildAxes3DforBoundaries(time_values, xValues, yValues, zValues, inout)
     
     s"""var b_${inout}_${variable + counter.toString} = {
        |   x: ${x_axis},
@@ -938,105 +938,105 @@ object TrajToJSV2 {
         (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"))
       }      
     }
-    
+
     /**
-    * Builds the strings for the X, Y, and Z axes based on provided data.
-    *
-    * @param firstAxe  List of values for the first axis.
-    * @param secondAxe List of values for the second axis.
-    * @param thirdAxe  List of values for the third axis.
-    * @return          A tuple containing the strings for the X, Y, and Z axes.
-    */
-    def buildAxes3D(firstAxe: List[Either[Double,(Double, Double)]]
-                  , secondAxe: List[Either[Double,(Double, Double)]]
-                  , thirdAxe: List[Either[Double,(Double, Double)]]): (String, String, String) = {
+  * Builds the strings for the X, Y, and Z axes based on provided data.
+  *
+  * @param time      List of time values.
+  * @param firstAxe  List of values for the first axis.
+  * @param secondAxe List of values for the second axis.
+  * @param thirdAxe  List of values for the third axis.
+  * @return          A tuple containing the strings for the X, Y, and Z axes.
+  */
+  def buildAxes3D(time: List[Double], firstAxe: List[Either[Double,(Double, Double)]], secondAxe: List[Either[Double,(Double, Double)]], thirdAxe: List[Either[Double,(Double, Double)]]): (String, String, String) = {
+    
+    var combined = List.empty[(Double, Either[Double,(Double, Double)], Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
+    var sortedCombined = List.empty[(Double, Either[Double,(Double, Double)], Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
 
-      var combined = List.empty[(Either[Double,(Double, Double)], Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
-      var sortedCombined = List.empty[(Either[Double,(Double, Double)], Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
+    combined = time.zip(firstAxe).zip(secondAxe).zip(thirdAxe).map {
+      case (((t, a), b), c) => (t, a, b, c)
+    }.toList
 
-      combined = (firstAxe, secondAxe, thirdAxe).zipped.toList
-      sortedCombined = combined.sortBy {
-        case (Left(a), _, _) => a
-        case (Right((a, _)), _, _) => a
-      }
+    sortedCombined = combined.sortBy(_._1)
 
+    val (firstPart, secondPart, thirdPart) = sortedCombined.map {
+      case (t, Left(a), Left(b), Left(c)) => (List(a.toString), List(b.toString), List(c.toString))
+      case (t, Left(a), Right((b, c)), Left(d)) => (List(a.toString, a.toString, a.toString), List(b.toString, "null", c.toString), List(d.toString, "null", d.toString))
+      case (t, Right((a, c)), Left(b), Left(d)) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", b.toString), List(d.toString, "null", d.toString))
+      case (t, Right((a, c)), Right((b, d)), Left(e)) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", d.toString), List(e.toString, "null", e.toString))
+      case (t, Left(a), Left(b), Right((d,e))) => (List(a.toString, a.toString, a.toString), List(b.toString, "null", b.toString), List(d.toString, "null", e.toString))
+      case (t, Left(a), Right((b, c)), Right((d,e))) => (List(a.toString, a.toString, a.toString), List(b.toString, "null", c.toString), List(d.toString, "null", e.toString))
+      case (t, Right((a, c)), Left(b), Right((d,e))) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", b.toString), List(d.toString, "null", e.toString))
+      case (t, Right((a, c)), Right((b, d)), Right((e,f))) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", d.toString), List(e.toString, "null", f.toString))
+    }.unzip3
+
+    (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"), thirdPart.flatten.mkString("[", ",", "]"))
+  }
+
+   
+  /**
+  * Builds the strings for the X, Y, and Z axes for boundary conditions.
+  *
+  * @param firstAxe  List of values for the first axis.
+  * @param secondAxe List of values for the second axis.
+  * @param thirdAxe  List of values for the third axis.
+  * @param inout     Specifies whether the points are for input or output boundaries.
+  * @return          A tuple containing the strings for the X, Y, and Z axes.
+  */
+  def buildAxes3DforBoundaries(time: List[Double]
+                              , firstAxe: List[Either[Double,(Double, Double)]]
+                              , secondAxe: List[Either[Double,(Double, Double)]]
+                              , thirdAxe: List[Either[Double,(Double, Double)]]
+                              , inout: String): (String, String, String) = {
+
+    var combined = List.empty[(Double, Either[Double,(Double, Double)], Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
+    var sortedCombined = List.empty[(Double, Either[Double,(Double, Double)], Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
+
+    combined = time.zip(firstAxe).zip(secondAxe).zip(thirdAxe).map {
+      case (((t, a), b), c) => (t, a, b, c)
+    }.toList
+
+    sortedCombined = combined.sortBy(_._1)
+    
+    if(inout == "in") {      
       val (firstPart, secondPart, thirdPart) = sortedCombined.map {
-        case (Left(a), Left(b), Left(c)) => (List(a.toString), List(b.toString), List(c.toString))
-        case (Left(a), Right((b, c)), Left(d)) => (List(a.toString, a.toString, a.toString), List(b.toString, "null", c.toString), List(d.toString, "null", d.toString))
-        case (Right((a, c)), Left(b), Left(d)) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", b.toString), List(d.toString, "null", d.toString))
-        case (Right((a, c)), Right((b, d)), Left(e)) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", d.toString), List(e.toString, "null", e.toString))
-        case (Left(a), Left(b), Right((d,e))) => (List(a.toString, a.toString, a.toString), List(b.toString, "null", b.toString), List(d.toString, "null", e.toString))
-        case (Left(a), Right((b, c)), Right((d,e))) => (List(a.toString, a.toString, a.toString), List(b.toString, "null", c.toString), List(d.toString, "null", e.toString))
-        case (Right((a, c)), Left(b), Right((d,e))) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", b.toString), List(d.toString, "null", e.toString))
-        case (Right((a, c)), Right((b, d)), Right((e,f))) => (List(a.toString, a.toString, c.toString), List(b.toString, "null", d.toString), List(e.toString, "null", f.toString))
+        case (t, Left(a), Left(b), Left(e)) => (List(a.toString), List(b.toString), List(e.toString))
+        case (t, Left(a), Right((b, c)), Left(e)) => (List(a.toString, a.toString), List(c.toString, "null"), List(e.toString, "null"))
+        case (t, Right((a, c)), Left(b), Left(e)) => (List(c.toString, c.toString), List(b.toString, "null"), List(e.toString, "null"))
+        case (t, Right((a, c)), Right((b, d)), Left(e)) => (List(c.toString, c.toString), List(d.toString, "null"), List(e.toString, "null"))
+        case (t, Left(a), Left(b), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
+        case (t, Left(a), Right((b, c)), Right((e,f))) => (List(a.toString, a.toString), List(c.toString, "null"), List(f.toString, "null"))
+        case (t, Right((a, c)), Left(b), Right((e,f))) => (List(c.toString, c.toString), List(b.toString, "null"), List(f.toString, "null"))
+        case (t, Right((a, c)), Right((b, d)), Right((e,f))) => (List(c.toString, c.toString), List(d.toString, "null"), List(f.toString, "null"))
       }.unzip3
       
       (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"), thirdPart.flatten.mkString("[", ",", "]"))
-    } 
 
-    /**
-    * Builds the strings for the X, Y, and Z axes for boundary conditions.
-    *
-    * @param firstAxe  List of values for the first axis.
-    * @param secondAxe List of values for the second axis.
-    * @param thirdAxe  List of values for the third axis.
-    * @param inout     Specifies whether the points are for input or output boundaries.
-    * @return          A tuple containing the strings for the X, Y, and Z axes.
-    */
-    def buildAxes3DforBoundaries(firstAxe: List[Either[Double,(Double, Double)]]
-                                , secondAxe: List[Either[Double,(Double, Double)]]
-                                , thirdAxe: List[Either[Double,(Double, Double)]]
-                                , inout: String): (String, String, String) = {
-
-      var combined = List.empty[(Either[Double,(Double, Double)], Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
-      var sortedCombined = List.empty[(Either[Double,(Double, Double)], Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
-
-      combined = (firstAxe, secondAxe, thirdAxe).zipped.toList
+    } else {
+      val (firstPart, secondPart, thirdPart) = sortedCombined.map {
+        case (t, Left(a), Left(b), Left(e)) => (List(a.toString), List(b.toString), List(e.toString))
+        case (t, Left(a), Right((b, c)), Left(e)) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
+        case (t, Right((a, c)), Left(b), Left(e)) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
+        case (t, Right((a, c)), Right((b, d)), Left(e)) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
+        case (t, Left(a), Left(b), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(f.toString, "null"))
+        case (t, Left(a), Right((b, c)), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
+        case (t, Right((a, c)), Left(b), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
+        case (t, Right((a, c)), Right((b, d)), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
+      }.unzip3
       
-      sortedCombined = combined.sortBy {
-        case (Left(a), _, _) => a
-        case (Right((a, _)), _, _) => a
-      }
-      
-      if(inout == "in") {      
-        val (firstPart, secondPart, thirdPart) = sortedCombined.map {
-          case (Left(a), Left(b), Left(e)) => (List(a.toString), List(b.toString), List(e.toString))
-          case (Left(a), Right((b, c)), Left(e)) => (List(a.toString, a.toString), List(c.toString, "null"), List(e.toString, "null"))
-          case (Right((a, c)), Left(b), Left(e)) => (List(c.toString, c.toString), List(b.toString, "null"), List(e.toString, "null"))
-          case (Right((a, c)), Right((b, d)), Left(e)) => (List(c.toString, c.toString), List(d.toString, "null"), List(e.toString, "null"))
-          case (Left(a), Left(b), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
-          case (Left(a), Right((b, c)), Right((e,f))) => (List(a.toString, a.toString), List(c.toString, "null"), List(f.toString, "null"))
-          case (Right((a, c)), Left(b), Right((e,f))) => (List(c.toString, c.toString), List(b.toString, "null"), List(f.toString, "null"))
-          case (Right((a, c)), Right((b, d)), Right((e,f))) => (List(c.toString, c.toString), List(d.toString, "null"), List(f.toString, "null"))
-        }.unzip3
-        
-        (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"), thirdPart.flatten.mkString("[", ",", "]"))
+      (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"), thirdPart.flatten.mkString("[", ",", "]"))
+    }      
+  }  
 
-      } else {
-        val (firstPart, secondPart, thirdPart) = sortedCombined.map {
-          case (Left(a), Left(b), Left(e)) => (List(a.toString), List(b.toString), List(e.toString))
-          case (Left(a), Right((b, c)), Left(e)) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
-          case (Right((a, c)), Left(b), Left(e)) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
-          case (Right((a, c)), Right((b, d)), Left(e)) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
-          case (Left(a), Left(b), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(f.toString, "null"))
-          case (Left(a), Right((b, c)), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
-          case (Right((a, c)), Left(b), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
-          case (Right((a, c)), Right((b, d)), Right((e,f))) => (List(a.toString, a.toString), List(b.toString, "null"), List(e.toString, "null"))
-        }.unzip3
-        
-        (firstPart.flatten.mkString("[", ",", "]"), secondPart.flatten.mkString("[", ",", "]"), thirdPart.flatten.mkString("[", ",", "]"))
-      }      
-    }  
-
-    /**
-    * Converts a list of Double values to a list of Either[Double, (Double, Double)].
-    *
-    * @param inputList List of Double values.
-    * @return          A list of Either values, where each element is either a single Double or a tuple of Doubles.
-    */
-    def convertToEitherList(inputList: List[Double]): List[Either[Double, (Double, Double)]] = {
-      inputList.map(value => Left(value))
-    }
+  /**
+  * Converts a list of Double values to a list of Either[Double, (Double, Double)].
+  *
+  * @param inputList List of Double values.
+  * @return          A list of Either values, where each element is either a single Double or a tuple of Doubles.
+  */
+  def convertToEitherList(inputList: List[Double]): List[Either[Double, (Double, Double)]] = {
+    inputList.map(value => Left(value))
+  }
 
   /**
   * Processes the values of a trace to extract and separate the time values (xt) and variable values (x).
