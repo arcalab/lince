@@ -45,7 +45,7 @@ object Parser extends RegexParsers {
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
   val skip = Atomic(Nil, DiffEqs(Nil, For(Value(0))))  
-  var initialValues: Map[String, List[Double]] = Map()
+  var initialValues: Map[String, List[NotLin]] = Map()
 
   //   ///////////////
   //   /// Program ///
@@ -122,39 +122,26 @@ object Parser extends RegexParsers {
     condP ^^ Guard |
       intPP ^^ Counter
   }
-
+    
+  // Parser for array values
+  lazy val arrayP: Parser[List[NotLin]] = "[" ~> repsep(notlinP, ",") <~ "]"
   
   /** Parser for an atomic program: an assignment or a set of diff equations. */
-  /*lazy val atomP: Parser[Atomic] =
-    (identifier ~ ":=" ~ notlinP) <~ ";" ^^ {
-      case v ~ _ ~ l => Atomic(List(Assign(Var("_" + v), l)), DiffEqs(Nil, For(Value(0))))
-    } |
-      (diffEqsP ~ opt(durP)) <~ ";" ^^ {
-        case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
-      } /**|
-      durP <~ ";" ^^ {
-        case d => Atomic(Nil, DiffEqs(Nil, d)) // upgrate
-      }*/*/
-
-  // Parser for array values
-  lazy val arrayP: Parser[List[Double]] = "[" ~> repsep(realP, ",") <~ "]"
-
   lazy val atomP: Parser[Atomic] =
     (identifier ~ ":=" ~ (notlinP | arrayP)) <~ ";" ^^ {
       case v ~ _ ~ l => l match {
-        case list: List[_] =>
-          val listValues = list.asInstanceOf[List[Double]]
-          initialValues += ("_" + v -> listValues)
-          Atomic(List(Assign(Var("_" + v), Value(listValues.head))), DiffEqs(Nil, For(Value(0))))
+        case list: List[NotLin] =>         
+          initialValues += ("_" + v -> list)
+          Atomic(List(Assign(Var("_" + v), list.head)), DiffEqs(Nil, For(Value(0))))
         case expr: NotLin =>
           Atomic(List(Assign(Var("_" + v), expr)), DiffEqs(Nil, For(Value(0))))
       }
     } |
     (diffEqsP ~ opt(durP)) <~ ";" ^^ {
       case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
-    }
+  }
   
-
+  
 
   /** Parser for  differential equations */
   lazy val diffEqsP: Parser[DiffEqs] =

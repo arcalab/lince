@@ -164,9 +164,9 @@ case class Mult(v: Value,l: Lin)    extends Lin
   
   object GetSyntax {
     private var parsedSyntax: Syntax = null
-    private var initialValues: Map[String, List[Double]] = Map()
+    private var initialValues: Map[String, List[NotLin]] = Map()
 
-    def getInitialValues(values: Map[String, List[Double]]): Unit = {
+    def getInitialValues(values: Map[String, List[NotLin]]): Unit = {
       initialValues = values
     }
 
@@ -179,7 +179,7 @@ case class Mult(v: Value,l: Lin)    extends Lin
       sintaxes
     }
 
-    def getAllSyntax(newVarValues: Map[String, List[Double]]): List[Syntax] = {
+    def getAllSyntax(newVarValues: Map[String, List[NotLin]]): List[Syntax] = {
     if (newVarValues.isEmpty) {
       List(parsedSyntax)     
     } else {
@@ -199,16 +199,16 @@ case class Mult(v: Value,l: Lin)    extends Lin
     }
   }
 
-    def changeAssignValues(syntax: Syntax, newVarValues: Map[String, Double]): Syntax = {
+    def changeAssignValues(syntax: Syntax, newVarValues: Map[String, NotLin]): Syntax = {
       syntax match {
         case Atomic(assigns, diffs) =>
           val newAssigns = assigns.map {
-            case Assign(Var(v), Value(value)) =>
+            case Assign(Var(v), l) =>
               newVarValues.get(v) match {
                 case Some(newValue) => 
-                  Assign(Var(v), Value(newValue))
+                  Assign(Var(v), newValue)
                 case None =>
-                  Assign(Var(v), Value(value))
+                  Assign(Var(v), l)
               }
             case other => other
           }
@@ -228,7 +228,7 @@ case class Mult(v: Value,l: Lin)    extends Lin
     }
 
 
-    def balanceVarValues(newVarValues: Map[String, List[Double]]): Map[String, List[Double]] = {
+    def balanceVarValues(newVarValues: Map[String, List[NotLin]]): Map[String, List[NotLin]] = {
       val maxLength = newVarValues.values.map(_.length).max
       newVarValues.map { case (key, values) =>
         val balancedValues = if (values.length < maxLength) {
