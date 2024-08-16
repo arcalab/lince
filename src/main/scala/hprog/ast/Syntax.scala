@@ -199,7 +199,7 @@ case class Mult(v: Value,l: Lin)    extends Lin
     }
   }
 
-    def changeAssignValues(syntax: Syntax, newVarValues: Map[String, NotLin]): Syntax = {
+    /*def changeAssignValues(syntax: Syntax, newVarValues: Map[String, NotLin]): Syntax = {
       syntax match {
         case Atomic(assigns, diffs) =>
           val newAssigns = assigns.map {
@@ -225,7 +225,51 @@ case class Mult(v: Value,l: Lin)    extends Lin
 
         case _ => syntax
       }
+    }*/
+    def changeAssignValues(syntax: Syntax, newVarValues: Map[String, NotLin]): Syntax = {
+      def processAssigns(assigns: List[Assign], remainingVarValues: Map[String, NotLin]): (List[Assign], Map[String, NotLin]) = {
+        assigns.foldLeft((List.empty[Assign], remainingVarValues)) {
+          case ((newAssigns, remainingValues), Assign(Var(v), l)) =>
+            remainingValues.get(v) match {
+              case Some(newValue) =>
+                (newAssigns :+ Assign(Var(v), newValue), remainingValues - v)
+              case None =>
+                (newAssigns :+ Assign(Var(v), l), remainingValues)
+            }
+          case ((newAssigns, remainingValues), other) =>
+            (newAssigns :+ other, remainingValues)
+        }
+      }
+
+      def change(syntax: Syntax, remainingVarValues: Map[String, NotLin]): (Syntax, Map[String, NotLin]) = {
+        syntax match {
+          case Atomic(assigns, diffs) =>
+            val (newAssigns, updatedValues) = processAssigns(assigns, remainingVarValues)
+            (Atomic(newAssigns, diffs), updatedValues)
+
+          case Seq(p, q) =>
+            val (newP, updatedValues) = change(p, remainingVarValues)
+            val (newQ, finalValues) = change(q, updatedValues)
+            (Seq(newP, newQ), finalValues)
+
+          case ITE(cond, thenP, elseP) =>
+            val (newThenP, updatedValues1) = change(thenP, remainingVarValues)
+            val (newElseP, updatedValues2) = change(elseP, updatedValues1)
+            (ITE(cond, newThenP, newElseP), updatedValues2)
+
+          case While(pre, guard, doP) =>
+            val (newPre, updatedValues1) = change(pre, remainingVarValues)
+            val (newDoP, updatedValues2) = change(doP, updatedValues1)
+            (While(newPre, guard, newDoP), updatedValues2)
+
+          case _ => (syntax, remainingVarValues)
+        }
+      }
+
+      change(syntax, newVarValues)._1
     }
+
+
 
 
     def balanceVarValues(newVarValues: Map[String, List[NotLin]]): Map[String, List[NotLin]] = {

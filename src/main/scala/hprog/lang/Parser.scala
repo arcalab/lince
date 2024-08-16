@@ -26,15 +26,22 @@ object Parser extends RegexParsers {
     * @param c string representing a program
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parse(c: String): ParseResult[Syntax] = parseAll(progP, c)
-
+    def parse(c: String): ParseResult[Syntax] = {
+      variables = List.empty[String]  
+      initialValues = Map.empty[String, List[NotLin]] 
+      parseAll(progP, c)
+    }
   /**
     * Main function that parses a string into a Condition.
     *
     * @param c string representing the condition
     * @return Parse result (parsed(cond) or failure(error))
     */
-  def parseCond(c: String): ParseResult[Cond] = parseAll(condP, c)
+    def parseCond(c: String): ParseResult[Cond] = {
+      variables = List.empty[String]  
+      initialValues = Map.empty[String, List[NotLin]] 
+      parseAll(condP, c)
+    }
 
 
   override def skipWhitespace = true
@@ -46,6 +53,7 @@ object Parser extends RegexParsers {
 
   val skip = Atomic(Nil, DiffEqs(Nil, For(Value(0))))  
   var initialValues: Map[String, List[NotLin]] = Map()
+  var variables: List[String] = List()
 
   //   ///////////////
   //   /// Program ///
@@ -54,17 +62,19 @@ object Parser extends RegexParsers {
   /** Parser for a program that checks if the program is closed before returning. */
 
 
-  lazy val progP: Parser[Syntax] =
+  lazy val progP: Parser[Syntax] =   
     declr ^^ { stx =>
       Utils.isClosed(stx) match {
         case Left(msg) => throw new ParserException(msg)
         case Right(_) => {
           Syntax.GetSyntax.addParsedSyntax(stx)
           Syntax.GetSyntax.getInitialValues(initialValues)
+          variables = List.empty[String]
+          initialValues = Map()
           //var aux:Map[String,NotLin]=Map()
           //var x=Utils.updateSyntax(stx,aux,0,Utils.extractVarsDifEqs(stx),0)
           //x._1
-          stx
+          stx          
         }
       }
     }
@@ -126,21 +136,51 @@ object Parser extends RegexParsers {
   // Parser for array values
   lazy val arrayP: Parser[List[NotLin]] = "[" ~> repsep(notlinP, ",") <~ "]"
   
-  /** Parser for an atomic program: an assignment or a set of diff equations. */
+  /*/** Parser for an atomic program: an assignment or a set of diff equations. */
   lazy val atomP: Parser[Atomic] =
     (identifier ~ ":=" ~ (notlinP | arrayP)) <~ ";" ^^ {
       case v ~ _ ~ l => l match {
-        case list: List[NotLin] =>         
+        case list: List[NotLin] => 
+          if (!variables.contains(v)) {
+            val error = s"""The attribution for the variavle ${v} with values: ${list} is done in the wrong place"""
+            throw new Exception(error)
+          }         
           initialValues += ("_" + v -> list)
           Atomic(List(Assign(Var("_" + v), list.head)), DiffEqs(Nil, For(Value(0))))
         case expr: NotLin =>
+          if (!variables.contains(v)) {
+            variables =  variables + List(v)
+          } 
           Atomic(List(Assign(Var("_" + v), expr)), DiffEqs(Nil, For(Value(0))))
       }
     } |
     (diffEqsP ~ opt(durP)) <~ ";" ^^ {
       case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
   }
-  
+  */
+  lazy val atomP: Parser[Atomic] =
+  (identifier ~ ":=" ~ (notlinP | arrayP)) <~ ";" ^^ {
+    case v ~ _ ~ l => l match {
+      case list: List[NotLin] => 
+        if (variables.contains(v)) {
+          val error = s"""The assignment for the variable $v with values: $list is done in the wrong place"""
+          throw new Exception(error)
+        }
+        variables = variables :+ v  
+        initialValues += ("_" + v -> list)
+        Atomic(List(Assign(Var("_" + v), list.head)), DiffEqs(Nil, For(Value(0))))
+      
+      case expr: NotLin =>
+        if (!variables.contains(v)) {
+          variables = variables :+ v          
+        }
+        Atomic(List(Assign(Var("_" + v), expr)), DiffEqs(Nil, For(Value(0))))
+    }
+  } |
+  (diffEqsP ~ opt(durP)) <~ ";" ^^ {
+    case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
+  }
+
   
 
   /** Parser for  differential equations */
