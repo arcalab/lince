@@ -161,7 +161,7 @@ object Parser extends RegexParsers {
   lazy val atomP: Parser[Atomic] =
   (identifier ~ ":=" ~ (notlinP | arrayP)) <~ ";" ^^ {
     case v ~ _ ~ l => l match {
-      case list: List[NotLin] => 
+      case list: List[NotLin] =>
         if (variables.contains(v)) {
           val error = s"""The assignment for the variable $v with values: $list is done in the wrong place"""
           throw new Exception(error)
@@ -250,8 +250,6 @@ object Parser extends RegexParsers {
       case l1 ~ None => l1
 
     }
-
-
 
   /*
   lazy val notlinAtP: Parser[NotLin] =

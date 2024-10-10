@@ -48,61 +48,59 @@ def multOfPiOn2(number: Double): Boolean = {
             case Value(v) => v
             case Add(l1, l2) => apply(state,l1) + apply(state,l2)
             case Mult(l1,l2)  => apply(state,l1)  * apply(state,l2)
-            case Div(l1,l2)  => {if (apply(state,l2)==0) {return throw new RuntimeException(s"Error: the divisor of the division '${Show.applyV(notlin)}' is zero.")}
-                                 else {return (apply(state,l1) / apply(state,l2))}
-                                }
-            case Res(l1,l2)  => {if (apply(state,l2)==0) {return throw new RuntimeException(s"Error: the divisor of the remainder '${Show.applyV(notlin)}' is zero.")}
-                                 else {return (apply(state,l1) % apply(state,l2))}
-                                }
+            case Div(l1,l2)  =>
+              if (apply(state,l2)==0)
+                sys.error(s"Error: the divisor of the division '${Show.applyV(notlin)}' is zero.")
+              else apply(state,l1) / apply(state,l2)
+            case Res(l1,l2)  =>
+              if (apply(state,l2)==0)
+                sys.error(s"Error: the divisor of the remainder '${Show.applyV(notlin)}' is zero.")
+              else apply(state,l1) % apply(state,l2)
             case Func(s,list) => (s,list) match {
               case ("PI",Nil) => math.Pi
               case ("E",Nil) => math.E
               case ("max",v1::v2::Nil) => math.max(apply(state,v1), apply(state,v2))
               case ("min",v1::v2::Nil) => math.min(apply(state,v1), apply(state,v2))
-              case ("pow",v1::v2::Nil) => {if(apply(state,v1)==0 && apply(state,v2)<0) return throw new RuntimeException(s"Error: The power of zero is undefined for a negative exponent: '${Show.applyV(notlin)}'.")
-                                           else pow(apply(state,v1),apply(state,v2))
-              }
+              case ("pow",v1::v2::Nil) =>
+                if(apply(state,v1)==0 && apply(state,v2)<0)
+                  sys.error(s"Error: The power of zero is undefined for a negative exponent: '${Show.applyV(notlin)}'.")
+                else pow(apply(state,v1),apply(state,v2))
               case ("exp",v::Nil) => math.exp(apply(state,v))
-              case ("sin",v::Nil) => {if (multOfPi(apply(state,v))) {return 0}
-
-                                      else {return math.sin(apply(state,v))}
-
-              }
-              case ("cos",v::Nil) => {if (multOfPiOn2(apply(state,v))) {return 0}
-
-                                      else {return math.cos(apply(state,v))}
-
-              }
-              case ("tan",v::Nil) =>{if (multOfPi(apply(state,v))) {return 0}
-
-                                      else {return math.tan(apply(state,v))}
-
-              }
-              case ("arcsin",v::Nil) => {
-                if ((math.asin(apply(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arcsin (-1<=x<=1).")
+              case ("sin",v::Nil) =>
+                if (multOfPi(apply(state,v)))  0
+                else math.sin(apply(state,v))
+              case ("cos",v::Nil) =>
+                if (multOfPiOn2(apply(state,v)))  0
+                else math.cos(apply(state,v))
+              case ("tan",v::Nil) =>
+                if (multOfPi(apply(state,v)))  0
+                else math.tan(apply(state,v))
+              case ("arcsin",v::Nil) =>
+                if ((math.asin(apply(state,v))).isNaN)
+                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arcsin (-1<=x<=1).")
                 else math.asin(apply(state,v))
-              }
-              case ("arccos",v::Nil) => {
-                if ((math.acos(apply(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arccos (-1<=x<=1).")
+              case ("arccos",v::Nil) =>
+                if ((math.acos(apply(state,v))).isNaN)
+                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arccos (-1<=x<=1).")
                 else math.acos(apply(state,v))
-              }
               case ("arctan",v::Nil) => math.atan(apply(state,v))
               case ("sinh",v::Nil) => math.sinh(apply(state,v))
               case ("cosh",v::Nil) => math.cosh(apply(state,v))
               case ("tanh",v::Nil) => math.tanh(apply(state,v))
-              case ("sqrt",v::Nil) => {
-                if ((math.sqrt(apply(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of sqrt (x>=0).")
+              case ("sqrt",v::Nil) =>
+                if ((math.sqrt(apply(state,v))).isNaN)
+                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of sqrt (x>=0).")
                 else math.sqrt(apply(state,v))
-              }
-              case ("log",v::Nil) =>  {
-                if (apply(state,v)<=0) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log (x>0).")
+              case ("log",v::Nil) =>
+                if (apply(state,v)<=0)
+                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log (x>0).")
                 else math.log(apply(state,v))
-              }
-              case ("log10",v::Nil) =>  {
-                if (apply(state,v)<=0) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log10 (x>0).")
+              case ("log10",v::Nil) =>
+                if (apply(state,v)<=0)
+                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log10 (x>0).")
                 else math.log10(apply(state,v))
-              }
-               case (_,_) => throw new RuntimeException(s"Unknown function '${s}(${(list.map(Show.applyV).toList).mkString(",")})', or the number of arguments are incorrect")
+               case (_,_) =>
+                 sys.error(s"Unknown function '${s}(${(list.map(Show.applyV).toList).mkString(",")})', or the number of arguments are incorrect")
 
             }
     }

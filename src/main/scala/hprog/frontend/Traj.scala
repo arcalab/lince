@@ -120,13 +120,8 @@ object Traj {
       case _ => true
     }
   }
-
   case class Time(t:SyExpr)             extends RunTarget
-
-
   case class Times(from:Double,to:Double,step:Double)  extends RunTarget
-
-
   case class Bound(n:Int, timer:SyExpr)  extends RunTarget
 
   sealed abstract class Run {
@@ -136,17 +131,9 @@ object Traj {
       case run => run
     }
   }
-
-  
-
   case object RInf                                  extends Run
-
-  
   case class REnd(at: RunTarget, x: Valuation,found:List[(SyExpr,Valuation)])   extends Run
-
   case class RFound(x: Valuation,tc:TimeClosure)    extends Run
-
-
   case class RFoundMany(found:List[(SyExpr,Valuation)])    extends Run
 
   case class TimeClosure(e:SySolution, t:SyExpr)
@@ -227,7 +214,7 @@ object Traj {
                     (implicit solver: Solver, dev: Deviator, logger: Logger)
   : Run = {
     // Printing numerical errors
-    Eval.apply(Eval.apply(x),ifS) // preprocess: checks if there are errors when evaluating Cond
+    Eval(Eval(x),ifS) // preprocess: checks if there are errors when evaluating Cond
     
     val ifValue = solver.solveSymb(ifS, x)
 
@@ -293,9 +280,8 @@ object Traj {
         val delta = Utils.toValuation(at.as,x)
         val x2 = x++delta
         // Printing numerical errors
-          if (at.as.nonEmpty) {
-          Eval.apply(Eval.apply(x2),at.as(0).e) // preprocess: checks if there are errors when evaluating an assigment
-          }
+          if (at.as.nonEmpty)
+            Eval(Eval(x2),at.as(0).e) // preprocess: checks if there are errors when evaluating an assigment
           
         
         if (delta.nonEmpty) {
@@ -306,15 +292,13 @@ object Traj {
       // Rule 2 or 3 with a fixed deadline
       case For(d) =>{
         // Printing numerical errors
-        Eval.apply(Eval.apply(x),d) // preprocess: checks if there are errors when evaluating an eq.diff
+        Eval(Eval(x),d) // preprocess: checks if there are errors when evaluating an eq.diff
         
         rb match {
           // Rule 1+2
           case Time(time) =>{
-
             // Printing numerical errors        
             (at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
-                    
             runAtomicWithTime(time,at,d,x,true) // set log=false if warnings are not important
           }
 
@@ -323,15 +307,12 @@ object Traj {
             
             // Printing numerical errors          
             (at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
-        
             runAtomicWithTimes(times, at, d, x, Nil)
 
           // variation of rule 3 (for time = inf, with bounded loops)
           case b:Bound =>
             // Printing numerical errors
             (at.de.eqs).map(e=>Eval.apply(Eval.apply(x),e.e))
-        
-           
             runAtomicWithBounds(b,at,d,x)
         }
       }
@@ -343,8 +324,7 @@ object Traj {
       case u:Until =>
         val x2 = x ++ Utils.toValuation(at.as,x) // update x with as
         // Printing numerical errors
-        Eval.apply(Eval.apply(x2),u.c)
-      
+        Eval.apply(Eval.apply(x2),u.c) // preprocess
 
         val durEstimation = Solver.estimateDur(u, at.de.eqs, x2, solver) match {
           case Some((d,ws)) =>
@@ -356,7 +336,7 @@ object Traj {
     }
   }
 
-  //Calculate Atomic with time (used by simbolic evaluation)
+  //Calculate Atomic with time (used by symbolic evaluation)
   private def runAtomicWithTime(time: SyExpr, at:Atomic, dur:NotLin, x:Valuation,log:Boolean = false)
                                (implicit solver:Solver, logger: Logger): Run = {
     try{
