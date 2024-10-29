@@ -4,7 +4,7 @@ import hprog.ast.SymbolicExpr.SyExprAll
 import hprog.ast._
 import hprog.frontend.Eval
 import Syntax._
-import hprog.frontend.CommonTypes.{Point, Solution, SySolution, Valuation}
+import hprog.frontend.CommonTypes.{Point, Solution, SySolution, ValuationSyExpr}
 
 
 /*
@@ -55,7 +55,7 @@ class SimpleSolver(windows_size:Double) extends Solver {
 
   override def solveSymb(eqs:List[DiffEq]): SySolution = Map()
   override def solveSymb(expr: SyExprAll): SyExprAll = expr
-  override def solveSymb(cond: Cond, v:Valuation): Boolean = Eval(Eval(v),cond)
+  override def solveSymb(cond: Cond, v:ValuationSyExpr): Boolean = Eval(Eval(v),cond)
 
 def runge_kutta_func(input:DValuation , eqs:List[DiffEq],time:Double, key_V:String): Double   = {
        
@@ -79,7 +79,7 @@ def runge_kutta_func(input:DValuation , eqs:List[DiffEq],time:Double, key_V:Stri
   acum(key) = init(key)
   }
   for (deq <- eqs){
-    k1(deq.v.v)=h*(Eval.applyAux(acum,deq.e))
+    k1(deq.v.v)=h*(Eval(acum,deq.e))
   }
 
 
@@ -93,7 +93,7 @@ def runge_kutta_func(input:DValuation , eqs:List[DiffEq],time:Double, key_V:Stri
   acum(key) = init(key)+k1(key)/2
   }
   for (deq <- eqs){
-    k2(deq.v.v)=h*(Eval.applyAux(acum,deq.e))
+    k2(deq.v.v)=h*(Eval(acum,deq.e))
   }
  
 
@@ -104,7 +104,7 @@ def runge_kutta_func(input:DValuation , eqs:List[DiffEq],time:Double, key_V:Stri
   acum(key) = init(key)+k2(key)/2
   }
   for (deq <- eqs){
-    k3(deq.v.v)=h*(Eval.applyAux(acum,deq.e))
+    k3(deq.v.v)=h*(Eval(acum,deq.e))
   }
 
 
@@ -120,7 +120,7 @@ def runge_kutta_func(input:DValuation , eqs:List[DiffEq],time:Double, key_V:Stri
   acum(key) = init(key)+k3(key)
   }
   for (deq <- eqs){
-    k4(deq.v.v)=h*(Eval.applyAux(acum,deq.e))
+    k4(deq.v.v)=h*(Eval(acum,deq.e))
   }
  
 

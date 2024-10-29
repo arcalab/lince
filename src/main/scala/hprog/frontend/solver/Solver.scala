@@ -35,9 +35,9 @@ trait Solver {
     */
   def solveSymb(eqs:List[DiffEq]): SySolution
   def solveSymb(expr: SyExprAll): SyExprAll
-  def solveSymb(cond: Cond, valua: Valuation): Boolean
+  def solveSymb(cond: Cond, valua: ValuationSyExpr): Boolean
 
-  def solveSymb(valua:Valuation): Valuation =
+  def solveSymb(valua:ValuationSyExpr): ValuationSyExpr =
     valua.view.mapValues(e => asSyExpr(solveSymb(e))).toMap
   def solveSymbExpr(expr:SyExpr): SyExpr =
     asSyExpr(solveSymb(expr))
@@ -58,7 +58,7 @@ object Solver {
     eq.v.v :: getVars(eq.e,eq.v.v)
 
 //New
-  private def getVars(e:NotLin,base:String): List[String] = e match {
+  private def getVars(e:Expr, base:String): List[String] = e match {
     case Var(v) => List(v)
     case Value(v) => List()
     case Add(l1, l2) => getVars(l1,base) ::: getVars(l2,base)
@@ -70,7 +70,7 @@ object Solver {
   }
 
 //new
-  def getVarsAux(list:List[NotLin],base:String): List[String] = list match {
+  def getVarsAux(list:List[Expr], base:String): List[String] = list match {
     case List() => List()
     case n::List() => getVars(n,base)
     case n::ns => getVars(n,base) ::: getVarsAux(ns,base)
@@ -85,7 +85,7 @@ object Solver {
    return  eq.v.v :: getVars_Numerical(eq.e,eq.v.v)
  }
 
-  private def getVars_Numerical(e:NotLin,base:String): List[String] = e match {
+  private def getVars_Numerical(e:Expr, base:String): List[String] = e match {
     case Var(v) => List(v)
     case Value(v) => List("_"+base)
     case Add(l1, l2) => getVars_Numerical(l1,base) ::: getVars_Numerical(l2,base)
@@ -96,7 +96,7 @@ object Solver {
     case Func(s,list) => getVarsAux_Numerical(list,base,s)
   }
 //new
-  def getVarsAux_Numerical(list:List[NotLin],base:String,s:String): List[String] = {
+  def getVarsAux_Numerical(list:List[Expr], base:String, s:String): List[String] = {
   var res:List[String]=List()
   if (s=="PI" || s=="E") {
    res = List("_"+base)
@@ -110,89 +110,89 @@ object Solver {
    return res
   }  
 
-  def getMatrix(eqs:List[DiffEq]): (List[String],List[List[Double]]) = {
-    val vars = getVars_Numerical(eqs) //List[String]
-    println("vars_getmatrix:",vars)
-    // rows= String->List[Double]
-    val rows = eqs.map((x:DiffEq) => x.v.v -> getRow(vars,x.v.v,x.e)).toMap
-    println("row_getmatrix:",rows)
-    (  vars
-      ,for (v<-vars) yield rows.getOrElse(v,vars.map(_ => 0.0))) // Note: set to 0 when unknown variable
-  }
+//  def getMatrix(eqs:List[DiffEq]): (List[String],List[List[Double]]) = {
+//    val vars = getVars_Numerical(eqs) //List[String]
+//    println("vars_getmatrix:",vars)
+//    // rows= String->List[Double]
+//    val rows = eqs.map((x:DiffEq) => x.v.v -> getRow(vars,x.v.v,x.e)).toMap
+//    println("row_getmatrix:",rows)
+//    (  vars
+//      ,for (v<-vars) yield rows.getOrElse(v,vars.map(_ => 0.0))) // Note: set to 0 when unknown variable
+//  }
 
 
-  private def getRow(vars:List[String],base:String,e:NotLin): List[Double] = {
-    // m=Map[String,Double]
-    val m = getRowValues(e,base)
-    println("m_getrow:",m)
-    println("vars.map(x => m.getOrElse[Double](x,0)):",vars.map(x => m.getOrElse[Double](x,0)))
-    return vars.map(x => m.getOrElse[Double](x,0))
-  }
-
-
-
+//  private def getRow(vars:List[String],base:String,e:Expr): List[Double] = {
+//    // m=Map[String,Double]
+//    val m = getRowValues(e,base)
+//    println("m_getrow:",m)
+//    println("vars.map(x => m.getOrElse[Double](x,0)):",vars.map(x => m.getOrElse[Double](x,0)))
+//    return vars.map(x => m.getOrElse[Double](x,0))
+//  }
 
 
 
 
-  private def getRowValues(e:NotLin,base:String): Map[String,Double] = {
-    var res:Map[String,Double]=e match {
-            case Var(v) => Map(v->1)
-            case Value(v) => Map(("_"+base)->v) //New 
-            case Add(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
-            case Mult(l1, l2) => multjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
-            case Div(l1,l2) => divjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
-            case Res(l1,l2) => resjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
-            //case Pow(l1,l2) => powjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
-            case Func(s,list) => funcjoin(s,list.map((l:NotLin) => getRowValues(l,base)),base) //new
-             
-          }
-      //println(s"getRowValues: notlin->${e} to ${res}")
-      res
-    }
 
 
 
-  //  private def multt(d:Double,d2:Double): Double = d*d2
-  private def join(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
-    var res = m2
-    for ((k, v1) <- m1) m2.get(k) match {
-      case Some(v2) => val v = v1+v2; res += k -> v
-      case None => res += k->v1
-    }
-    res
-  }
-
-//New
-    private def multjoin(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
-    var res = m2
-    for ((k, v1) <- m1) m2.get(k) match {
-      case Some(v2) => val v = v1*v2; res += k -> v
-      case None => res += k->v1
-    }
-    res
-  }
+//  private def getRowValues(e:Expr, base:String): Map[String,Double] = {
+//    var res:Map[String,Double]=e match {
+//            case Var(v) => Map(v->1)
+//            case Value(v) => Map(("_"+base)->v) //New
+//            case Add(l1, l2) => join(getRowValues(l1,base),getRowValues(l2,base))
+//            case Mult(l1, l2) => multjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
+//            case Div(l1,l2) => divjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
+//            case Res(l1,l2) => resjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
+//            //case Pow(l1,l2) => powjoin(getRowValues(l1,base),getRowValues(l2,base)) //new
+//            case Func(s,list) => funcjoin(s,list.map((l:Expr) => getRowValues(l,base)),base) //new
+//
+//          }
+//      //println(s"getRowValues: notlin->${e} to ${res}")
+//      res
+//    }
 
 
-//New
-  private def divjoin(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
-    var res = m2
-    for ((k, v1) <- m1) m2.get(k) match {
-      case Some(v2) => val v = v1/v2; res += k -> v
-      case None => res += k->v1
-    }
-    res
-  }
-
-  //New
-  private def resjoin(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
-    var res = m2
-    for ((k, v1) <- m1) m2.get(k) match {
-      case Some(v2) => val v = v1%v2; res += k -> v
-      case None => res += k->v1
-    }
-    res
-  }
+//
+//  //  private def multt(d:Double,d2:Double): Double = d*d2
+//  private def join(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
+//    var res = m2
+//    for ((k, v1) <- m1) m2.get(k) match {
+//      case Some(v2) => val v = v1+v2; res += k -> v
+//      case None => res += k->v1
+//    }
+//    res
+//  }
+//
+////New
+//    private def multjoin(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
+//    var res = m2
+//    for ((k, v1) <- m1) m2.get(k) match {
+//      case Some(v2) => val v = v1*v2; res += k -> v
+//      case None => res += k->v1
+//    }
+//    res
+//  }
+//
+//
+////New
+//  private def divjoin(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
+//    var res = m2
+//    for ((k, v1) <- m1) m2.get(k) match {
+//      case Some(v2) => val v = v1/v2; res += k -> v
+//      case None => res += k->v1
+//    }
+//    res
+//  }
+//
+//  //New
+//  private def resjoin(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
+//    var res = m2
+//    for ((k, v1) <- m1) m2.get(k) match {
+//      case Some(v2) => val v = v1%v2; res += k -> v
+//      case None => res += k->v1
+//    }
+//    res
+//  }
 
 /**
 //New
@@ -206,65 +206,65 @@ object Solver {
   }
   */
 
+//
+////New
+//  private def funcjoin(s:String,list:List[Map[String,Double]],base:String):Map[String,Double] ={
+//      if(list.length == 0 || list.length>2){
+//        s match {
+//          case ("PI") => Map(("_"+base) -> math.Pi) //new
+//          case ("E") => Map(("_"+base) -> math.E) // new
+//          case (_) => throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+//        }
+//
+//      }
+//      else {
+//        if (list.length == 1){
+//          s match {
+//            case ("exp") => list(0).map(v => v._1 -> math.exp(v._2))
+//            case ("sin") => list(0).map(v => v._1 -> math.sin(v._2))
+//            case ("cos") => list(0).map(v => v._1 -> math.cos(v._2))
+//            case ("tan") => list(0).map(v => v._1 -> math.tan(v._2))
+//            case ("arcsin") => list(0).map(v => v._1 -> math.asin(v._2))
+//            case ("arccos") => list(0).map(v => v._1 -> math.acos(v._2))
+//            case ("arctan") => list(0).map(v => v._1 -> math.atan(v._2))
+//            case ("sinh") => list(0).map(v => v._1 -> math.sinh(v._2))
+//            case ("cosh") => list(0).map(v => v._1 -> math.cosh(v._2))
+//            case ("tanh") => list(0).map(v => v._1 -> math.tanh(v._2))
+//            case ("sqrt") => list(0).map(v => v._1 -> math.sqrt(v._2))
+//            case ("log") => list(0).map(v => v._1 -> math.log(v._2))
+//            case ("log10") => list(0).map(v => v._1 -> math.log10(v._2))
+//            case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+//          }
+//        }
+//        else {
+//          s match {
+//            case ("max") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.max((list(0))(x),v) else v))
+//            case ("min") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.min((list(0))(x),v) else v))
+//            //case ("pow") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.pow((list(0))(x),v) else v))
+//            case ("pow") => {   var res = list(1)
+//                                for ((k, v1) <- list(0)) list(1).get(k) match {
+//                                                              case Some(v2) => val v = math.pow(v1,v2); res += k -> v
+//                                                              case None => res += k->v1
+//                                                                      }
+//                            res}
+//            case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+//          }
+//        }
+//
+//      }
+//    }
+//
 
-//New
-  private def funcjoin(s:String,list:List[Map[String,Double]],base:String):Map[String,Double] ={
-      if(list.length == 0 || list.length>2){
-        s match {
-          case ("PI") => Map(("_"+base) -> math.Pi) //new
-          case ("E") => Map(("_"+base) -> math.E) // new
-          case (_) => throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
-        }
-        
-      }
-      else {
-        if (list.length == 1){
-          s match {
-            case ("exp") => list(0).map(v => v._1 -> math.exp(v._2))
-            case ("sin") => list(0).map(v => v._1 -> math.sin(v._2))
-            case ("cos") => list(0).map(v => v._1 -> math.cos(v._2))
-            case ("tan") => list(0).map(v => v._1 -> math.tan(v._2))
-            case ("arcsin") => list(0).map(v => v._1 -> math.asin(v._2))
-            case ("arccos") => list(0).map(v => v._1 -> math.acos(v._2))
-            case ("arctan") => list(0).map(v => v._1 -> math.atan(v._2))
-            case ("sinh") => list(0).map(v => v._1 -> math.sinh(v._2))
-            case ("cosh") => list(0).map(v => v._1 -> math.cosh(v._2))
-            case ("tanh") => list(0).map(v => v._1 -> math.tanh(v._2))
-            case ("sqrt") => list(0).map(v => v._1 -> math.sqrt(v._2))
-            case ("log") => list(0).map(v => v._1 -> math.log(v._2))
-            case ("log10") => list(0).map(v => v._1 -> math.log10(v._2))
-            case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
-          }
-        }
-        else {
-          s match {
-            case ("max") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.max((list(0))(x),v) else v))
-            case ("min") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.min((list(0))(x),v) else v))
-            //case ("pow") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.pow((list(0))(x),v) else v))
-            case ("pow") => {   var res = list(1)
-                                for ((k, v1) <- list(0)) list(1).get(k) match {
-                                                              case Some(v2) => val v = math.pow(v1,v2); res += k -> v
-                                                              case None => res += k->v1
-                                                                      }
-                            res}
-            case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
-          }  
-        }
-
-      }
-    }
-
-
-
-  @deprecated
-  private def mult(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
-    var res = m2
-    for ((k, v1) <- m1) m2.get(k) match {
-      case Some(v2) => val v = v1*v2; res += k -> v
-      case None => res += k->v1
-    }
-    res
-  }
+//
+//  @deprecated
+//  private def mult(m1:Map[String,Double],m2:Map[String,Double]): Map[String,Double] = {
+//    var res = m2
+//    for ((k, v1) <- m1) m2.get(k) match {
+//      case Some(v2) => val v = v1*v2; res += k -> v
+//      case None => res += k->v1
+//    }
+//    res
+//  }
 
 ////////////////////////////////////////////////////////////////
 
@@ -287,7 +287,8 @@ object Solver {
 
 
 
-  def estimateDur(until:Until, eqs:List[DiffEq], x:Valuation, solver:Solver): Option[(Double,Option[Double=>String])] = {
+  def estimateDur(until:Until, eqs:List[DiffEq], x:ValuationSyExpr,
+                  solver:Solver): Option[(Double,Option[Double=>String])] = {
     val sol = solver.evalFun(eqs) // maps variables to their solutions (function from t/ctx to value)
     def guard: Double => Boolean =
       t => {
@@ -297,7 +298,8 @@ object Solver {
     durValue
   }
 
-  def searchCond[X](until:Until, guard:Double=>Boolean,solver:Solver): Option[(Double,Option[Double=>String])] = {
+  def searchCond[X](until:Until, guard:Double=>Boolean,
+                    solver:Solver): Option[(Double,Option[Double=>String])] = {
     if (guard(0.0)) Some((0.0,None))
        else
         stepwiseSearch(0,until.jump,until.eps,guard,until.c,solver)

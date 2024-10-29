@@ -4,15 +4,13 @@ import hprog.ast.SymbolicExpr.{SyExpr, SyExprAll, SyExprTime, SyExprVar}
 import hprog.ast._
 import Syntax._
 import hprog.backend.Show
-import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, Valuation, Solution,ValuationNotLin}
+import hprog.frontend.CommonTypes.{Point, SySolution, SySolutionTime, SySolutionVar, ValuationSyExpr, Solution,ValuationExpr}
 import hprog.frontend.solver.Solver
 import hprog.frontend.Utils
 import scala.math._
 import scala.sys.error
 
 object Eval {
-
-
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -27,176 +25,110 @@ object Eval {
   }
 */
 
-def multOfPi(number: Double): Boolean = {
-  val eps = 1e-8 // Define a small value for tolerance
-  val res = abs(number % math.Pi) // Calculate the remainder
-  // Check if the remainder is within the tolerance range
-  return res < eps || abs(res - math.Pi) < eps
-}
+  type GenPoint = collection.Map[String,Double] // mutable or immutable map
 
-def multOfPiOn2(number: Double): Boolean = {
-  val eps = 1e-8 // Define a small value for tolerance
-  val res = abs((number+math.Pi/2) % math.Pi) // Calculate the remainder
-  // Check if the remainder is within the tolerance range
-  return res < eps || abs(res - math.Pi) < eps
-}
+  def multOfPi(number: Double): Boolean = {
+    val eps = 1e-8 // Define a small value for tolerance
+    val res = abs(number % math.Pi) // Calculate the remainder
+    // Check if the remainder is within the tolerance range
+    return res < eps || abs(res - math.Pi) < eps
+  }
+
+  def multOfPiOn2(number: Double): Boolean = {
+    val eps = 1e-8 // Define a small value for tolerance
+    val res = abs((number+math.Pi/2) % math.Pi) // Calculate the remainder
+    // Check if the remainder is within the tolerance range
+    return res < eps || abs(res - math.Pi) < eps
+  }
 
   /** Evaluation of a non-linear expression. */
-  def apply(state:Point, notlin: NotLin): Double = {
-    val res = notlin match {
-            case Var(v) => state(v)
-            case Value(v) => v
-            case Add(l1, l2) => apply(state,l1) + apply(state,l2)
-            case Mult(l1,l2)  => apply(state,l1)  * apply(state,l2)
-            case Div(l1,l2)  =>
-              if (apply(state,l2)==0)
-                sys.error(s"Error: the divisor of the division '${Show.applyV(notlin)}' is zero.")
-              else apply(state,l1) / apply(state,l2)
-            case Res(l1,l2)  =>
-              if (apply(state,l2)==0)
-                sys.error(s"Error: the divisor of the remainder '${Show.applyV(notlin)}' is zero.")
-              else apply(state,l1) % apply(state,l2)
-            case Func(s,list) => (s,list) match {
-              case ("PI",Nil) => math.Pi
-              case ("E",Nil) => math.E
-              case ("max",v1::v2::Nil) => math.max(apply(state,v1), apply(state,v2))
-              case ("min",v1::v2::Nil) => math.min(apply(state,v1), apply(state,v2))
-              case ("pow",v1::v2::Nil) =>
-                if(apply(state,v1)==0 && apply(state,v2)<0)
-                  sys.error(s"Error: The power of zero is undefined for a negative exponent: '${Show.applyV(notlin)}'.")
-                else pow(apply(state,v1),apply(state,v2))
-              case ("exp",v::Nil) => math.exp(apply(state,v))
-              case ("sin",v::Nil) =>
-                if (multOfPi(apply(state,v)))  0
-                else math.sin(apply(state,v))
-              case ("cos",v::Nil) =>
-                if (multOfPiOn2(apply(state,v)))  0
-                else math.cos(apply(state,v))
-              case ("tan",v::Nil) =>
-                if (multOfPi(apply(state,v)))  0
-                else math.tan(apply(state,v))
-              case ("arcsin",v::Nil) =>
-                if ((math.asin(apply(state,v))).isNaN)
-                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arcsin (-1<=x<=1).")
-                else math.asin(apply(state,v))
-              case ("arccos",v::Nil) =>
-                if ((math.acos(apply(state,v))).isNaN)
-                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arccos (-1<=x<=1).")
-                else math.acos(apply(state,v))
-              case ("arctan",v::Nil) => math.atan(apply(state,v))
-              case ("sinh",v::Nil) => math.sinh(apply(state,v))
-              case ("cosh",v::Nil) => math.cosh(apply(state,v))
-              case ("tanh",v::Nil) => math.tanh(apply(state,v))
-              case ("sqrt",v::Nil) =>
-                if ((math.sqrt(apply(state,v))).isNaN)
-                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of sqrt (x>=0).")
-                else math.sqrt(apply(state,v))
-              case ("log",v::Nil) =>
-                if (apply(state,v)<=0)
-                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log (x>0).")
-                else math.log(apply(state,v))
-              case ("log10",v::Nil) =>
-                if (apply(state,v)<=0)
-                  sys.error(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log10 (x>0).")
-                else math.log10(apply(state,v))
-               case (_,_) =>
-                 sys.error(s"Unknown function '${s}(${(list.map(Show.applyV).toList).mkString(",")})', or the number of arguments are incorrect")
+  def apply(state:GenPoint, expr: Expr): Double = {
+    val res = expr match {
+      case Var(v) => state(v)
+      case Value(v) => v
+      case Add(l1, l2) => apply(state,l1) + apply(state,l2)
+      case Mult(l1,l2)  => apply(state,l1)  * apply(state,l2)
+      case Div(l1,l2)  =>
+        if (apply(state,l2)==0)
+          sys.error(s"Error: the divisor of the division '${Show.applyV(expr)}' is zero.")
+        else apply(state,l1) / apply(state,l2)
+      case Res(l1,l2)  =>
+        if (apply(state,l2)==0)
+          sys.error(s"Error: the divisor of the remainder '${Show.applyV(expr)}' is zero.")
+        else apply(state,l1) % apply(state,l2)
+      case Func(s,list) => (s,list) match {
+        //case ("random",Nil) => rand()
+        case ("PI",Nil) => math.Pi
+        case ("E",Nil) => math.E
+        case ("max",v1::v2::Nil) => math.max(apply(state,v1), apply(state,v2))
+        case ("min",v1::v2::Nil) => math.min(apply(state,v1), apply(state,v2))
+        case ("pow",v1::v2::Nil) =>
+          if(apply(state,v1)==0 && apply(state,v2)<0)
+            sys.error(s"Error: The power of zero is undefined for a negative exponent: '${Show.applyV(expr)}'.")
+          else pow(apply(state,v1),apply(state,v2))
+        case ("exp",v::Nil) => math.exp(apply(state,v))
+        case ("sin",v::Nil) =>
+          if (multOfPi(apply(state,v)))  0
+          else math.sin(apply(state,v))
+        case ("cos",v::Nil) =>
+          if (multOfPiOn2(apply(state,v)))  0
+          else math.cos(apply(state,v))
+        case ("tan",v::Nil) =>
+          if (multOfPi(apply(state,v)))  0
+          else math.tan(apply(state,v))
+        case ("arcsin",v::Nil) =>
+          if ((math.asin(apply(state,v))).isNaN)
+            sys.error(s"Error: In the expression '${Show.applyV(expr)}', '${Show.applyV(v)}' is outside the domain of arcsin (-1<=x<=1).")
+          else math.asin(apply(state,v))
+        case ("arccos",v::Nil) =>
+          if ((math.acos(apply(state,v))).isNaN)
+            sys.error(s"Error: In the expression '${Show.applyV(expr)}', '${Show.applyV(v)}' is outside the domain of arccos (-1<=x<=1).")
+          else math.acos(apply(state,v))
+        case ("arctan",v::Nil) => math.atan(apply(state,v))
+        case ("sinh",v::Nil) => math.sinh(apply(state,v))
+        case ("cosh",v::Nil) => math.cosh(apply(state,v))
+        case ("tanh",v::Nil) => math.tanh(apply(state,v))
+        case ("sqrt",v::Nil) =>
+          if ((math.sqrt(apply(state,v))).isNaN)
+            sys.error(s"Error: In the expression '${Show.applyV(expr)}', '${Show.applyV(v)}' is outside the domain of sqrt (x>=0).")
+          else math.sqrt(apply(state,v))
+        case ("log",v::Nil) =>
+          if (apply(state,v)<=0)
+            sys.error(s"Error: In the expression '${Show.applyV(expr)}', '${Show.applyV(v)}' is outside the domain of log (x>0).")
+          else math.log(apply(state,v))
+        case ("log10",v::Nil) =>
+          if (apply(state,v)<=0)
+            sys.error(s"Error: In the expression '${Show.applyV(expr)}', '${Show.applyV(v)}' is outside the domain of log10 (x>0).")
+          else math.log10(apply(state,v))
+         case (_,_) =>
+           sys.error(s"Unknown function '${s}(${(list.map(Show.applyV).toList).mkString(",")})', or the number of arguments are incorrect")
 
-            }
+      }
     }
   //println(s"Eval: notlin->${notlin} to ${res}")
   res
 }
 
 
-/** Evaluation of a non-linear expression. */
-  def applyAux(state:scala.collection.mutable.Map[String,Double], notlin: NotLin): Double = {
-    val res = notlin match {
-            case Var(v) => state(v)
-            case Value(v) => v
-            case Add(l1, l2) => applyAux(state,l1) + applyAux(state,l2)
-            case Mult(l1,l2)  => applyAux(state,l1)  * applyAux(state,l2)
-            case Div(l1,l2)  => {if (applyAux(state,l2)==0) {return throw new RuntimeException(s"Error: the divisor of the division '${Show.applyV(notlin)}' is zero.")}
-                                 else {return (applyAux(state,l1) / applyAux(state,l2))}
-                                }
-            case Res(l1,l2)  => {if (applyAux(state,l2)==0) {return throw new RuntimeException(s"Error: the divisor of the remainder '${Show.applyV(notlin)}' is zero.")}
-                                 else {return (applyAux(state,l1) % applyAux(state,l2))}
-                                }
-            case Func(s,list) => (s,list) match {
-              case ("PI",Nil) => math.Pi
-              case ("E",Nil) => math.E
-              case ("max",v1::v2::Nil) => math.max(applyAux(state,v1), applyAux(state,v2))
-              case ("min",v1::v2::Nil) => math.min(applyAux(state,v1), applyAux(state,v2))
-              case ("pow",v1::v2::Nil) => {if(applyAux(state,v1)==0 && applyAux(state,v2)<0) return throw new RuntimeException(s"Error: The power of zero is undefined for a negative exponent: '${Show.applyV(notlin)}'.")
-                                           else pow(applyAux(state,v1),applyAux(state,v2))
-              }
-              case ("exp",v::Nil) => math.exp(applyAux(state,v))
-              case ("sin",v::Nil) => {if (multOfPi(applyAux(state,v))) {return 0}
-
-                                      else {return math.sin(applyAux(state,v))}
-
-              }
-              case ("cos",v::Nil) => {if (multOfPiOn2(applyAux(state,v))) {return 0}
-
-                                      else {return math.cos(applyAux(state,v))}
-
-              }
-              case ("tan",v::Nil) =>{if (multOfPi(applyAux(state,v))) {return 0}
-
-                                      else {return math.tan(applyAux(state,v))}
-
-              }
-              case ("arcsin",v::Nil) => {
-                if ((math.asin(applyAux(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arcsin (-1<=x<=1).")
-                else math.asin(applyAux(state,v))
-              }
-              case ("arccos",v::Nil) => {
-                if ((math.acos(applyAux(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of arccos (-1<=x<=1).")
-                else math.acos(applyAux(state,v))
-              }
-              case ("arctan",v::Nil) => math.atan(applyAux(state,v))
-              case ("sinh",v::Nil) => math.sinh(applyAux(state,v))
-              case ("cosh",v::Nil) => math.cosh(applyAux(state,v))
-              case ("tanh",v::Nil) => math.tanh(applyAux(state,v))
-              case ("sqrt",v::Nil) => {
-                if ((math.sqrt(applyAux(state,v))).isNaN) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of sqrt (x>=0).")
-                else math.sqrt(applyAux(state,v))
-              }
-              case ("log",v::Nil) =>  {
-                if (applyAux(state,v)<=0) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log (x>0).")
-                else math.log(applyAux(state,v))
-              }
-              case ("log10",v::Nil) =>  {
-                if (applyAux(state,v)<=0) return throw new RuntimeException(s"Error: In the expression '${Show.applyV(notlin)}', '${Show.applyV(v)}' is outside the domain of log10 (x>0).")
-                else math.log10(applyAux(state,v))
-              }
-               case (_,_) => throw new RuntimeException(s"Unknown function '${s}(${(list.map(Show.applyV).toList).mkString(",")})', or the number of arguments are incorrect")
-
-            }
-    }
-  //println(s"Eval: notlin->${notlin} to ${res}")
-  res
-}
-
-  def updateNotlin(state:ValuationNotLin, notlin: NotLin,vars:List[String]): NotLin = {
+  def updateExpr(state:ValuationExpr, notlin: Expr, vars:List[String]): Expr = {
     val res = notlin match {
             case Var(v) => {if (vars.contains(v)) {Var(v)} else {state(v)}}
             case Value(v) => Value(v)
-            case Add(l1, l2) => Add(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case Mult(l1,l2)  => Mult(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case Div(l1,l2)  => Div(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case Res(l1,l2)  => Res(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
+            case Add(l1, l2) => Add(updateExpr(state,l1,vars), updateExpr(state,l2,vars))
+            case Mult(l1,l2)  => Mult(updateExpr(state,l1,vars), updateExpr(state,l2,vars))
+            case Div(l1,l2)  => Div(updateExpr(state,l1,vars), updateExpr(state,l2,vars))
+            case Res(l1,l2)  => Res(updateExpr(state,l1,vars), updateExpr(state,l2,vars))
            // case Pow(l1,l2)  => Pow(updateNotlin(state,l1,vars), updateNotlin(state,l2,vars))
-            case Func(s,list) => Func(s,list.map(l=>updateNotlin(state,l,vars)).toList)
+            case Func(s,list) => Func(s,list.map(l=>updateExpr(state,l,vars)).toList)
 
             }
     res
 }
 
- // The purpose of this function is to replace the constant variables of a diff.eq. by their respective constant values 
-  def updateDiffEq(diffeq:DiffEq,v:ValuationNotLin,vars:List[String]):DiffEq = {
-     
-     var newNotLin= updateNotlin(v,diffeq.e,vars)
+ // The purpose of this function is to replace the constant variables of a diff.eq. by their respective constant values
+  def updateDiffEq(diffeq:DiffEq, v:ValuationExpr, vars:List[String]):DiffEq = {
+
+     var newNotLin= updateExpr(v,diffeq.e,vars)
      var newdiffeq= DiffEq(diffeq.v,newNotLin)
      return newdiffeq
   }
@@ -222,8 +154,8 @@ def multOfPiOn2(number: Double): Boolean = {
 
 
 
- def apply(e:SyExprAll, t: Double, x: Valuation): Double = {
-    val res = e match {
+ def apply(e:SyExprAll, t: Double, x: ValuationSyExpr): Double = {
+  val res = e match {
     case SVal(v) => v
     case _:SArg => t
     //case SVar("e")  if !x.contains("e")  => math.E
@@ -241,6 +173,7 @@ def multOfPiOn2(number: Double): Boolean = {
       case (v,List(SVal(0.0))) if x contains v => apply(x(v),t,x) // could create infinite loop
       case ("PI",Nil) => math.Pi
       case ("E",Nil) => math.E
+      //case ("random",Nil) => rand()
       case ("max",v1::v2::Nil) => math.max(apply(v1,t,x), apply(v2,t,x))
       case ("min",v1::v2::Nil) => math.min(apply(v1,t,x), apply(v2,t,x))
       case ("pow",v1::v2::Nil) => math.pow(apply(v1,t,x), apply(v2,t,x))
@@ -270,7 +203,7 @@ def multOfPiOn2(number: Double): Boolean = {
       case ("log",v::Nil) => math.log(apply(v,t,x))
       case ("log10",v::Nil) => math.log10(apply(v,t,x))
       //case (_,_) => throw new RuntimeException(s"")
-      case (_,_) => throw new RuntimeException(s"Unknown function '${s.f}(${s.args.mkString(",")})',or the number of arguments are incorrect")
+      case (_,_) => throw new RuntimeException(s"[Eval-SyExpr] Unknown function '${s.f}(${s.args.mkString(",")})',or the number of arguments are incorrect")
     }
   }
  /*
@@ -354,20 +287,20 @@ def multOfPiOn2(number: Double): Boolean = {
 
   // Ignore variables or time arguments 
   def apply(e:SyExprTime, t:Double): Double = apply(e,t,Map())
-  def apply(e:SyExprVar, x:Valuation): Double = apply(e,0,x)
+  def apply(e:SyExprVar, x:ValuationSyExpr): Double = apply(e,0,x)
   def apply(e:SyExpr): Double = apply(e,0,Map())
 
-  def apply(v: Valuation): Point = v.view.mapValues(apply).toMap 
+  def apply(v: ValuationSyExpr): Point = v.view.mapValues(apply(_)).toMap
 
-  def update(e:SyExprAll, t:SyExpr, v:Valuation): SyExpr =
+  def update(e:SyExprAll, t:SyExpr, v:ValuationSyExpr): SyExpr =
     updInput(Eval.updTime(t,e),v)
 
-  def update(phi:SySolution, t:SyExpr, v:Valuation): Valuation =
+  def update(phi:SySolution, t:SyExpr, v:ValuationSyExpr): ValuationSyExpr =
     updInput(v,Eval.updTime(t,phi))
 
 
   // variation for numerically computed solutions
-  def updateNum(phi: Solution, t: SyExpr, v: Valuation): Valuation =
+  def updateNum(phi: Solution, t: SyExpr, v: ValuationSyExpr): ValuationSyExpr =
     phi.view.mapValues(updater => SVal(updater(apply(t))(apply(v)))).toMap
    
 
@@ -378,7 +311,7 @@ def multOfPiOn2(number: Double): Boolean = {
     * @param sol solution with the new values
     * @return updated expression
     */
-  def updInputFun(e:SyExprAll, sol:Valuation): SyExprTime = e match {
+  def updInputFun(e:SyExprAll, sol:ValuationSyExpr): SyExprTime = e match {
     case s:SVar => sol(s.v)
     case s:SFun[SymbolicExpr.All] =>
       SFun[SymbolicExpr.Time](s.f,s.args.map(e2 =>  updInputFun(e2,sol)))
@@ -392,18 +325,18 @@ def multOfPiOn2(number: Double): Boolean = {
     case t:SArg  => t
   }
 
-  def updInput(e:SyExprVar, sol:Valuation): SyExpr = updInputFun(e,sol) match {
+  def updInput(e:SyExprVar, sol:ValuationSyExpr): SyExpr = updInputFun(e,sol) match {
     case t:SyExpr @unchecked => t // guaranteed to succeed (but type eliminated by erasure)
     case v => throw new RuntimeException(s"updating variable in ${Show(e)} does not yield an SExpr (${Show(v)}).")
   }
 
   def updTime(t:SyExpr, phi:SySolution): SySolutionVar =
     phi.view.mapValues(updTime(t,_)).toMap
-  def updInput(input:Valuation,phi:SySolutionVar): Valuation =
+  def updInput(input:ValuationSyExpr, phi:SySolutionVar): ValuationSyExpr =
     phi.view.mapValues(updInput(_,input)).toMap
-  def updInputFun(input:Valuation,phi:SySolution): SySolutionTime =
+  def updInputFun(input:ValuationSyExpr, phi:SySolution): SySolutionTime =
     phi.view.mapValues(updInputFun(_,input)).toMap
-  def solveValues(s:Solver,phi:Valuation): Valuation =
+  def solveValues(s:Solver,phi:ValuationSyExpr): ValuationSyExpr =
     phi.view.mapValues(s.solveSymbExpr).toMap
 
   def updTime(newt: SyExprVar, expr: SyExprAll): SyExprVar = updTimeFun(newt, expr) match {
@@ -437,7 +370,7 @@ def multOfPiOn2(number: Double): Boolean = {
   }
   */
 
-def syExpr2notlin(l:SyExpr):NotLin= l match {
+def syExpr2notlin(l:SyExpr):Expr= l match {
   case SVal(v) => Value(v) 
   //case SVar(v) => Var(v) 
   case SFun(s,list)=> Func(s,list.map((l:SyExpr) => syExpr2notlin(l)))
@@ -464,14 +397,14 @@ def syExpr2notlin(l:SyExpr):NotLin= l match {
 */
 
  // New
-  def notlin2sage(l:NotLin): SyExprVar = l match {
+  def notlin2sage(l:Expr): SyExprVar = l match {
     case Var(v) => SVar(v) //SFun(v,List(SVal(0))) //SVar(v)
     case Value(v) => SVal(v)
     case Add(l1, l2) => SAdd(notlin2sage(l1),notlin2sage(l2))
     case Mult(l1, l2) => SMult(notlin2sage(l1),notlin2sage(l2))
     case Div(l1, l2) => SDiv(notlin2sage(l1),notlin2sage(l2))
     //case Pow(l1,l2) => SPow(notlin2sage(l1),notlin2sage(l2))
-    case Func(s,list)=>SFun(s,list.map((l:NotLin) => notlin2sage(l)))
+    case Func(s,list)=>SFun(s,list.map((l:Expr) => notlin2sage(l)))
     case Res(l1,l2) => SRes(notlin2sage(l1),notlin2sage(l2)) 
 
   }
@@ -548,4 +481,38 @@ def syExpr2notlin(l:SyExpr):NotLin= l match {
     }
   }
 
+  def solveRandom(at: Atomic)(implicit rand:()=>Double): Atomic =
+    Atomic(at.as.map(solveRandom),solveRandom(at.de))
+  def solveRandom(asg: Assign)(implicit rand:()=>Double): Assign =
+    Assign(asg.v,solveRandom(asg.e))
+  def solveRandom(des: DiffEqs)(implicit rand:()=>Double): DiffEqs =
+    DiffEqs(des.eqs.map(solveRandom),solveRandom(des.dur))
+  def solveRandom(de: DiffEq)(implicit rand:()=>Double): DiffEq =
+    DiffEq(de.v,solveRandom(de.e))
+  def solveRandom(dur: Dur)(implicit rand:()=>Double): Dur = dur match {
+    case For(e) => For(solveRandom(e))
+    case Until(c, eps, jump) => Until(solveRandom(c), eps, jump)
+    case Forever => Forever
+  }
+  def solveRandom(exp: Expr)(implicit rand:()=>Double): Expr = exp match {
+    case Var(v) => exp
+    case Value(v) => exp
+    case Add(l1, l2) => Add(solveRandom(l1),solveRandom(l2))
+    case Mult(l1, l2) => Mult(solveRandom(l1),solveRandom(l2))
+    case Div(l1, l2) => Div(solveRandom(l1),solveRandom(l2))
+    case Res(l1, l2) => Res(solveRandom(l1),solveRandom(l2))
+    case Func("random", Nil) => Value(rand())
+    case Func(f,args) => Func(f,args.map(solveRandom))
+  }
+  def solveRandom(cond: Cond)(implicit rand:()=>Double): Cond = cond match {
+    case BVal(b) => cond
+    case And(c1, c2) => And(solveRandom(c1),solveRandom(c2))
+    case Or(c1, c2) => Or(solveRandom(c1),solveRandom(c2))
+    case Not(c) => Not(solveRandom(c))
+    case EQ(l1, l2) => EQ(solveRandom(l1),solveRandom(l2))
+    case GT(l1, l2) => GT(solveRandom(l1),solveRandom(l2))
+    case LT(l1, l2) => LT(solveRandom(l1),solveRandom(l2))
+    case GE(l1, l2) => GE(solveRandom(l1),solveRandom(l2))
+    case LE(l1, l2) => LE(solveRandom(l1),solveRandom(l2))
+  }
 }

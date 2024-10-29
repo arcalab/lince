@@ -10,7 +10,7 @@ class TrajOld
 
 /**
   *
-//  * @tparam X type of the value at a given time - e.g., [[hprog.frontend.CommonTypes.Valuation]].
+//  * @tparam X type of the value at a given time - e.g., [[hprog.frontend.CommonTypes.ValuationSyExpr]].
   */
 
 //trait Traj[X] {

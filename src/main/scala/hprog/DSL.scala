@@ -4,7 +4,7 @@ import hprog.ast.SymbolicExpr.SyExprAll
 import hprog.ast._
 import Syntax._
 import hprog.common.ParserException
-import hprog.frontend.CommonTypes.Valuation
+import hprog.frontend.CommonTypes.ValuationSyExpr
 import hprog.frontend.solver.LiveSageSolver
 import hprog.frontend.{CommonTypes, Deviator, Distance, Traj}
 import hprog.lang.{Parser, Parser2, SageParser}

@@ -5,7 +5,7 @@ import hprog.ast._
 import Syntax._
 import hprog.backend.Show
 import hprog.common.{ParserException, TimeoutException}
-import hprog.frontend.CommonTypes.{SySolution, Valuation}
+import hprog.frontend.CommonTypes.{SySolution, ValuationSyExpr}
 import hprog.frontend.Utils
 
 import scala.sys.process._
@@ -185,7 +185,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
     rep
   }
 
-  def askSage(c:Cond,vl:Valuation): Option[String] = {
+  def askSage(c:Cond,vl:ValuationSyExpr): Option[String] = {
     val instructions =
       "bool(" + Show.apply_withbool(c,vl) + "); \"ok\""
     debug(()=>s"expression to solve: '$instructions'")
@@ -234,7 +234,7 @@ class LiveSageSolver(path:String) extends StaticSageSolver {
       }
     }
 
-  override def +=(cond:Cond, valua:Valuation): Unit = {
+  override def +=(cond:Cond, valua:ValuationSyExpr): Unit = {
     if (!cacheBool.contains(cond,valua)) {
       askSage(cond,valua) match {
         case Some(reply) => importBool(cond, valua, reply)

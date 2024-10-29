@@ -1,7 +1,7 @@
 package hprog.backend
 
 import hprog.ast.{SDiv, SSub, SVal}
-import hprog.frontend.CommonTypes.Valuation
+import hprog.frontend.CommonTypes.ValuationSyExpr
 import hprog.frontend.{Eval, Traj}
 import scala.collection.immutable.List
 
@@ -15,7 +15,6 @@ object TrajToJSV2 {
   
   // Auxiliar Types
   type JSString = String // 
-
 
   def apply(traj:Traj,divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true, variables_List: List[(String, String, Option[String])], graphType: String, simulationName: String, count: Int): (JSString, List[String], List[String], String, String, String, Int) = {
     
@@ -470,7 +469,7 @@ object TrajToJSV2 {
                         , dict_Graph: Map[Double, (Either[Double,(Double,Double)], Either[Double,(Double,Double)])]
                         , graph_name: String
                         , counter: Int
-                        , graphType: String): String = {   
+                        , graphType: String): String = {
 
     var xvalues: List[Either[Double, (Double, Double)]] = List()
     var yvalues: List[Either[Double, (Double, Double)]] = List()
@@ -488,7 +487,7 @@ object TrajToJSV2 {
           .filter(es => inScope(es._1))
           .sorted
           .map(warn=>(warn._1, Eval(
-            values.getOrElse(warn._1,Map():Valuation) // get Valuation at warning warn
+            values.getOrElse(warn._1,Map():ValuationSyExpr) // get Valuation at warning warn
                   .getOrElse(variable, SVal(0)) // get expression of Variable
             ), warn._2))
           .unzip3
@@ -755,7 +754,7 @@ object TrajToJSV2 {
                         , dict_Graph: Map[Double, (Either[Double,(Double,Double)], Either[Double,(Double,Double)], Either[Double,(Double,Double)])]
                         , graph_name: String
                         , counter: Int
-                        , graphType: String): String = {   
+                        , graphType: String): String = {
 
     var xvalues: List[Either[Double, (Double, Double)]] = List()
     var yvalues: List[Either[Double, (Double, Double)]] = List()
@@ -776,7 +775,7 @@ object TrajToJSV2 {
           .filter(es => inScope(es._1))
           .sorted
           .map(warn=>(warn._1, Eval(
-            values.getOrElse(warn._1,Map():Valuation) // get Valuation at warning warn
+            values.getOrElse(warn._1,Map():ValuationSyExpr) // get Valuation at warning warn
                   .getOrElse(variable, SVal(0)) // get expression of Variable
             ), warn._2))
           .unzip3
@@ -887,7 +886,7 @@ object TrajToJSV2 {
       var combined = List.empty[(Double, Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
       var sortedCombined = List.empty[(Double, Either[Double,(Double, Double)], Either[Double,(Double, Double)])]
 
-      combined = (time, firstAxe, secondAxe).zipped.toList
+      combined = time.lazyZip(firstAxe).lazyZip(secondAxe).toList
 
       sortedCombined = combined.sortBy(_._1)
 
@@ -914,7 +913,7 @@ object TrajToJSV2 {
                                 , secondAxe: List[Either[Double,(Double, Double)]]
                                 , inout:String): (String, String) = {
 
-      val combined = (time, firstAxe, secondAxe).zipped.toList      
+      val combined = time.lazyZip(firstAxe).lazyZip(secondAxe).toList
       val sortedCombined = combined.sortBy(_._1)
       
       if(inout == "in") {      

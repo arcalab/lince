@@ -1,7 +1,7 @@
 package hprog.backend
 
 import hprog.ast.{SDiv, SSub, SVal}
-import hprog.frontend.CommonTypes.Valuation
+import hprog.frontend.CommonTypes.ValuationSyExpr
 import hprog.frontend.{Eval, Traj}
 
 object TrajToJS {
@@ -20,6 +20,9 @@ object TrajToJS {
     // trick to avoid many sampling when already lots of boundaries exist
     val nbrSamples = 0.max(100 - traj.getInits.getOrElse(Map()).size)
 
+
+    implicit val rand:()=>Double = ()=>
+      sys.error("Unsupported: continuous points in a trajectory should not have random functions.")
 
     val max: Double = Eval(dur.getOrElse(SVal(10)),0)
 
@@ -173,7 +176,8 @@ object TrajToJS {
     js
   }
 
-  private def buildWarnings(traj: Traj, inScope:Double=>Boolean, colorIDs: Map[String, Int]): String = {
+  private def buildWarnings(traj: Traj, inScope:Double=>Boolean,
+                            colorIDs: Map[String, Int])(implicit rand:()=>Double): String = {
     var js = ""
     for (variable <- traj.getVars) {
       js += mkWarnings(variable,traj,inScope,
@@ -231,7 +235,7 @@ object TrajToJS {
 
   private def mkWarnings(variable: String, traj: Traj
                        , inScope: Double=>Boolean
-                       , style:String): String = {
+                       , style:String)(implicit rand:()=>Double): String = {
 
     (traj.getWarnings,traj.getInits,traj.getEnds) match {
       case (Some(warns),Some(inits),Some(ends)) =>
@@ -242,7 +246,7 @@ object TrajToJS {
           .filter(es => inScope(es._1))
           .sorted
           .map(warn=>(warn._1, Eval(
-            values.getOrElse(warn._1,Map():Valuation) // get Valuation at warning warn
+            values.getOrElse(warn._1,Map():ValuationSyExpr) // get Valuation at warning warn
                   .getOrElse(variable, SVal(0)) // get expression of Variable
             ), warn._2))
           .unzip3

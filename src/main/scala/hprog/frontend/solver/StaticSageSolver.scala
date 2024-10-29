@@ -5,7 +5,7 @@ import hprog.ast._
 import Syntax._
 import hprog.backend.Show
 import hprog.common.ParserException
-import hprog.frontend.CommonTypes.{SySolution, Valuation, Warnings}
+import hprog.frontend.CommonTypes.{SySolution, ValuationSyExpr, Warnings}
 import hprog.frontend.{Eval, Utils}
 import hprog.lang.SageParser
 
@@ -21,7 +21,7 @@ class StaticSageSolver extends Solver {
   protected var cacheVal:
     Map[SyExprAll   , ExprCache]  =  Map()
   protected var cacheBool:
-    Map[(Cond,Valuation), BoolCache]  =  Map()
+    Map[(Cond,ValuationSyExpr), BoolCache]  =  Map()
   protected var cacheStrDE:     Map[String,DiffCache] = Map()
   protected var cacheStrVal:  Map[String,ExprCache] = Map()
   protected var cacheStrBool: Map[String,BoolCache] = Map()
@@ -86,7 +86,7 @@ class StaticSageSolver extends Solver {
     * @param cond Condition to check if it is in cache
     * @param valua valuation to apply to condition
     */
-  def +=(cond: Cond, valua: Valuation): Unit = {
+  def +=(cond: Cond, valua: ValuationSyExpr): Unit = {
     if (!cacheBool.contains(cond, valua) && !cacheStrBool.contains(Show(cond, valua))) {
       val est = Eval(valua.view.mapValues(Eval(_, 0)).toMap, cond)
       cacheStrBool += Show(cond,valua) -> (est,"")
@@ -112,7 +112,7 @@ class StaticSageSolver extends Solver {
     }
   }
 
-  override def solveSymb(cond: Cond, valua: Valuation): Boolean = {
+  override def solveSymb(cond: Cond, valua: ValuationSyExpr): Boolean = {
     this += (cond,valua)
     cacheBool.get((cond,valua)) match {
       case Some(c) => c._1
@@ -160,7 +160,7 @@ class StaticSageSolver extends Solver {
   /**
     * Import the reply from Sage from evaluating a boolean expression
     */
-  def importBool(c:Cond, vl: Valuation, sageReply:String): Unit =
+  def importBool(c:Cond, vl: ValuationSyExpr, sageReply:String): Unit =
     if (!cacheBool.contains(c,vl))
       cacheBool += (c,vl) -> replyToBoolCache(sageReply)
 
@@ -307,7 +307,7 @@ class StaticSageSolver extends Solver {
             case Array("") =>
             case Array(t,wn) => this addWarning (Eval.update(hprog.DSL.parseExpr(t)
                                                     ,SVal(0):SyExpr
-                                                    ,Map():Valuation)
+                                                    ,Map():ValuationSyExpr)
                                         ,wn)
             case _ => throw new ParserException(s"Failed to parse reply '$w' for a warning.")
           }

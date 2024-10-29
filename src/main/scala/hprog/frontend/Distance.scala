@@ -50,21 +50,23 @@ object Distance {
     def contains(p:Point): Boolean = ineqs.forall(_ contains p)
   }
   sealed abstract class Ineq {
-    def contains(p:Point): Boolean = this match {
-      case GT(l1, l2) => Eval(p,l1) >  Eval(p,l2)
-      case LT(l1, l2) => Eval(p,l1) <  Eval(p,l2)
-      case GE(l1, l2) => Eval(p,l1) >= Eval(p,l2)
-      case LE(l1, l2) => Eval(p,l1) <= Eval(p,l2)
+    def contains(p:Point): Boolean = {
+      this match {
+        case GT(l1, l2) => Eval(p,l1) >  Eval(p,l2)
+        case LT(l1, l2) => Eval(p,l1) <  Eval(p,l2)
+        case GE(l1, l2) => Eval(p,l1) >= Eval(p,l2)
+        case LE(l1, l2) => Eval(p,l1) <= Eval(p,l2)
+      }
     }
   }
 
 
 
   // New
-  case class GT(l1:NotLin,l2:NotLin)      extends Ineq
-  case class LT(l1:NotLin,l2:NotLin)      extends Ineq
-  case class GE(l1:NotLin,l2:NotLin)      extends Ineq
-  case class LE(l1:NotLin,l2:NotLin)      extends Ineq
+  case class GT(l1:Expr, l2:Expr)      extends Ineq
+  case class LT(l1:Expr, l2:Expr)      extends Ineq
+  case class GE(l1:Expr, l2:Expr)      extends Ineq
+  case class LE(l1:Expr, l2:Expr)      extends Ineq
 
 //////////////////////////////////////////////////////////////////
 
@@ -150,7 +152,7 @@ object Distance {
     else closest(p,left(ineq),right(ineq))
   }
 
-  def closest(p:Point, l1:NotLin, l2:NotLin): Point = {
+  def closest(p:Point, l1:Expr, l2:Expr): Point = {
     val delta = neg(p)
     val p1 = notlin2point(shiftNotLin(l1,delta))
     val p2 = notlin2point(shiftNotLin(l2,delta))
@@ -163,7 +165,7 @@ object Distance {
   }
 
 //New
-  def notlin2point(notlin: NotLin): Point = notlin match {
+  def notlin2point(notlin: Expr): Point = notlin match {
     case Var(v) => Map(v->1.0)
     case Value(v) => Map("" -> v)
     case Add(l1, l2) => add(notlin2point(l1),notlin2point(l2))
@@ -171,7 +173,7 @@ object Distance {
     case Div(l1, l2) => div(notlin2point(l1),notlin2point(l2))
     case Res(l1, l2) => res(notlin2point(l1),notlin2point(l2))
     //case Pow(l1, l2) => powdef(notlin2point(l1),notlin2point(l2))
-    case Func(s,list) => funcdef(s,list.map((l:NotLin) => notlin2point(l)))
+    case Func(s,list) => funcdef(s,list.map((l:Expr) => notlin2point(l)))
    
 
     }
@@ -217,7 +219,7 @@ object Distance {
       s match {
         case ("PI") => Map("" -> math.Pi)
         case ("E") => Map("" -> math.E)
-        case (_) => throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+        case (_) => throw new RuntimeException(s"[Dev] Unknown function '${s}',or the number of arguments are incorrect")
       }
       
     }
@@ -237,7 +239,7 @@ object Distance {
           case ("sqrt") => list(0).map(v => v._1 -> math.sqrt(v._2))
           case ("log") => list(0).map(v => v._1 -> math.log(v._2))
           case ("log10") => list(0).map(v => v._1 -> math.log10(v._2))
-          case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+          case (_)=>throw new RuntimeException(s"[Dev] Unknown function '${s}',or the number of arguments are incorrect")
         }
       }
       else {
@@ -245,7 +247,7 @@ object Distance {
           case ("max") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.max((list(0))(x),v) else v))
           case ("min") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  math.min((list(0))(x),v) else v))
           case ("pow") => list(0) ++ (for ((x,v) <- list(1)) yield x -> (if (list(0).contains(x))  pow(list(0)(x),v) else v))
-          case (_)=>throw new RuntimeException(s"Unknown function '${s}',or the number of arguments are incorrect")
+          case (_)=>throw new RuntimeException(s"[Dev] Unknown function '${s}',or the number of arguments are incorrect")
         }  
       }
 
@@ -265,13 +267,13 @@ object Distance {
     plane.view.mapValues(x => x*d/norm).toMap
   }
 
-  def left(ineq: Ineq): NotLin = ineq match {
+  def left(ineq: Ineq): Expr = ineq match {
     case GT(l1,_) => l1
     case LT(l1,_) => l1
     case GE(l1,_) => l1
     case LE(l1,_) => l1
   }
-  def right(ineq: Ineq): NotLin = ineq match {
+  def right(ineq: Ineq): Expr = ineq match {
     case GT(_,l2) => l2
     case LT(_,l2) => l2
     case GE(_,l2) => l2
@@ -299,7 +301,7 @@ object Distance {
 
 
   //New
-  def shiftNotLin(notlin: NotLin, delta:Point): NotLin = notlin match {
+  def shiftNotLin(notlin: Expr, delta:Point): Expr = notlin match {
     case Var(v) => if (delta(v)!=0) Add(notlin,Value(-delta(v))) else notlin // Porquê o menos ??
     case Value(_) => notlin
     case Add(l1, l2) => Add(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
@@ -307,7 +309,7 @@ object Distance {
     case Div(l1,l2) => Div(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
     case Res(l1,l2) => Res(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
     //case Pow(l1,l2) => PowNotLin(shiftNotLin(l1,delta),shiftNotLin(l2,delta))
-    case Func(s,list)=> Func(s,list.map((l:NotLin) => shiftNotLin(l,delta)))
+    case Func(s,list)=> Func(s,list.map((l:Expr) => shiftNotLin(l,delta)))
 
      
   }
@@ -361,13 +363,13 @@ object Distance {
     point2Expr(small,vars) <:= point2Expr(big,vars)
   }
 
-  def smallPart(ineq: Ineq): NotLin = ineq match {
+  def smallPart(ineq: Ineq): Expr = ineq match {
     case GT(_, l2) => l2
     case LT(l1, _) => l1
     case GE(_, l2) => l2
     case LE(l1, _) => l1
   }
-  def bigPart(ineq: Ineq): NotLin = ineq match {
+  def bigPart(ineq: Ineq): Expr = ineq match {
     case GT(l1, _) => l1
     case LT(_, l2) => l2
     case GE(l1, _) => l1

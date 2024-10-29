@@ -45,7 +45,7 @@ object Syntax {
 
   
   /** An assignment is a member of the Atomic programs, between a variable and a non linear expression */
-  case class Assign(v:Var,e:NotLin) 
+  case class Assign(v:Var,e:Expr)
 
   case class DiffEqs(eqs:List[DiffEq],dur:Dur) {
     def &(dur:Dur): DiffEqs = DiffEqs(eqs,dur) // override dur
@@ -54,11 +54,11 @@ object Syntax {
   }
 
   // DiffEq
-  case class DiffEq(v:Var,e:NotLin)
+  case class DiffEq(v:Var,e:Expr)
 
   // duration
   sealed abstract class Dur
-  case class  For(e:NotLin)  extends Dur
+  case class  For(e:Expr)  extends Dur
   case class  Until(c:Cond, eps:Option[Double], jump:Option[Double]) extends Dur
   case object Forever       extends Dur
 
@@ -68,33 +68,33 @@ object Syntax {
   case class Guard(c:Cond)  extends LoopGuard
 
   // non linear expression
-  sealed abstract class NotLin {
-    def +(other:NotLin): NotLin = Add(this,other)
+  sealed abstract class Expr {
+    def +(other:Expr): Expr = Add(this,other)
   }
-  case class Var(v:String)       extends NotLin {
-    def ^=(l: NotLin): DiffEq = DiffEq(this,l) //New
-    def :=(l: NotLin): Assign = Assign(this,l)
-    def >(l: NotLin):  Cond = GT(this,l)
-    def <(l: NotLin):  Cond = LT(this,l)
-    def >=(l: NotLin): Cond = GE(this,l)
-    def <=(l: NotLin): Cond = LE(this,l)
-    def ===(l: NotLin):Cond = EQ(this,l)
+  case class Var(v:String)       extends Expr {
+    def ^=(l: Expr): DiffEq = DiffEq(this,l) //New
+    def :=(l: Expr): Assign = Assign(this,l)
+    def >(l: Expr):  Cond = GT(this,l)
+    def <(l: Expr):  Cond = LT(this,l)
+    def >=(l: Expr): Cond = GE(this,l)
+    def <=(l: Expr): Cond = LE(this,l)
+    def ===(l: Expr):Cond = EQ(this,l)
   }
-  case class Value(v:Double)     extends NotLin { 
-    def *(l: NotLin): NotLin = Mult(this,l) 
+  case class Value(v:Double)     extends Expr {
+    def *(l: Expr): Expr = Mult(this,l)
   }
-  case class Add(l1:NotLin,l2:NotLin)  extends NotLin 
+  case class Add(l1:Expr, l2:Expr)  extends Expr
 
-  case class Mult(l1:NotLin,l2:NotLin) extends NotLin 
-  
-  case class Div(l1:NotLin,l2:NotLin) extends NotLin 
+  case class Mult(l1:Expr, l2:Expr) extends Expr
 
-  case class Res(l1:NotLin,l2:NotLin) extends NotLin
+  case class Div(l1:Expr, l2:Expr) extends Expr
 
-  //case class Pow(l1:NotLin,l2:NotLin) extends NotLin  
+  case class Res(l1:Expr, l2:Expr) extends Expr
 
-  case class Func(s:String, arg:List[NotLin]) extends NotLin  
-  
+  //case class Pow(l1:NotLin,l2:NotLin) extends NotLin
+
+  case class Func(s:String, arg:List[Expr]) extends Expr
+
 /**
 sealed abstract class Lin {
   def +(other: Lin):Lin = Add(this,other)
@@ -131,7 +131,7 @@ case class Mult(v: Value,l: Lin)    extends Lin
   case class Mult(l1:Lin,l2:Lin) extends Lin
 
 */
-  
+
   // Conditions
   sealed abstract class Cond {
     def &&(that:Cond): Cond  = (this,that) match {
@@ -156,17 +156,17 @@ case class Mult(v: Value,l: Lin)    extends Lin
   case class And(c1:Cond,c2:Cond) extends Cond
   case class Or(c1:Cond,c2:Cond)  extends Cond
   case class Not(c:Cond)          extends Cond
-  case class EQ(l1:NotLin,l2:NotLin)    extends Cond
-  case class GT(l1:NotLin,l2:NotLin)    extends Cond
-  case class LT(l1:NotLin,l2:NotLin)    extends Cond
-  case class GE(l1:NotLin,l2:NotLin)    extends Cond
-  case class LE(l1:NotLin,l2:NotLin)    extends Cond
-  
+  case class EQ(l1:Expr, l2:Expr)    extends Cond
+  case class GT(l1:Expr, l2:Expr)    extends Cond
+  case class LT(l1:Expr, l2:Expr)    extends Cond
+  case class GE(l1:Expr, l2:Expr)    extends Cond
+  case class LE(l1:Expr, l2:Expr)    extends Cond
+
   object GetSyntax {
     private var parsedSyntax: Syntax = null
-    private var initialValues: Map[String, List[NotLin]] = Map()
+    private var initialValues: Map[String, List[Expr]] = Map()
 
-    def getInitialValues(values: Map[String, List[NotLin]]): Unit = {
+    def getInitialValues(values: Map[String, List[Expr]]): Unit = {
       initialValues = values
     }
 
@@ -175,26 +175,26 @@ case class Mult(v: Value,l: Lin)    extends Lin
     }
 
     def allSyntax: List[Syntax] = {
-      val sintaxes = getAllSyntax(initialValues)      
+      val sintaxes = getAllSyntax(initialValues)
       sintaxes
     }
 
-    def getAllSyntax(newVarValues: Map[String, List[NotLin]]): List[Syntax] = {
+    def getAllSyntax(newVarValues: Map[String, List[Expr]]): List[Syntax] = {
     if (newVarValues.isEmpty) {
-      List(parsedSyntax)     
+      List(parsedSyntax)
     } else {
       val balancedVarValues = balanceVarValues(newVarValues)
-      
-      val numCombinations = balancedVarValues.head._2.length  
-      
+
+      val numCombinations = balancedVarValues.head._2.length
+
       val combinations = (0 until numCombinations).map { i =>
         balancedVarValues.map { case (key, values) =>
           key -> values(i)
         }.toMap
-      }.toList    
-      
+      }.toList
+
       val syntaxes = combinations.map(changeAssignValues(parsedSyntax, _))
-      
+
       syntaxes
     }
   }
@@ -205,7 +205,7 @@ case class Mult(v: Value,l: Lin)    extends Lin
           val newAssigns = assigns.map {
             case Assign(Var(v), l) =>
               newVarValues.get(v) match {
-                case Some(newValue) => 
+                case Some(newValue) =>
                   Assign(Var(v), newValue)
                 case None =>
                   Assign(Var(v), l)
@@ -226,8 +226,8 @@ case class Mult(v: Value,l: Lin)    extends Lin
         case _ => syntax
       }
     }*/
-    def changeAssignValues(syntax: Syntax, newVarValues: Map[String, NotLin]): Syntax = {
-      def processAssigns(assigns: List[Assign], remainingVarValues: Map[String, NotLin]): (List[Assign], Map[String, NotLin]) = {
+    def changeAssignValues(syntax: Syntax, newVarValues: Map[String, Expr]): Syntax = {
+      def processAssigns(assigns: List[Assign], remainingVarValues: Map[String, Expr]): (List[Assign], Map[String, Expr]) = {
         assigns.foldLeft((List.empty[Assign], remainingVarValues)) {
           case ((newAssigns, remainingValues), Assign(Var(v), l)) =>
             remainingValues.get(v) match {
@@ -241,7 +241,7 @@ case class Mult(v: Value,l: Lin)    extends Lin
         }
       }
 
-      def change(syntax: Syntax, remainingVarValues: Map[String, NotLin]): (Syntax, Map[String, NotLin]) = {
+      def change(syntax: Syntax, remainingVarValues: Map[String, Expr]): (Syntax, Map[String, Expr]) = {
         syntax match {
           case Atomic(assigns, diffs) =>
             val (newAssigns, updatedValues) = processAssigns(assigns, remainingVarValues)
@@ -272,7 +272,7 @@ case class Mult(v: Value,l: Lin)    extends Lin
 
 
 
-    def balanceVarValues(newVarValues: Map[String, List[NotLin]]): Map[String, List[NotLin]] = {
+    def balanceVarValues(newVarValues: Map[String, List[Expr]]): Map[String, List[Expr]] = {
       val maxLength = newVarValues.values.map(_.length).max
       newVarValues.map { case (key, values) =>
         val balancedValues = if (values.length < maxLength) {

@@ -3,7 +3,7 @@ package hprog.backend
 import hprog.ast.SymbolicExpr.{Pure, SyExpr}
 import hprog.ast._
 import Syntax._
-import hprog.frontend.CommonTypes.{SySolution, Valuation}
+import hprog.frontend.CommonTypes.{SySolution, ValuationSyExpr}
 import hprog.frontend.{Eval, Traj}
 import hprog.frontend.Traj.RunTarget
 
@@ -90,7 +90,7 @@ object Show {
   }
 */
   
-  def apply(notlin:NotLin): String= apply(notlin,Map():Valuation)
+  def apply(notlin:Expr): String= apply(notlin,Map():ValuationSyExpr)
 
 
 /*
@@ -130,7 +130,7 @@ object Show {
 
 
   // Showing non-linear expressions with the name of variables instead of their value
-  def applyV(notlin: NotLin):String= notlin match {
+  def applyV(notlin: Expr):String= notlin match {
     case v:Var => v.v
     // If Value is an integer it will print without the zero, otherwise it prints with decimals 
     case Value(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
@@ -150,7 +150,7 @@ object Show {
   }
 
 
-  def apply_parantesesV(notlin:NotLin):String= notlin match {
+  def apply_parantesesV(notlin:Expr):String= notlin match {
     case v:Var => v.v
     case Value(v) => floatToFraction(v)
     case Func("PI",Nil)=>s"pi"
@@ -160,7 +160,7 @@ object Show {
     case _ => s"(${applyV(notlin)})"
   }
 
-  def stringListV(list:List[NotLin]): String = list match{
+  def stringListV(list:List[Expr]): String = list match{
     case List() => s""
     case n::List() => s"${applyV(n)}"
     case n::ns => s"${applyV(n)},${stringListV(ns)}"
@@ -168,7 +168,7 @@ object Show {
 
 
 
-  def apply(notlin: NotLin, vl: Valuation): String = notlin match {
+  def apply(notlin: Expr, vl: ValuationSyExpr): String = notlin match {
     case v:Var => showVar(v,vl,apply[Pure])
     // If Value is an integer it will print without the zero, otherwise it prints with decimals 
     case Value(v) => floatToFraction(v)//if (v-v.toInt == 0) v.toInt.toString else v.toString
@@ -191,7 +191,7 @@ object Show {
 
   }
 
-  def apply_paranteses(notlin:NotLin,vl:Valuation):String= notlin match {
+  def apply_paranteses(notlin:Expr, vl:ValuationSyExpr):String= notlin match {
     case v:Var => showVar(v,vl,apply[Pure])
     case Value(v) => floatToFraction(v)
     case Func("PI",Nil)=>s"pi"
@@ -201,14 +201,14 @@ object Show {
     case _ => s"(${apply(notlin,vl)})"
   }
 
-  def stringList(list:List[NotLin],vl:Valuation): String = list match{
+  def stringList(list:List[Expr], vl:ValuationSyExpr): String = list match{
     case List() => s""
     case n::List() => s"${apply(n,vl)}"
     case n::ns => s"${apply(n,vl)},${stringList(ns,vl)}"
   }
 
   // show a condition parseable by Sage
-  def apply(cond: Cond, vl:Valuation = Map()): String = cond match {
+  def apply(cond: Cond, vl:ValuationSyExpr = Map()): String = cond match {
     case BVal(b)     => b.toString
     case And(And(e1,e2),e3) => apply(And(e1,And(e2,e3)),vl) 
     case And(e1,e2:And)     => s"${showP(e1,vl)} & ${showP(e2,vl)}" 
@@ -242,7 +242,7 @@ object Show {
     case BVal(b) => b.toString
     case _ => s"(${ppBool(exp)})"
   }
-  def ppExp(exp: NotLin): String = exp match {
+  def ppExp(exp: Expr): String = exp match {
     case Var(v) => v.drop(1)
     case Value(v) => v.toString
     case Add(l1, l2) => s"${ppExpP(l1)} + ${ppExpP(l2)}"
@@ -255,14 +255,14 @@ object Show {
     case Func(s, list) => s"${s}(${list.map(ppExp).mkString(",")})"
   }
 
-  def ppExpP(exp:NotLin):String= exp match {
+  def ppExpP(exp:Expr):String= exp match {
     case _:Var | _:Value | _:Func => ppExp(exp)
     case _ => s"(${ppExp(exp)})"
   }
 
 
     // show a condition parseable by Sage
-  def apply_withbool(cond: Cond, vl:Valuation = Map()): String = cond match {
+  def apply_withbool(cond: Cond, vl:ValuationSyExpr = Map()): String = cond match {
     case BVal(b)     => s"bool(${b.toString})"
     case And(And(e1,e2),e3) => apply_withbool(And(e1,And(e2,e3)),vl) 
     case And(e1,e2:And)     => s"${showPP(e1,vl)} & ${showPP(e2,vl)}" 
@@ -278,17 +278,17 @@ object Show {
   }
 
   
-  private def showP(exp:Cond, vl:Valuation):String = exp match {
+  private def showP(exp:Cond, vl:ValuationSyExpr):String = exp match {
     case BVal(b) => b.toString
     case _ => s"(${apply(exp,vl)})"
   }
 
-  private def showPP(exp:Cond, vl:Valuation):String = exp match {
+  private def showPP(exp:Cond, vl:ValuationSyExpr):String = exp match {
     case BVal(b) => b.toString
     case _ => s"(${apply_withbool(exp,vl)})"
   }
 
-  private def showVar(v: Var, valuation: Valuation,cont:SyExpr => String): String = {
+  private def showVar(v: Var, valuation: ValuationSyExpr, cont:SyExpr => String): String = {
     valuation.get(v.v) match {
       case Some(exp) => cont(Eval.updInput(exp,valuation))  
       case None => v.v 
@@ -383,7 +383,7 @@ object Show {
   def pp(sol:SySolution): String =
     sol.map(kv => s"${kv._1.drop(1)}(t) = ${pp(kv._2)}").mkString("</br>") // drop 1 to skip the "_"
 
-  def pp(sol:SySolution, v:Valuation): String = {
+  def pp(sol:SySolution, v:ValuationSyExpr): String = {
     pp(sol.view.mapValues(Eval.updInputFun(_,v)).toMap)
   }
 

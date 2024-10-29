@@ -151,22 +151,22 @@ object Parser2 {
 */
 
 
-  def notlinP: P[NotLin] = P.recursive((linRec:P[NotLin]) => {
-    def litnotlin: P[NotLin] = P.recursive((litRec:P[NotLin]) => {
+  def notlinP: P[Expr] = P.recursive((linRec:P[Expr]) => {
+    def litnotlin: P[Expr] = P.recursive((litRec:P[Expr]) => {
       char('(') *> linRec.surroundedBy(sps) <* char(')') |
       (char('-') ~ litRec).map(x => Mult(Value(-1), x._2)) |
       realP.map(Value.apply) |
       varName.map(Var.apply)
     })
 
-    def multnotlin: P[(NotLin, NotLin) => NotLin] =
-      string("*").as((x:NotLin,y:NotLin) => (x,y) match {
+    def multnotlin: P[(Expr, Expr) => Expr] =
+      string("*").as((x:Expr, y:Expr) => (x,y) match {
         case (l1,l2) => Mult(l1,l2)
       })
 
-    def plusminusnotlin: P[(NotLin, NotLin) => NotLin] =
-      string("+").as((x:NotLin,y:NotLin) => Add(x,y)) |
-      string("-").as((x:NotLin,y:NotLin) => Add(x, Mult(Value(-1), y)))
+    def plusminusnotlin: P[(Expr, Expr) => Expr] =
+      string("+").as((x:Expr, y:Expr) => Add(x,y)) |
+      string("-").as((x:Expr, y:Expr) => Add(x, Mult(Value(-1), y)))
 
     listSep(listSep(litnotlin, multnotlin), plusminusnotlin)
   })
@@ -232,15 +232,15 @@ object Parser2 {
       char('(') *> bexprRec <* char(')')
     )
 
-    def op: P[(NotLin, NotLin) => Cond] =
+    def op: P[(Expr, Expr) => Cond] =
     //      string("<=").as((x: Lin, y: Lin) => Or(LT(x, y), EQ(x, y))) |
     //        string(">=").as((x: Lin, y: Lin) => Or(GT(x, y), EQ(x, y))) |
-      string("<=").as((x: NotLin, y: NotLin) => LE(x, y)) |
-      string(">=").as((x: NotLin, y: NotLin) => GE(x, y)) |
-      char('<').as((x:NotLin,y:NotLin) => LT(x,y)) |
-      char('>').as((x:NotLin,y:NotLin) => GT(x,y)) |
-      string("==").as((x:NotLin,y:NotLin) => EQ(x,y)) |
-      string("!=").as((x:NotLin,y:NotLin) => Not(EQ(x,y)))
+      string("<=").as((x: Expr, y: Expr) => LE(x, y)) |
+      string(">=").as((x: Expr, y: Expr) => GE(x, y)) |
+      char('<').as((x:Expr, y:Expr) => LT(x,y)) |
+      char('>').as((x:Expr, y:Expr) => GT(x,y)) |
+      string("==").as((x:Expr, y:Expr) => EQ(x,y)) |
+      string("!=").as((x:Expr, y:Expr) => Not(EQ(x,y)))
 
     def ineq =
       (notlinP ~ op.surroundedBy(sps) ~ notlinP).map(x => x._1._2(x._1._1, x._2))
