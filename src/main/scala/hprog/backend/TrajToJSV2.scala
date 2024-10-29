@@ -835,10 +835,12 @@ object TrajToJSV2 {
 
       for ((x, y) <- variablesList2D) {
         if (!uniqueX.contains(x.replaceAll("_",""))) {
-          uniqueX += x.replaceAll("_","")
+          if (x=="t" && !uniqueX.contains("time")) uniqueX += "time"
+          else if (x!="t") uniqueX += x.replaceAll("_","")
         }
         if (!uniqueY.contains(y.replaceAll("_",""))) {
-          uniqueY += y.replaceAll("_","")          
+          if (y=="t" && !uniqueY.contains("time")) uniqueY += "time"
+          else if (y!="t") uniqueY += y.replaceAll("_","")
         }
       }
       val xAxisLabel = uniqueX.mkString("/")
