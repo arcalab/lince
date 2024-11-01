@@ -496,15 +496,32 @@ object TrajToJSV2 {
         xvalues = x_values
         yvalues = y_values
 
+
         xValuesToProcess = dict_Graph.keys.toList.zip(xvalues)
         yValuesToProcess = dict_Graph.keys.toList.zip(yvalues)         
 
         val (time, xaxis) = processValues(xValuesToProcess) 
-        x_axis = xaxis.mkString("[",",","]")
-
+        
         val (t, yaxis) = processValues(yValuesToProcess) 
         y_axis = yaxis.mkString("[",",","]")
+
+        val x_axisValues = expandList(xaxis, yaxis, time, t)
+        x_axis = x_axisValues.mkString("[",",","]")
         
+        println("-------------------------------------- x print---------------")
+        println(xaxis)
+        println("-------------------------------------- y print---------------")
+        println(yaxis)
+        println("-------------------------------------- t print---------------")
+        println(t)
+        println("-------------------------------------- time print---------------")
+        println(time)
+
+        println("-------------------------------------- x final---------------")
+        println(x_axis)
+        println("-------------------------------------- y final---------------")
+        println(y_axis)
+
         s"""var w_${variable + counter.toString} = {
           |   x: ${x_axis},
           |   y: ${y_axis},
@@ -1049,6 +1066,25 @@ object TrajToJSV2 {
     val tr = values.sortWith(_._1 <= _._1).flatMap(expandPoint)
     val (xt, x) = tr.unzip
     (xt, x)
+  }
+
+  /**
+  * @param xValues List of x values as Strings.
+  * @param yValues List of y values as Strings.
+  * @param timeX   List of time values for x.
+  * @param timeY   List of time values for y.
+  * @return A List of expanded x values based on y values.
+  */
+  def expandList(xValues: List[String], yValues: List[String], timeX: List[Double], timeY: List[Double]): List[String] = {
+    val expandedList = for (i <- yValues.indices) yield {
+      val tValue = timeY(i)                       
+      val timeIndex = timeX.indexOf(tValue)     
+      if (timeIndex >= 0 && timeIndex < xValues.length) {
+        xValues(timeIndex)                        
+      }
+    }
+
+    expandedList.map(_.toString).toList                                   
   }
 
   /**
