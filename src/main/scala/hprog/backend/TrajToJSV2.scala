@@ -506,21 +506,7 @@ object TrajToJSV2 {
         y_axis = yaxis.mkString("[",",","]")
 
         val x_axisValues = expandList(xaxis, yaxis, time, t)
-        x_axis = x_axisValues.mkString("[",",","]")
-        
-        println("-------------------------------------- x print---------------")
-        println(xaxis)
-        println("-------------------------------------- y print---------------")
-        println(yaxis)
-        println("-------------------------------------- t print---------------")
-        println(t)
-        println("-------------------------------------- time print---------------")
-        println(time)
-
-        println("-------------------------------------- x final---------------")
-        println(x_axis)
-        println("-------------------------------------- y final---------------")
-        println(y_axis)
+        x_axis = x_axisValues.mkString("[",",","]")   
 
         s"""var w_${variable + counter.toString} = {
           |   x: ${x_axis},
