@@ -5,6 +5,10 @@ import hprog.frontend.CommonTypes.ValuationSyExpr
 import hprog.frontend.{Eval, Traj}
 import scala.collection.immutable.List
 
+/**
+  * Created by Daniel Mendes in 03/11/24.
+  */
+
 object TrajToJSV2 {
 
   // Type of intermediate structures
@@ -478,40 +482,38 @@ object TrajToJSV2 {
     var xValuesToProcess: List[(Double, Either[Double, (Double, Double)])] = List()
     var yValuesToProcess: List[(Double, Either[Double, (Double, Double)])] =  List()
 
-    (traj.getWarnings,traj.getInits,traj.getEnds) match {
-      case (Some(warns),Some(inits),Some(ends)) =>
-        val values = (ends ++ inits).map(kv => Eval(kv._1) -> kv._2)       
-        val (x,y,msg) = warns
+    (traj.getWarnings, traj.getInits, traj.getEnds) match {
+      case (Some(warns), Some(inits), Some(ends)) =>
+        val values = (ends ++ inits).map(kv => Eval(kv._1) -> kv._2)
+        val warnWithMsgs = warns
           .toList
           .map(es => (Eval(es._1, 0), "'" + fixStr(es._2) + "'"))
           .filter(es => inScope(es._1))
           .sorted
-          .map(warn=>(warn._1, Eval(
-            values.getOrElse(warn._1,Map():ValuationSyExpr) // get Valuation at warning warn
-                  .getOrElse(variable, SVal(0)) // get expression of Variable
-            ), warn._2))
-          .unzip3
+          .map(warn => (warn._1, Eval(
+            values.getOrElse(warn._1, Map(): ValuationSyExpr)
+              .getOrElse(variable, SVal(0))
+          ), warn._2))
 
-        val (x_values, y_values) = x.map(key => dict_Graph(key)).unzip
-        xvalues = x_values
-        yvalues = y_values
+        val (x_keys, y_keys, msgs) = warnWithMsgs.unzip3
+        val (x_values, y_values) = x_keys.map(key => dict_Graph(key)).unzip
 
+        val xValuesToProcess = dict_Graph.keys.toList.zip(x_values).zip(msgs).map { case ((key, xVal), msg) => (key, xVal, msg) }
+        val yValuesToProcess = dict_Graph.keys.toList.zip(y_values).zip(msgs).map { case ((key, yVal), msg) => (key, yVal, msg) }
 
-        xValuesToProcess = dict_Graph.keys.toList.zip(xvalues)
-        yValuesToProcess = dict_Graph.keys.toList.zip(yvalues)         
+        val (time, xaxis, orderedMsgX) = processValuesWithMsg(xValuesToProcess)
+        val (t, yaxis, orderedMsgY) = processValuesWithMsg(yValuesToProcess)
 
-        val (time, xaxis) = processValues(xValuesToProcess) 
-        
-        val (t, yaxis) = processValues(yValuesToProcess) 
-        y_axis = yaxis.mkString("[",",","]")
-
+        val y_axis = yaxis.mkString("[", ",", "]")
         val x_axisValues = expandList(xaxis, yaxis, time, t)
-        x_axis = x_axisValues.mkString("[",",","]")   
+        val x_axis = x_axisValues.mkString("[", ",", "]")
+
+        val warningsMsg = formatMsg(yaxis, orderedMsgY)
 
         s"""var w_${variable + counter.toString} = {
           |   x: ${x_axis},
           |   y: ${y_axis},
-          |   text: ${msg.mkString("[",",","]")},
+          |   text: ${warningsMsg.mkString("[",",","]")},
           |   mode: 'markers',
           |   marker: $style,
           |   type: '${graphType}',
@@ -769,44 +771,47 @@ object TrajToJSV2 {
     var yValuesToProcess: List[(Double, Either[Double, (Double, Double)])] =  List()
     var zValuesToProcess: List[(Double, Either[Double, (Double, Double)])] =  List()
 
-    (traj.getWarnings,traj.getInits,traj.getEnds) match {
-      case (Some(warns),Some(inits),Some(ends)) =>
+    (traj.getWarnings, traj.getInits, traj.getEnds) match {
+      case (Some(warns), Some(inits), Some(ends)) =>
         val values = (ends ++ inits).map(kv => Eval(kv._1) -> kv._2)
-        val (x,y,msg) = warns
+        val warnWithMsgs = warns
           .toList
           .map(es => (Eval(es._1, 0), "'" + fixStr(es._2) + "'"))
           .filter(es => inScope(es._1))
           .sorted
-          .map(warn=>(warn._1, Eval(
-            values.getOrElse(warn._1,Map():ValuationSyExpr) // get Valuation at warning warn
-                  .getOrElse(variable, SVal(0)) // get expression of Variable
-            ), warn._2))
-          .unzip3
-        
-        val (x_values, y_values, z_values) = x.flatMap(dict_Graph.get).unzip3
-        
+          .map(warn => (warn._1, Eval(
+            values.getOrElse(warn._1, Map(): ValuationSyExpr)
+              .getOrElse(variable, SVal(0))
+          ), warn._2))
+
+        val x_keys = warnWithMsgs.map(_._1)
+        val y_keys = warnWithMsgs.map(_._1)
+        val z_keys = warnWithMsgs.map(_._1)
+        val msgs = warnWithMsgs.map(_._3)
+
+        val (x_values, y_values, z_values) = x_keys.flatMap(dict_Graph.get).unzip3
+
         xvalues = x_values
         yvalues = y_values
         zvalues = z_values
 
-        xValuesToProcess = dict_Graph.keys.toList.zip(xvalues)
-        yValuesToProcess = dict_Graph.keys.toList.zip(yvalues)        
-        zValuesToProcess = dict_Graph.keys.toList.zip(yvalues)         
+        val xValuesToProcess = dict_Graph.keys.toList.zip(xvalues).zip(msgs).map { case ((key, xVal), msg) => (key, xVal, msg) }
+        val yValuesToProcess = dict_Graph.keys.toList.zip(yvalues).zip(msgs).map { case ((key, yVal), msg) => (key, yVal, msg) }
+        val zValuesToProcess = dict_Graph.keys.toList.zip(zvalues).zip(msgs).map { case ((key, zVal), msg) => (key, zVal, msg) }
 
-        val (time, xaxis) = processValues(xValuesToProcess) 
-        x_axis = xaxis.mkString("[",",","]")
+        val (time, xaxis, yaxis, zaxis, orderedMsg) = processValuesWithMsg3D(xValuesToProcess, yValuesToProcess, zValuesToProcess)
 
-        val (t, yaxis) = processValues(yValuesToProcess) 
-        y_axis = yaxis.mkString("[",",","]")
+        x_axis = xaxis.mkString("[", ",", "]")
+        y_axis = yaxis.mkString("[", ",", "]")
+        z_axis = zaxis.mkString("[", ",", "]")
 
-        val (ti, zaxis) = processValues(yValuesToProcess) 
-        z_axis = zaxis.mkString("[",",","]")
+        val warningsMsg = formatMsg(zaxis, orderedMsg)
       
         s"""var w_${variable + counter.toString} = {
           |   x: ${x_axis},
           |   y: ${y_axis},
           |   z: ${z_axis},
-          |   text: ${msg.mkString("[",",","]")},
+          |   text: ${warningsMsg.mkString("[",",","]")},
           |   mode: 'markers',
           |   marker: $style,
           |   legendgroup: 'g_${graph_name}',
@@ -1055,6 +1060,70 @@ object TrajToJSV2 {
   }
 
   /**
+  * Processes values to extract time values (xt), variable values (x), and associated messages (msg).
+  *
+  * @param values List of tuples containing time-value-message to process.
+  * @return       A tuple containing lists of sorted time values (xt), variable values (x), and messages (msg).
+  */
+  def processValuesWithMsg(values: List[(Double, Either[Double, (Double, Double)], String)]): (List[Double], List[String], List[String]) = {
+    val expandedValues = values.flatMap { case (time, value, msg) =>
+      value match {
+        case Left(singleValue) => List((time, singleValue.toString, msg))
+        case Right((start, end)) => List((time, start.toString, msg), (time, end.toString, msg))
+      }
+    }
+
+    val sortedValues = expandedValues.sortBy(_._1)
+    val (xt, x, msg) = sortedValues.map { case (time, value, message) => (time, value, message) }.unzip3
+    (xt, x, msg)
+  }
+
+  /**
+  * Processes values for 3D coordinates, extracting time values (xt), and variable values for x, y, and z,
+  * while also aligning associated messages (msg) with their respective time points.
+  *
+  * @param values List of tuples containing time, 3D values (x, y, z), and associated messages to process.
+  * @return       A tuple containing lists of sorted time values (xt), and sorted variable values for x, y, z, and messages (msg).
+  */
+  def processValuesWithMsg3D(
+      xValues: List[(Double, Either[Double, (Double, Double)], String)],
+      yValues: List[(Double, Either[Double, (Double, Double)], String)],
+      zValues: List[(Double, Either[Double, (Double, Double)], String)]
+  ): (List[Double], List[String], List[String], List[String], List[String]) = {
+
+    val expandedX = xValues.flatMap { case (time, value, msg) =>
+      value match {
+        case Left(singleValue) => List((time, singleValue.toString, msg))
+        case Right((start, end)) => List((time, start.toString, msg), (time, end.toString, msg))
+      }
+    }
+
+    val expandedY = yValues.flatMap { case (time, value, msg) =>
+      value match {
+        case Left(singleValue) => List((time, singleValue.toString, msg))
+        case Right((start, end)) => List((time, start.toString, msg), (time, end.toString, msg))
+      }
+    }
+
+    val expandedZ = zValues.flatMap { case (time, value, msg) =>
+      value match {
+        case Left(singleValue) => List((time, singleValue.toString, msg))
+        case Right((start, end)) => List((time, start.toString, msg), (time, end.toString, msg))
+      }
+    }
+
+    val sortedX = expandedX.sortBy(_._1)
+    val sortedY = expandedY.sortBy(_._1)
+    val sortedZ = expandedZ.sortBy(_._1)
+
+    val (xt, x, msgX) = sortedX.map { case (time, value, message) => (time, value, message) }.unzip3
+    val (_, y, msgY) = sortedY.map { case (time, value, message) => (time, value, message) }.unzip3
+    val (_, z, msgZ) = sortedZ.map { case (time, value, message) => (time, value, message) }.unzip3
+
+    (xt, x, y, z, msgX)
+  }
+
+  /**
   * @param xValues List of x values as Strings.
   * @param yValues List of y values as Strings.
   * @param timeX   List of time values for x.
@@ -1071,6 +1140,34 @@ object TrajToJSV2 {
     }
 
     expandedList.map(_.toString).toList                                   
+  }
+
+  /**
+  * Updates the msg list based on null values in the yaxis list.
+  * For each value in yaxis, if it is null, it inserts an empty string "" into msg.
+  * Otherwise, it keeps the next value from msg in order.
+  *
+  * @param inputList List of y-axis values, with potential null entries.
+  * @param msg   List of message strings.
+  * @return A List of strings in msg, expanded with "" where yaxis has null.
+  */
+  def formatMsg(inputList: List[String], msg: List[String]): List[String] = {
+    var updatedMsg = List[String]()
+    var msgIndex = 0 
+
+    for (item <- inputList) {
+      if (item == "null") {
+        updatedMsg = updatedMsg :+ " "  
+      } else {
+        if (msgIndex < msg.length) {
+          updatedMsg = updatedMsg :+ msg(msgIndex)
+          msgIndex += 1
+        } else {
+          updatedMsg = updatedMsg :+ ""  
+        }
+      }
+    }
+    updatedMsg
   }
 
   /**
