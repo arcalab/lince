@@ -21,13 +21,42 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator,
     randomSeed match {
       case Some(s) => new scala.util.Random(s)
       case None =>
-        val r = new scala.util.Random()
-        randomSeed = Some(r.nextLong())
-        r.setSeed(randomSeed.get)
-        r
+        getSeedProg(syntax) match {
+          case Some(s) =>
+            println(s"found seed in init: $s - using it")
+            randomSeed = Some(s)
+            new scala.util.Random(s)
+          case None =>
+            val r = new scala.util.Random()
+            randomSeed = Some(r.nextLong())
+            println(s"no seed found in ${syntax} - using: ${randomSeed.get}")
+            r.setSeed(randomSeed.get)
+            r
+        }
     }
-  private def resetSeed(): Unit =
+
+  private def getInit(s:Syntax): List[Assign] = s match {
+    case Seq(Atomic(as,DiffEqs(Nil,For(Value(0)))), q) => as ::: getInit(q)
+    case Seq(Atomic(as,_), _) => as
+    case Atomic(as,_) => as
+    case While(pre,_,_) => getInit(pre)
+    case Seq(Seq(p,q),r) => getInit(Seq(p,Seq(q,r)))
+    case _ => Nil
+  }
+
+  private def getSeedProg(s: Syntax): Option[Long] =
+    getInit(s).find(_.v.v=="_seed") match {
+      case Some(Assign(_,Value(s))) => Some(s.toLong)
+      case _ => None
+    }
+
+  private def resetSeed(): Unit = {
+    getSeedProg(syntax) match {
+      case Some(l) => randomSeed = Some(l)
+      case _ => {}
+    }
     rand.setSeed(randomSeed.get)
+  }
 
   implicit val nextRand:()=>Double = ()=>rand.nextDouble()
 

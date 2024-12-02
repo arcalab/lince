@@ -502,6 +502,9 @@ def syExpr2notlin(l:SyExpr):NotLin= l match {
     case Div(l1, l2) => Div(solveRandom(l1),solveRandom(l2))
     case Res(l1, l2) => Res(solveRandom(l1),solveRandom(l2))
     case Func("random", Nil) => Value(rand())
+    case Func("unif",List(Value(n))) => Value(rand()*n*2-n)
+    case Func("unif",List(Value(n1),Value(n2))) => Value(rand()*(n2-n1)+n1)
+    case Func("expn",List(Value(n))) => Value(-Math.log(rand())/n)
     case Func(f,args) => Func(f,args.map(solveRandom))
   }
   def solveRandom(cond: Cond)(implicit rand:()=>Double): Cond = cond match {

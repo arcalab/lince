@@ -134,7 +134,11 @@ object Parser extends RegexParsers {
   }
 
   // Parser for array values
-  lazy val arrayP: Parser[List[Expr]] = "[" ~> repsep(exprP, ",") <~ "]"
+  lazy val arrayP: Parser[List[Expr]] =
+    "[" ~> repsep(exprP, ",") <~ "]" |
+    ("[" ~> intP) ~ (".." ~> intP <~ "]") ^^ {
+      case i1 ~ i2 => (for (x<-i1 to i2) yield Value(x)).toList
+    }
 
   /*/** Parser for an atomic program: an assignment or a set of diff equations. */
   lazy val atomP: Parser[Atomic] =
@@ -573,7 +577,7 @@ lazy val reallinMultP: Parser[Double] =
       intP
   /** Parser for an integer number */
   lazy val intP: Parser[Int] =
-    """[0-9]+""".r ^^ { s: String => s.toInt }
+    """-?[0-9]+""".r ^^ { s: String => s.toInt }
 
 
   /*
