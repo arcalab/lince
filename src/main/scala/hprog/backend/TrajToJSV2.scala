@@ -1,8 +1,13 @@
 package hprog.backend
 
-import hprog.ast.{SDiv, SSub, SVal}
+import hprog.ast.Syntax.Syntax
+import hprog.ast.{SDiv, SSub, SVal, Syntax}
+import hprog.common.TimeOutOfBoundsException
 import hprog.frontend.CommonTypes.ValuationSyExpr
-import hprog.frontend.{Eval, Traj}
+import hprog.frontend.solver.Solver
+import hprog.frontend.{Deviator, Eval, Traj}
+import hprog.lang.Parser
+
 import scala.collection.immutable.List
 
 /**
@@ -20,8 +25,15 @@ object TrajToJSV2 {
   // Auxiliar Types
   type JSString = String // 
 
-  def apply(traj:Traj,divName:String, range:Option[(Double,Double)]=None, hideCont:Boolean=true, variables_List: List[(String, String, Option[String])], graphType: String, simulationName: String, count: Int): (JSString, List[String], List[String], String, String, String, Int) = {
-    
+  def apply(traj:Traj,
+            divName:String,
+            range:Option[(Double,Double)]=None,
+            hideCont:Boolean=true,
+            variables_List: List[(String, String, Option[String])],
+            graphType: String,
+            simulationName: String, count: Int)
+      : (JSString, List[String], List[String], String, String, String, Int) = {
+
     val dur = traj.getDur    
 
     // trick to avoid many sampling when already lots of boundaries exist
@@ -173,20 +185,30 @@ object TrajToJSV2 {
           graph_legend = s"""$x vs $y$simulationName"""
         }   
 
-        val (jsGraphs, g_name, dict_Graph) = buildTraces2D(traces,colorIDs, varList, counter, graphType, graph_color, graph_legend)
+        val (jsGraphs, g_name, dict_Graph) =
+          buildTraces2D(traces,colorIDs, varList, counter, graphType, graph_color, graph_legend)
         dict_Graph2D = dict_Graph    
         graph_name = g_name 
         
-        graphsNamesList = graphsNamesList ++ List("t_" + graph_name)      
-        warningsBoundariesList = if (xValue == "t") warningsBoundariesList ++ List("b_out_" + yValue + counter.toString, "b_in_" + yValue + counter.toString, "w_" + yValue + counter.toString) 
-        else warningsBoundariesList ++ List("b_out_" + xValue + counter.toString, "b_in_" + xValue + counter.toString, "w_" + xValue + counter.toString, "b_out_" + yValue + counter.toString, "b_in_" + yValue + counter.toString, "w_" + yValue + counter.toString) 
-      
-        val jsBoundaries = buildBoundaries2D(boundaries,colorIDs, varList, dict_Graph2D, graph_name, graph_color, counter, graphType)
-        val jsWarnings = buildWarnings2D(traj,varList,inScope,colorIDs, dict_Graph2D, graph_name, graph_color, counter, graphType)
-
+        graphsNamesList = graphsNamesList ++ List("t_" + graph_name)
         js += jsGraphs
-        js += jsBoundaries
-        js += jsWarnings
+
+        if (graphType != "histogram") {
+          warningsBoundariesList =
+            if (xValue == "t")
+              warningsBoundariesList ++ List("b_out_" + yValue + counter.toString, "b_in_" + yValue + counter.toString, "w_" + yValue + counter.toString)
+            else
+              warningsBoundariesList ++ List("b_out_" + xValue + counter.toString, "b_in_" + xValue + counter.toString, "w_" + xValue + counter.toString, "b_out_" + yValue + counter.toString, "b_in_" + yValue + counter.toString, "w_" + yValue + counter.toString)
+          val jsBoundaries =
+            buildBoundaries2D(boundaries, colorIDs, varList, dict_Graph2D, graph_name, graph_color, counter, graphType)
+          val jsWarnings =
+            buildWarnings2D(traj, varList, inScope, colorIDs, dict_Graph2D, graph_name, graph_color, counter, graphType)
+          js += jsBoundaries
+          js += jsWarnings
+        } else
+          warningsBoundariesList = Nil
+
+        // println(s"JS graph:\n$js")
 
         counter = counter + 1
       }      
@@ -252,8 +274,77 @@ object TrajToJSV2 {
     (js, graphsNamesList,warningsBoundariesList, x_Title, y_Title, z_Title, counter)
   }
 
+  /////////////////////////////////////////////////
+  //////    Functions to build an histogram  //////
+  /////////////////////////////////////////////////
 
-    /////////////////////////////////////////////////
+  def makeHistogram(trajs: List[Syntax],
+                    divName: String,
+                    bs: (Double, Int), // boundes (max, maxIterations)
+                    hideCont: Boolean = true,
+                    variables_List: List[(String, String, Option[String])],
+                    graphType: String,
+                    simulationName: String,
+                    solver:Solver)
+      : (JSString, List[String], String, String, String) = {
+
+    val from = 0.0
+    val to = bs._1
+    var step = 1.0
+    var condition: Syntax.Cond = Syntax.BVal(false)
+    val times: Iterable[Double] = Parser.parseAll(Parser.histP,graphType) match {
+      case Parser.Success((cond,Left(intrv)),_) =>
+        condition = cond
+        step = intrv
+        for (i <- 0 to ((to-from)/intrv).toInt) yield from+intrv*i
+      case Parser.Success((cond,Right(reps)),_) =>
+        condition = cond
+        if (reps<=1) {
+          step = from-to
+          Seq(from)
+        }
+        else {
+          step = (to - from) / (reps - 1)
+          for (i <- 0 to (reps - 1)) yield from+step*i
+        }
+      case res: Parser.NoSuccess => sys.error(s"Failed to parse histogram request: ${res.msg}")
+    }
+    val counters = scala.collection.mutable.Map[Double,Int]().withDefaultValue(0)
+//    for (t<-times) counters(t)=0
+
+    for (stx <- trajs) {
+      val traj = new hprog.frontend.Traj(stx, solver, Deviator.dummy, bs)
+      for (kv <- traj.evalBatch(SVal(from), SVal(to), SVal(step))) {
+        if (Eval(Eval(kv._2),condition)) counters(Eval(kv._1)) += 1
+        else counters(Eval(kv._1)) += 0
+
+//      for (t<-times) {
+//        try { traj.eval(t) match {
+//          case Some(point) if (Eval.apply(point, condition)) => counters(t) += 1
+//          case _ => {}
+//        }}
+//        catch {
+//          case e:TimeOutOfBoundsException => {}
+//          case e:Throwable => throw e
+//        }
+      }
+    }
+    val newTimes = counters.keys.toList.sorted
+    val graphName = "histogram"
+    val js =
+      s"""var t_${graphName} = {
+         |   x: ${newTimes.mkString("[",",","]")},
+         |   y: ${newTimes.map(t=>counters(t)).mkString("[",",","]")},
+         |   legendgroup: 'g_${graphName}',
+         |   type: 'bar',
+         |   name: '${Show(condition)}'
+         |};
+        """.stripMargin
+
+    (js,List(s"t_$graphName"),"time",s"count (${graphType.split(":").tail.mkString(":").trim})","")
+  }
+
+  /////////////////////////////////////////////////
     //////    Functions to build a 2D Graph    ////// 
     /////////////////////////////////////////////////
 

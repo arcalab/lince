@@ -21,6 +21,7 @@ object ParserConfig extends RegexParsers {
 
   override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
   val variable: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
+  val untilNext: Parser[String] = """[^,]*""".r
 
   lazy val realP: Parser[Double] =
     """-?[0-9]+(\.([0-9]+))?""".r ^^ { s: String => s.toDouble }
@@ -61,7 +62,7 @@ object ParserConfig extends RegexParsers {
     "maxIterations:" ~> intP ^^ { s => "MaxIterationsValue" -> MaxIterationsValue(s) }
 
    lazy val graphType: Parser[(String, ConfigVal)] =
-    "graphType:" ~> variable ^^ { t => "GraphTypeValue" -> GraphTypeValue(t) }
+    "graphType:" ~> untilNext ^^ { t => "GraphTypeValue" -> GraphTypeValue(t) }
   
   lazy val initialValues: Parser[(String, ConfigVal)] =
     "initialValues:[" ~> repsep(initialValue, ",") <~ "]" ^^ { values =>

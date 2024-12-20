@@ -23,13 +23,11 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator,
       case None =>
         getSeedProg(syntax) match {
           case Some(s) =>
-            println(s"found seed in init: $s - using it")
             randomSeed = Some(s)
             new scala.util.Random(s)
           case None =>
             val r = new scala.util.Random()
             randomSeed = Some(r.nextLong())
-            println(s"no seed found in ${syntax} - using: ${randomSeed.get}")
             r.setSeed(randomSeed.get)
             r
         }

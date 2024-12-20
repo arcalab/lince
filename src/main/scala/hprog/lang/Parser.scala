@@ -165,11 +165,12 @@ object Parser extends RegexParsers {
   lazy val atomP: Parser[Atomic] =
   (identifier ~ ":=" ~ (exprP | arrayP)) <~ ";" ^^ {
     case v ~ _ ~ l => l match {
-      case list: List[Expr] =>
+      case listE: List[_] =>
         if (variables.contains(v)) {
-          val error = s"""The assignment for the variable $v with values: $list is done in the wrong place"""
+          val error = s"""The assignment for the variable $v with values: $listE is done in the wrong place"""
           throw new Exception(error)
         }
+        val list: List[Expr] = listE.asInstanceOf[List[Expr]] // list must be an expression, since exprP/arrayP are
         variables = variables :+ v
         initialValues += ("_" + v -> list)
         Atomic(List(Assign(Var("_" + v), list.head)), DiffEqs(Nil, For(Value(0))))
@@ -579,7 +580,14 @@ lazy val reallinMultP: Parser[Double] =
   lazy val intP: Parser[Int] =
     """-?[0-9]+""".r ^^ { s: String => s.toInt }
 
-
+  lazy val histP: Parser[(Cond,Either[Double,Int])] =
+    ("histogram" ~> ":" ~> condP) ~ ("@"~>whenHistP).? ^^ {
+      case c ~ Some(lim) => (c,lim)
+      case c ~ None => (c,Right(33))
+    }
+  lazy val whenHistP: Parser[Either[Double,Int]] =
+    "every" ~> realP   ^^ { Left(_) } |
+      intP <~ "times" ^^ {Right(_)}
   /*
   /** Auxiliary: function that negates a (linear) integer expression */
   private def invert(lin: Lin): Lin = lin match {
