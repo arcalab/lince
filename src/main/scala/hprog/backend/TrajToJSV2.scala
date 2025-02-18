@@ -328,6 +328,10 @@ object TrajToJSV2 {
 //          case e:Throwable => throw e
 //        }
       }
+//      println("--- "+traj.getCurrentEnds.toString)
+//      for (valuation <- traj.getCurrentEnds.get(SVal(to)))  {
+//        if (Eval(Eval(valuation),condition)) counters(to) += 1
+//      }
     }
     val newTimes = counters.keys.toList.sorted
     val graphName = "histogram"
