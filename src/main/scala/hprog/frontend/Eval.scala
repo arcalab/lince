@@ -110,7 +110,7 @@ object Eval {
 }
 
 
-  def updateExpr(state:ValuationExpr, notlin: Expr, vars:List[String]): Expr = {
+  def updateExpr(state:ValuationExpr, notlin: Expr, vars:List[String]=Nil): Expr = {
     val res = notlin match {
             case Var(v) => {if (vars.contains(v)) {Var(v)} else {state(v)}}
             case Value(v) => Value(v)
@@ -303,9 +303,9 @@ object Eval {
   def updateNum(phi: Solution, t: SyExpr, v: ValuationSyExpr): ValuationSyExpr =
     phi.view.mapValues(updater => SVal(updater(apply(t))(apply(v)))).toMap
    
+//  def update(exp: Expr)(implicit env: )
 
 
-    
   /** Update an expression by replacing initial values v(0)
     * @param e expression to be updated
     * @param sol solution with the new values
@@ -381,6 +381,10 @@ def syExpr2notlin(l:SyExpr):Expr= l match {
   case SAdd(e1, e2) => Add(syExpr2notlin(e1),syExpr2notlin(e2))
   case SSub(e1, e2) => Add(syExpr2notlin(e1),Mult(Value(-1),syExpr2notlin(e2)))
 }
+
+  def valSyExp2valExp(v:ValuationSyExpr): ValuationExpr =
+    v.map(kv=>(kv._1,syExpr2notlin(kv._2)))
+
 /**
 // Convert SyExpr to NotLin
 def syExpr2notlin(l:SyExpr):NotLin= l match {
@@ -481,20 +485,20 @@ def syExpr2notlin(l:SyExpr):NotLin= l match {
     }
   }
 
-  def solveRandom(at: Atomic)(implicit rand:()=>Double): Atomic =
+  def solveRandom(at: Atomic)(implicit rand:()=>Double, env:ValuationExpr): Atomic =
     Atomic(at.as.map(solveRandom),solveRandom(at.de))
-  def solveRandom(asg: Assign)(implicit rand:()=>Double): Assign =
+  def solveRandom(asg: Assign)(implicit rand:()=>Double, env:ValuationExpr): Assign =
     Assign(asg.v,solveRandom(asg.e))
-  def solveRandom(des: DiffEqs)(implicit rand:()=>Double): DiffEqs =
+  def solveRandom(des: DiffEqs)(implicit rand:()=>Double, env:ValuationExpr): DiffEqs =
     DiffEqs(des.eqs.map(solveRandom),solveRandom(des.dur))
-  def solveRandom(de: DiffEq)(implicit rand:()=>Double): DiffEq =
+  def solveRandom(de: DiffEq)(implicit rand:()=>Double, env:ValuationExpr): DiffEq =
     DiffEq(de.v,solveRandom(de.e))
-  def solveRandom(dur: Dur)(implicit rand:()=>Double): Dur = dur match {
+  def solveRandom(dur: Dur)(implicit rand:()=>Double, env:ValuationExpr): Dur = dur match {
     case For(e) => For(solveRandom(e))
     case Until(c, eps, jump) => Until(solveRandom(c), eps, jump)
     case Forever => Forever
   }
-  def solveRandom(exp: Expr)(implicit rand:()=>Double): Expr = exp match {
+  def solveRandom(exp: Expr)(implicit rand:()=>Double, env:ValuationExpr): Expr = exp match {
     case Var(v) => exp
     case Value(v) => exp
     case Add(l1, l2) => Add(solveRandom(l1),solveRandom(l2))
@@ -503,11 +507,23 @@ def syExpr2notlin(l:SyExpr):NotLin= l match {
     case Res(l1, l2) => Res(solveRandom(l1),solveRandom(l2))
     case Func("random", Nil) => Value(rand())
     case Func("unif",List(Value(n))) => Value(rand()*n*2-n)
-    case Func("unif",List(Value(n1),Value(n2))) => Value(rand()*(n2-n1)+n1)
+    case Func("unif", List(Value(n1), Value(n2))) => Value(rand() * (n2 - n1) + n1)
     case Func("expn",List(Value(n))) => Value(-Math.log(rand())/n)
+    case Func("unif",List(exp)) =>
+      val n = updateExpr(env,exp)
+      Mult(n,Value(rand()*2-1))
+    case Func("unif", List(e1,e2)) =>
+      val n1 = updateExpr(env, e1)
+      val n2 = updateExpr(env, e2)
+    //      Add(Mult(Add(n2,Mult(Value(-1),Value(rand())))),n1)
+      Add( Mult( Value(rand()), Add(n2,Mult(Value(-1),n1))) , n1)
+    case Func("expn",List(exp)) =>
+      val n = updateExpr(env, exp)
+      //Value(-Math.log(rand())/n)
+      Mult(Value(-1),Div(Func("log",List(Value(rand()))),n))
     case Func(f,args) => Func(f,args.map(solveRandom))
   }
-  def solveRandom(cond: Cond)(implicit rand:()=>Double): Cond = cond match {
+  def solveRandom(cond: Cond)(implicit rand:()=>Double, env:ValuationExpr): Cond = cond match {
     case BVal(b) => cond
     case And(c1, c2) => And(solveRandom(c1),solveRandom(c2))
     case Or(c1, c2) => Or(solveRandom(c1),solveRandom(c2))

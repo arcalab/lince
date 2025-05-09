@@ -102,6 +102,9 @@ object Parser extends RegexParsers {
 
   /** Parser for a basic program: "skip", "while", "repeat", "if", "wait", or an atomic program (see below) */
   lazy val basicProg: Parser[Syntax] =
+    ("bernoulli" ~> "(" ~> (exprP <~ ")") ~ body ~ body) ^^ {
+      case e~p~q => mkBernoulli(e,p,q)
+    } |
     "skip" ~> opt("for" ~> realP) <~ ";" ^^ {
       case None => skip
       case Some(real) => Atomic(Nil, DiffEqs(Nil, For(Value(real))))
@@ -109,11 +112,14 @@ object Parser extends RegexParsers {
       "while" ~> whileGuard ~ "do" ~ "{" ~ seqP ~ "}" ^^ {
         case c ~ _ ~ _ ~ p ~ _ => While(skip, c, p)
       } |
-      "repeat" ~> intPP ~ "{" ~ seqP ~ "}" ^^ {
-        case c ~ _ ~ p ~ _ => While(skip, Counter(c), p)
+      "while" ~> whileGuard ~ body ^^ {
+        case c ~ p => While(skip, c, p)
+      } |
+      "repeat" ~> intPP ~ body ^^ {
+        case c ~ p => While(skip, Counter(c), p)
 
       } |
-      "if" ~> condP ~ "then" ~ blockP ~ "else" ~ blockP ^^ {
+      "if" ~> condP ~ "then" ~ body ~ "else" ~ body ^^ {
         case c ~ _ ~ p1 ~ _ ~ p2 => ITE(c, p1, p2)
       } |
       ("wait" ~> exprP) <~ ";" ^^ {
@@ -121,11 +127,15 @@ object Parser extends RegexParsers {
       } |
       atomP
 
+  /** parser of a program wrapped with curly brackets or a sequence of commands */
+  lazy val body: Parser[Syntax] =
+    ("{" ~> seqP <~ "}") | basicProg
+
 
   /** parser of a program wrapped with curly brackets or a basic program */
-  lazy val blockP: Parser[Syntax] =
-    "{" ~> seqP <~ "}" |
-      basicProg
+//  lazy val blockP: Parser[Syntax] =
+//    "{" ~> seqP <~ "}" |
+//      basicProg
 
   /** Parser for the guard of a while loop (a condition of an integer) */
   lazy val whileGuard: Parser[LoopGuard] = {
@@ -163,31 +173,37 @@ object Parser extends RegexParsers {
       case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
   }
   */
-  lazy val atomP: Parser[Atomic] =
-  (identifier ~ ":=" ~ (exprP | arrayP)) <~ ";" ^^ {
-    case v ~ _ ~ l => l match {
-      case listE: List[_] =>
-        if (variables.contains(v)) {
-          val error = s"""The assignment for the variable $v with values: $listE is done in the wrong place"""
-          throw new Exception(error)
-        }
-        val list: List[Expr] = listE.asInstanceOf[List[Expr]] // list must be an expression, since exprP/arrayP are
-        variables = variables :+ v
-        initialValues += ("_" + v -> list)
-        Atomic(List(Assign(Var("_" + v), list.head)), DiffEqs(Nil, For(Value(0))))
-
-      case expr: Expr =>
-        if (!variables.contains(v)) {
+  lazy val atomP: Parser[Atomic] = {
+    (identifier <~ "++" <~ ";") ^^ {case x =>
+      Atomic(List(Assign(Var("_"+x),Var("_"+x) + Value(1))),DiffEqs(Nil,For(Value(0))))} |
+    (identifier <~ "--" <~ ";") ^^ {case x =>
+      Atomic(List(Assign(Var("_"+x),Var("_"+x) + Value(-1))),DiffEqs(Nil,For(Value(0))))} |
+    (identifier ~ ":=" ~ (exprP | arrayP)) <~ ";" ^^ {
+      case v ~ _ ~ l => l match {
+        case listE: List[_] =>
+          if (variables.contains(v)) {
+            val error = s"""The assignment for the variable $v with values: $listE is done in the wrong place"""
+            throw new Exception(error)
+          }
+          val list: List[Expr] = listE.asInstanceOf[List[Expr]] // list must be an expression, since exprP/arrayP are
           variables = variables :+ v
-        }
-        Atomic(List(Assign(Var("_" + v), expr)), DiffEqs(Nil, For(Value(0))))
+          initialValues += ("_" + v -> list)
+          Atomic(List(Assign(Var("_" + v), list.head)), DiffEqs(Nil, For(Value(0))))
+
+        case expr: Expr =>
+          if (!variables.contains(v)) {
+            variables = variables :+ v
+          }
+          Atomic(List(Assign(Var("_" + v), expr)), DiffEqs(Nil, For(Value(0))))
+      }
+    } |
+    (diffEqsP ~ opt(durP)) <~ ";" ^^ {
+      case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
     }
-  } |
-  (diffEqsP ~ opt(durP)) <~ ";" ^^ {
-    case des ~ d => Atomic(Nil, des & d.getOrElse(Forever))
   }
 
-
+  def mkBernoulli(r: Syntax.Expr, p: Syntax, q: Syntax): ITE =
+    ITE(  LE(Func("unif",List(Value(0),Value(1))) , r), p, q )
 
   /** Parser for  differential equations */
   lazy val diffEqsP: Parser[DiffEqs] =

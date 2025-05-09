@@ -257,7 +257,7 @@ object Traj {
   private def runITE(r: RunTarget, ifS: Cond, p: Syntax, q: Syntax, x: ValuationSyExpr)
                     (implicit solver: Solver, dev: Deviator, logger: Logger, rand:()=>Double)
   : Run = {
-    val ifS2 = Eval.solveRandom(ifS)
+    val ifS2 = Eval.solveRandom(ifS)(rand,Eval.valSyExp2valExp(x))
     // Printing numerical errors
     Eval(Eval(x),ifS2) // preprocess: checks if there are errors when evaluating Cond
     
@@ -319,7 +319,7 @@ object Traj {
   private def runAtomicUntilEnd(rb: RunTarget, at: Atomic, x: ValuationSyExpr)
                                (implicit solver: Solver, logger: Logger, rand: ()=>Double)
   : Run = {
-    val at2 = Eval.solveRandom(at)//Atomic(at.as.map(Eval.solveRandom),solveRandom())
+    val at2 = Eval.solveRandom(at)(rand, Eval.valSyExp2valExp(x))//Atomic(at.as.map(Eval.solveRandom),solveRandom())
     at2.de.dur match {
       // special case: (0 duration - log 0-time event (if some valuation))
       case For(Value(0)) =>
