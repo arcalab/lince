@@ -54,9 +54,15 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator,
       case _ => {}
     }
     rand.setSeed(randomSeed.get)
+//    println(s"### seed reset to: ${randomSeed.get}")
   }
 
-  implicit val nextRand:()=>Double = ()=>rand.nextDouble()
+  implicit val nextRand:()=>Double = ()=> rand.nextDouble()
+//  {
+//    val res = rand.nextDouble()
+//    println(s"---> random: $res")
+//    res
+//  }
 
   def eval(t:Double): Option[Point] =
     eval(SVal(t)).map(e => Eval(e._1))
@@ -95,7 +101,7 @@ class Traj(syntax:Syntax, solver:Solver, dev: Deviator,
     Traj.run(Times(fromv,tov,stepv), syntax, Map())(solver, dev, logger, nextRand) match {
       case RFoundMany(found) => found
       case REnd(_, _,found) =>
-              found 
+              found
       case Traj.RInf =>
         Nil
       case RFound(_,_) =>

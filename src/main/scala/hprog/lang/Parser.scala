@@ -151,7 +151,13 @@ object Parser extends RegexParsers {
       case i1 ~ i2 ~ Some(step) => for (x<- (BigDecimal(i1) to i2 by step).toList) yield Value(x.toDouble)
     }
 
-  /*/** Parser for an atomic program: an assignment or a set of diff equations. */
+  lazy val rangeP: Parser[(Double,Double,Option[Double])] =
+    ("[" ~> realP) ~ (".." ~> realP) ~ (("by" ~> realP).? <~ "]") ^^ {
+      case i1 ~ i2 ~ i3 => (i1,i2, i3)
+    }
+
+
+        /*/** Parser for an atomic program: an assignment or a set of diff equations. */
   lazy val atomP: Parser[Atomic] =
     (identifier ~ ":=" ~ (notlinP | arrayP)) <~ ";" ^^ {
       case v ~ _ ~ l => l match {
